@@ -27,7 +27,9 @@ typedef struct Obj3D {
     int kind;                           /* 20 ship (shape_names) or shot type */
     int reach;                          /* 22 radius for culling */
     int size;                           /* 24 drawn radius */
-    char unk26[6];                      /* 26 */
+    int vx;                             /* 26 velocity per frame */
+    int vy;                             /* 28 */
+    int vz;                             /* 2A */
     int (far *draw)(struct Obj3D *o);   /* 2C */
     void (far *free)(struct Obj3D *o);  /* 30 */
     int drawn;                          /* 34 set when drawn this frame */

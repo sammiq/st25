@@ -8,6 +8,7 @@
 #include "bitmap.h"
 #include "cache.h"
 #include "gfx.h"
+#include "sprite.h"
 #include "fixmath.h"
 #include "obj3d.h"
 
@@ -70,7 +71,7 @@ extern Vec32 fr_bottom;
 extern Vec32 cam_pos;
 extern Matrix cam_orient;
 extern Matrix cam_matrix;           /* cam_orient transposed */
-extern int space_active;
+extern Sprite view_sprite;           /* the view, as a sprite */
 extern Obj3D player_ship;
 extern Obj3D shot_obj;
 extern Obj3D dummy_planet;
@@ -279,7 +280,7 @@ void RenderR3(int statics)
     int dead;
 
     dead = 0;
-    space_active = 1;
+    view_sprite.dirty = 1;
     MatTranspose(&cam_orient, &cam_matrix);
     ClearView();
     DrawStarfield();
