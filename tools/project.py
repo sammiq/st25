@@ -19,6 +19,7 @@ EXE_PATH = ROOT / "orig/CD/TREKCD/STARTREK_U.EXE"
 IDA_EXPORT = ROOT / "config/ida_export.txt"
 SYMBOLS = ROOT / "config/symbols.txt"
 UNITS = ROOT / "config/units.txt"
+ALIASES = ROOT / "config/aliases.txt"
 
 LOAD_SEG = 0x1000
 LOAD_BASE = LOAD_SEG * 16

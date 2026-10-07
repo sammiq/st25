@@ -9,7 +9,7 @@ relocations are reconstructed:
   * near offsets IDA identified as references    -> R_386_16
   * near calls/jumps into another unit            -> R_386_PC16
 
-References that stay inside a unit's own code section get no relocation,
+Near jumps and calls that stay inside a unit's own code get no relocation,
 matching what tools/omf2elf.py does for compiled objects.
 """
 
@@ -211,8 +211,6 @@ class Splitter:
                         break
                 if hit is None:
                     continue
-                if start <= hit < end:
-                    continue       # same code section: resolved in place, like omf2elf
                 sym, add = self.symbol_for(unit, hit)
                 self._add(w, sec, start, at, R_386_16, sym, add, covered)
 
@@ -268,8 +266,6 @@ class Splitter:
             s0 = self.syms.get(t)
             if s0 is None or s0.kind != "data":
                 return
-        if start <= t < end:
-            return
         sym, add = self.symbol_for(unit, t)
         self._add(w, sec, start, at, R_386_16, sym, add, covered)
 
@@ -303,8 +299,6 @@ class Splitter:
                 v = exe.word(at)
                 for t in targets:
                     if (t - self.frame_of(t)) & 0xFFFF == v:
-                        if sec == ".text" and start <= t < end:
-                            break
                         sym, add = self.symbol_for(unit, t)
                         self._add(w, sec, start, at, R_386_16, sym, add, covered)
                         break

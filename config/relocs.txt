@@ -12,3 +12,10 @@
 
 # seg013 (memory)
 2743A  _lpPoolCurrent
+
+# seg024 (bitmap scaler)
+34331  _scale_code
+34386  _scale_code
+34419  _scale_code
+34697  aTooManyInstD
+346B0  _RunScaler+0x19

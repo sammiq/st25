@@ -28,7 +28,8 @@ seg020                     .text    2F0DA  3227D
 seg021                     .text    3227E  33838
 seg022                     .text    33838  33DD6
 seg023                     .text    33DD6  341CE
-seg024                     .text    341CE  346C6
+seg024                     .text    341CE  346C6  complete
+seg024                     .rodata  497C2  497D5  complete
 seg025                     .text    346C6  35052
 asm/t35052                 .text    35052  359F5
 lib/crt0                   .text    359F6  35AED  lib=MLIBCR.LIB:crt0.asm
@@ -205,7 +206,8 @@ data/d47118                .data    47118  47238
 data/d473E6                .data    473E6  473F0
 data/d47490                .rodata  47490  484A2
 data/d48510                .rodata  48510  48C72
-data/d48DA6                .rodata  48DA6  49C66
+data/d48DA6                .rodata  48DA6  497C2
+data/d497D6                .rodata  497D6  49C66
 data/d49C6E                .rodata  49C6E  49E56
 data/d49E78                .bss     49E78  53920
 data/stack                 .bss     53920  54820

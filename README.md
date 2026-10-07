@@ -88,6 +88,10 @@ If an operand needs a reference that IDA didn't record, or IDA picked the wrong 
 | argument type differs from the parameter (`unsigned` → `int`, `long` → `unsigned long`) | loaded into registers before the `push`. A direct `push word ptr [..]` means the types agree |
 | `return a == b;` | `mov ax, 1 / jmp / mov ax, 0` then `jmp epilogue` |
 | a function containing `_asm` | the usual `push si / push di` and `enter` frame |
+| locals | stack slots in declaration order from `[bp-2]` down, word aligned (a `char` still takes 2 bytes); unused locals still take space |
+| `register` local | lives in `si`/`di` but **also** gets a stack slot. A `register` parameter (`f(register char *p)`) is loaded into `si` and has no slot |
+| `max(a, b)` from `<stdlib.h>` | `mov ax, a / cmp ax, b / jg / mov ax, a / jmp / mov ax, b` |
+| `long` multiply | `__aFulmul` with both operands pushed, right one first. `__aFlmul` is the same routine (see `config/aliases.txt`) |
 
 String literals go into `CONST` (`.rodata`), in source order. A unit's strings form a contiguous range of the game's `CONST` area, so assign that range to the unit as `.rodata` in `units.txt`. Each module's `CONST` starts on an even address. If a module's strings have an odd total length, the `00` byte after them is LINK padding, not part of the module, so end the range before it.
 
@@ -121,7 +125,7 @@ objdiff doesn't read OMF or 16-bit code, so both sides are converted to ELF32 (`
 | `R_386_SEG16` (45) | segment (paragraph) of a symbol; `DGROUP` for the data group |
 | `R_386_FAR16` (250) | `seg:off` far pointer or far call, shown as one operand |
 
-References inside a unit's own code section get no relocation on either side.
+Near jumps and calls inside a unit's own code get no relocation on either side. Absolute offsets into it (`offset label`, `switch` jump tables) do, because in the EXE they're relative to the segment's frame, which can start before the module.
 
 On the compiled side, the 8087 emulator fixups (`FIDRQQ` and friends) and other absolute library symbols are applied in place, just as LINK does. QuickC-style `BAKPAT` records are applied as well. On the target side, the operands of emulated x87 instructions (`INT 34h`–`3Ch`) are decoded so that their memory references can be relocated.
 

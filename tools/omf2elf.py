@@ -4,7 +4,7 @@
 Section mapping:   class CODE -> .text, CONST -> .rodata, class BSS -> .bss,
                    _DATA/other data -> .data, debug segments are dropped.
 Relocations follow the same conventions as tools/split.py:
-  * near references within the same (ungrouped) code segment are resolved in place
+  * near jumps/calls within the same (ungrouped) code segment are resolved in place
   * R_386_16 near offset, R_386_PC16 self-relative, R_386_SEG16 segment base,
     R_386_FAR16 seg:off pair. Group frames (DGROUP) are named by the group.
 """
@@ -49,6 +49,20 @@ def section_name(seg: omf.Segment, code_count: dict[str, int]) -> str | None:
     if seg.name == "_DATA":
         return ".data"
     return f".data.{seg.name}"
+
+
+def load_aliases(path: Path = Path(__file__).resolve().parent.parent / "config/aliases.txt") -> dict[str, str]:
+    """Library publics with several names at one address -> the name the target objects use."""
+    out = {}
+    if path.exists():
+        for line in path.read_text().splitlines():
+            f = line.split("#", 1)[0].split()
+            if len(f) == 2:
+                out[f[0]] = f[1]
+    return out
+
+
+ALIASES = load_aliases()
 
 
 def convert(mod: omf.Module) -> ElfWriter:
@@ -145,7 +159,7 @@ def _apply_fixup(w: ElfWriter, mod: omf.Module, seg: omf.Segment, sec: str,
             data[f.offset] = (data[f.offset] + (value >> 8 if f.loc == omf.LOC_HIBYTE else value)) & 0xFF
         return
     if f.target_method == omf.T_EXTDEF:
-        sym = mod.ext(f.target_index).name
+        sym = ALIASES.get(mod.ext(f.target_index).name, mod.ext(f.target_index).name)
         if sym in public_loc:
             tseg, toff = public_loc[sym]
             toff += disp
@@ -171,10 +185,12 @@ def _apply_fixup(w: ElfWriter, mod: omf.Module, seg: omf.Segment, sec: str,
     same_seg = tseg == seg.index and own_group is None and frame_group is None
 
     if f.loc in (omf.LOC_OFFSET, omf.LOC_OFFSET_LOADER):
-        if same_seg:
-            val = toff if f.seg_relative else toff - (f.offset + 2)
-            struct.pack_into("<H", data, f.offset, val & 0xFFFF)
+        if same_seg and not f.seg_relative:
+            # near jump/call within the segment: position independent
+            struct.pack_into("<H", data, f.offset, (toff - (f.offset + 2)) & 0xFFFF)
             return
+        # absolute offsets into the own segment stay relocations: in the EXE
+        # they are relative to the frame, which may start before the module
         if f.seg_relative:
             w.add_reloc(sec, f.offset, R_386_16, sym, addend)
         else:

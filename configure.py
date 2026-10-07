@@ -27,7 +27,7 @@ UNIT_CFLAGS: dict[str, list[str]] = {
     # "seg000": ["/AM", "/G2", "/Os", "/Gs"],
 }
 
-TOOLS = ["tools/project.py", "tools/elf16.py"]
+TOOLS = ["tools/project.py", "tools/elf16.py", "config/aliases.txt"]
 
 
 def main() -> None:
