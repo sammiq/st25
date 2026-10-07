@@ -14,7 +14,7 @@ seg007                     .text    1DA22  1E8E4
 seg008                     .text    1E8E4  23A23
 seg009                     .text    23A24  24074
 seg010                     .text    24074  251F6
-seg011                     .text    251F6  252EF
+seg011                     .text    251F6  252EF  complete
 seg012                     .text    252F0  26DEC
 seg013                     .text    26DEC  277BD  complete
 seg013                     .rodata  48C72  48DA5  complete

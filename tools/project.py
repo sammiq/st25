@@ -219,7 +219,7 @@ class SymbolTable:
     def save(self, path: Path = SYMBOLS) -> None:
         lines = ["# addr    kind   size     name  [flags]",
                  "# addr is the IDA linear address; names are linker names (C names get a",
-                 "# leading underscore). Flags: lib=<module>, static, noreturn",
+                 "# leading underscore). Flags: lib, near, noreturn, unused (never referenced)",
                  ""]
         for s in sorted(self.by_addr.values(), key=lambda s: s.addr):
             flags = " ".join(sorted(s.flags))

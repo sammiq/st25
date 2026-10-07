@@ -1,6 +1,6 @@
 # addr    kind   size     name  [flags]
 # addr is the IDA linear address; names are linker names (C names get a
-# leading underscore). Flags: lib=<module>, static, noreturn
+# leading underscore). Flags: lib, near, noreturn, unused (never referenced)
 
 10000  func   000018  _sub_10000
 10018  func   0000AA  _sub_10018
@@ -315,9 +315,10 @@
 250B4  func   000053  _sub_250B4
 25107  func   0000C3  _sub_25107
 251CA  func   00002C  _sub_251CA
-251F6  func   000037  _sub_251F6
-2522D  func   000040  _sub_2522D
-2526D  func   00003B  _sub_2526D
+251F6  func   000037  _ListInit
+2522D  func   000040  _ListAdd
+2526D  func   00003B  _ListRemove
+252A8  func   000047  _ListCount  unused
 252F0  func   0002EC  _main  lib
 255DC  func   000090  _sub_255DC
 2566C  func   0000EB  _sub_2566C
