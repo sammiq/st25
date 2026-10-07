@@ -100,6 +100,8 @@ MASM 5.0 (`tools/MASM50`) assembles `src/<unit>.asm` (`/Ml`, case-sensitive name
 | a function containing `_asm` | the usual `push si / push di` and `enter` frame |
 | locals | stack slots in declaration order from `[bp-2]` down, word aligned (a `char` still takes 2 bytes); unused locals still take space |
 | `register` local | lives in `si`/`di` but **also** gets a stack slot. A `register` parameter (`f(register char *p)`) is loaded into `si` and has no slot |
+| `register` local declared in an inner block | `si`/`di` is only saved around block moves (`push si / rep movsw / pop si`) while the variable is in scope. An extra `push si` around a struct copy after the block means the `register` variable was declared too far out |
+| a unit whose last function is followed by a pad byte | end the unit's `.text` range before the pad (the next segment starts on a paragraph) |
 | `max(a, b)` from `<stdlib.h>` | `mov ax, a / cmp ax, b / jg / mov ax, a / jmp / mov ax, b` |
 | locals in nested `{ }` blocks | sibling blocks reuse the same stack slots |
 | compiler temporaries | spill into the frame below the locals live at that point, so the frame can be larger than the declared locals. Sometimes an "extra" local is really a temporary for a subexpression: write the expression inline rather than adding a variable |

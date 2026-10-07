@@ -98,3 +98,6 @@
 467F6  _blaster_desc+14
 467F8  _blaster_desc+16
 467FA  _blaster_type
+
+# seg005 (events)
+18CAF  _ev_queue+0x380
