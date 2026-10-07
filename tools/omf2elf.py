@@ -86,6 +86,12 @@ def convert(mod: omf.Module) -> ElfWriter:
             w.add_symbol(p.name, sec, p.offset, end - p.offset, kind, local=p.local)
             public_loc[p.name] = (segi, p.offset)
 
+    # objdiff only compares data up to the end of the last symbol in a section,
+    # and string literals/statics have none, so cover each data section
+    for segi, sec in secname.items():
+        if not sec.startswith(".text"):
+            w.add_symbol(f"${sec[1:]}", sec, 0, mod.seg(segi).length, "object", local=True)
+
     for seg in mod.segments:
         if seg.index not in secname:
             continue

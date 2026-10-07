@@ -6,7 +6,8 @@ seg000                     .text    10000  11DCC
 seg001                     .text    11DCC  160EE
 seg002                     .text    160EE  16E08
 seg003                     .text    16E08  18430
-seg004                     .text    18430  18A90
+seg004                     .text    18430  18A90  complete
+seg004                     .rodata   484A2  48510  complete
 seg005                     .text    18A90  19720
 seg006                     .text    19720  1DA22
 seg007                     .text    1DA22  1E8E4
@@ -201,7 +202,8 @@ data/d45A50                .data    45A50  46ED2
 data/d46F68                .data    46F68  470AC
 data/d47118                .data    47118  47238
 data/d473E6                .data    473E6  473F0
-data/d47490                .data    47490  49C66
+data/d47490                .rodata   47490  484A2
+data/d48510                .rodata   48510  49C66
 data/d49C6E                .rodata  49C6E  49E56
 data/d49E78                .bss     49E78  53920
 data/stack                 .bss     53920  54820

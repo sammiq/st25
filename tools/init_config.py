@@ -171,8 +171,10 @@ def build_units(exe, ida: IdaExport, placed: list[libmatch.Placement],
     # DGROUP: everything not owned by a library module, split by class
     edata = next((s.addr for s in syms.by_addr.values() if s.name == "_edata"), None)
     end = next((s.addr for s in syms.by_addr.values() if s.name == "_end"), dgroup.end)
-    const_starts = [r[".rodata"][0] for u in units if ".rodata" in u.ranges for r in [u.ranges]]
-    const_start = min(const_starts) if const_starts else edata
+    # Class DATA (game _DATA, then library _DATA) precedes class CONST, which
+    # starts with the game's CONST (string literals under /qc)
+    lib_data_ends = [u.ranges[".data"][1] for u in units if u.lib and ".data" in u.ranges]
+    const_start = max(lib_data_ends) if lib_data_ends else edata
     for gs, ge in gaps(dgroup.start, dgroup.end):
         if is_padding(exe, gs, ge) and ge - gs <= 3:
             continue

@@ -1,0 +1,11 @@
+# Reference overrides for the target objects.
+#   INSN_ADDR  SYMBOL[+ADDEND]   force a reference from the instruction at INSN_ADDR
+#   INSN_ADDR  none              no reference at all
+# The operand (immediate or displacement) whose value equals the symbol's
+# offset is relocated. Use this where IDA did not mark an operand as an offset
+# or chose the wrong symbol (e.g. one past the end of an array).
+
+# seg004 (EMS)
+184AB  _ems_blocks
+18871  _ems_blocks
+1887D  _ems_blocks+0xE00

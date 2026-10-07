@@ -33,7 +33,9 @@ STACK_SEG = "seg043"
 
 
 class Splitter:
-    def __init__(self, exe: Exe, ida: IdaExport, syms: SymbolTable, units: list[Unit]):
+    def __init__(self, exe: Exe, ida: IdaExport, syms: SymbolTable, units: list[Unit],
+                 overrides: dict[int, tuple[str, int] | None] | None = None):
+        self.overrides = overrides or {}
         self.exe = exe
         self.ida = ida
         self.syms = syms
@@ -150,6 +152,10 @@ class Splitter:
                 continue
             co = dec.get_constant_offsets(ins)
 
+            if ea in self.overrides:
+                self._override(w, sec, start, ea, ins, co, code, covered)
+                continue
+
             # Segment fixups from the MZ table
             for r in self.mz_relocs_in(ea, ea + size):
                 segv = exe.relocs[r]
@@ -209,6 +215,28 @@ class Splitter:
                     continue       # same code section: resolved in place, like omf2elf
                 sym, add = self.symbol_for(unit, hit)
                 self._add(w, sec, start, at, R_386_16, sym, add, covered)
+
+    def _override(self, w: ElfWriter, sec: str, start: int, ea: int, ins: ix.Instruction,
+                  co: ix.ConstantOffsets, code: bytes, covered: set[int]) -> None:
+        """Apply a config/relocs.txt entry: the reference is given explicitly (or suppressed)."""
+        ov = self.overrides[ea]
+        if ov is None:
+            return
+        name, addend = ov
+        s = self.by_name.get(name)
+        if s is None:
+            sys.exit(f"relocs.txt: unknown symbol {name} at {ea:05X}")
+        value = (s.addr + addend - self.frame_of(s.addr)) & 0xFFFF
+        fields = []
+        if co.displacement_size == 2:
+            fields.append(co.displacement_offset)
+        if co.immediate_size == 2:
+            fields.append(co.immediate_offset)
+        for off in fields:
+            if _word(code, off) == value:
+                self._add(w, sec, start, ea + off, R_386_16, name, addend, covered)
+                return
+        sys.exit(f"relocs.txt: no operand of the instruction at {ea:05X} equals {name}+{addend:#x}")
 
     def _emu_operand(self, w: ElfWriter, unit: Unit, sec: str, start: int, end: int, ea: int,
                      vector: int, covered: set[int]) -> None:
@@ -323,6 +351,25 @@ def _word(code: bytes, off: int) -> int:
     return code[off] | (code[off + 1] << 8)
 
 
+def load_overrides(path: Path = ROOT / "config/relocs.txt") -> dict[int, tuple[str, int] | None]:
+    """config/relocs.txt:  INSN_ADDR  SYMBOL[+ADDEND] | none"""
+    out: dict[int, tuple[str, int] | None] = {}
+    if not path.exists():
+        return out
+    for line in path.read_text().splitlines():
+        line = line.split("#", 1)[0].strip()
+        if not line:
+            continue
+        addr, ref = line.split()[:2]
+        if ref == "none":
+            out[int(addr, 16)] = None
+            continue
+        name, sign, add = ref.partition("+") if "+" in ref else ref.partition("-")
+        addend = int(add, 0) if add else 0
+        out[int(addr, 16)] = (name, -addend if sign == "-" else addend)
+    return out
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawTextHelpFormatter)
     ap.add_argument("-o", "--out", default=str(ROOT / "build/target"), help="output directory")
@@ -333,7 +380,7 @@ def main() -> None:
     ida = load_ida(exe)
     syms = SymbolTable.load()
     units = load_units()
-    sp = Splitter(exe, ida, syms, units)
+    sp = Splitter(exe, ida, syms, units, load_overrides())
     out = Path(args.out)
     for u in units:
         if args.units and u.name not in args.units:

@@ -56,7 +56,7 @@ def main() -> None:
     targets = [f"build/target/{u.name}.o" for u in units]
     n.build("build/target/.stamp", "split",
             implicit=["orig/CD/TREKCD/STARTREK_U.EXE", "config/ida_export.txt",
-                      "config/symbols.txt", "config/units.txt", "tools/split.py", *TOOLS],
+                      "config/symbols.txt", "config/units.txt", "config/relocs.txt", "tools/split.py", *TOOLS],
             implicit_outputs=targets)
     n.newline()
 
