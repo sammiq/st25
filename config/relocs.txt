@@ -101,3 +101,6 @@
 
 # seg005 (events)
 18CAF  _ev_queue+0x380
+
+# seg018 (planets)
+2E160  none
