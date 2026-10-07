@@ -14,8 +14,8 @@
 
 int tolower(int c);
 void sub_267C7(char *fmt, ...);             /* fatal error */
-unsigned sub_2A10D(void far *buf, long len); /* seg015: read stream data */
-void sub_2AAC8(void);                       /* seg015 */
+unsigned ReadVoc(void far *buf, long len); /* seg015: read stream data */
+void DigiShutdown(void);                       /* seg015 */
 
 CacheEntry cache_entries[CACHE_ENTRIES];
 List cache_list;
@@ -470,7 +470,7 @@ void StreamFill(void)
         addr = addr + pos;
         p = LockMem((MemHandle)&addr);
         chunk = left > 0x2000 ? 0x2000L : left;
-        n = sub_2A10D(p, chunk);
+        n = ReadVoc(p, chunk);
         if (n == 0) {
             stream_active = 0;
             UnlockMem((MemHandle)&addr);
@@ -596,7 +596,7 @@ void FreeAllEMSFiles(void)
 {
     int i;
 
-    sub_2AAC8();
+    DigiShutdown();
     for (i = 0; i < 8; i++)
         if (ems_files[i].handle != 0) {
             FreeAnyFile(ems_files[i].handle);

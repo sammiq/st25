@@ -28,10 +28,15 @@ typedef struct EMSFile {
     char name[10];          /* 02 */
 } EMSFile;
 
+/* A sound effect channel. Starts like a MemRef so MapMemRef can map the
+ * read position; pos/len walk the VOC blocks of the loaded file. */
 typedef struct SndChan {
     MemHandle handle;       /* 00 */
     int busy;               /* 02 */
-    char unk[16];
+    unsigned long pos;      /* 04 offset in the file */
+    long len;               /* 08 bytes left in the current block */
+    unsigned long loop_pos; /* 0C VOC repeat start */
+    unsigned long loops;    /* 10 VOC repeat count */
 } SndChan;
 
 /* A location inside a handle's block. */

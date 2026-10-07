@@ -92,3 +92,9 @@
 # seg007 (video)
 1DC46  _video_mode
 1DFCA  _remap_table
+
+# seg015 (sound)
+467F4  _blaster_desc+12
+467F6  _blaster_desc+14
+467F8  _blaster_desc+16
+467FA  _blaster_type

@@ -24,8 +24,8 @@
 	PUBLIC	_sub_3ADF5
 	PUBLIC	_sub_3AE1F
 	PUBLIC	_sub_3AE6A
-	PUBLIC	_sub_3AEFF
-	PUBLIC	_sub_3AF4A
+	PUBLIC	_AIL_startup
+	PUBLIC	_AIL_shutdown
 	PUBLIC	_sub_3AFAF
 	PUBLIC	_sub_3B07A
 	PUBLIC	_sub_3B0C3
@@ -34,20 +34,20 @@
 	PUBLIC	_sub_3B16D
 	PUBLIC	_sub_3B1C2
 	PUBLIC	_sub_3B23F
-	PUBLIC	_sub_3B253
-	PUBLIC	_sub_3B37D
-	PUBLIC	_sub_3B3A3
-	PUBLIC	_sub_3B3A9
+	PUBLIC	_AIL_register_driver
+	PUBLIC	_AIL_describe_driver
+	PUBLIC	_AIL_detect_device
+	PUBLIC	_AIL_init_driver
 	PUBLIC	_sub_3B45B
-	PUBLIC	_sub_3B4E8
-	PUBLIC	_sub_3B4EE
-	PUBLIC	_sub_3B4F4
-	PUBLIC	_sub_3B4FA
-	PUBLIC	_sub_3B500
-	PUBLIC	_sub_3B50C
-	PUBLIC	_sub_3B524
-	PUBLIC	_sub_3B52A
-	PUBLIC	_sub_3B536
+	PUBLIC	_AIL_state_table_size
+	PUBLIC	_AIL_register_sequence
+	PUBLIC	_AIL_release_sequence_handle
+	PUBLIC	_AIL_default_timbre_cache_size
+	PUBLIC	_AIL_define_timbre_cache
+	PUBLIC	_AIL_install_timbre
+	PUBLIC	_AIL_start_sequence
+	PUBLIC	_AIL_stop_sequence
+	PUBLIC	_AIL_sequence_status
 	PUBLIC	_sub_3B584
 	PUBLIC	_sub_3B6AC
 	PUBLIC	_sub_3B6E3
@@ -581,7 +581,7 @@ L3AEF5	EQU	$-2
 	pop si
 	pop ds
 	retf
-_sub_3AEFF:
+_AIL_startup:
 	push ds
 	push si
 	push di
@@ -613,7 +613,7 @@ L3AF40	EQU	$-2
 	pop si
 	pop ds
 	retf
-_sub_3AF4A:
+_AIL_shutdown:
 	push bp
 	mov bp, sp
 	push ds
@@ -998,7 +998,7 @@ L3B249	EQU	$-2
 	pop si
 	pop ds
 	retf
-_sub_3B253:
+_AIL_register_driver:
 	push bp
 	mov bp, sp
 	push ds
@@ -1038,7 +1038,7 @@ L3B2A4:
 	mov word ptr cs:[si+_byte_3A956+2], es
 	push word ptr cs:[_word_3A9DA]
 	push cs
-	call _sub_3B37D
+	call _AIL_describe_driver
 	add sp, 2
 	mov es, dx
 	mov di, ax
@@ -1106,7 +1106,7 @@ L3B372	EQU	$-2
 	pop ds
 	pop bp
 	retf
-_sub_3B37D:
+_AIL_describe_driver:
 	push bp
 	mov bp, sp
 	push ax
@@ -1126,10 +1126,10 @@ _sub_3B37D:
 	add sp, 6
 	pop bp
 	retf
-_sub_3B3A3:
+_AIL_detect_device:
 	mov ax, 65h
 	jmp _sub_3AC24
-_sub_3B3A9:
+_AIL_init_driver:
 	push bp
 	mov bp, sp
 	push ds
@@ -1144,7 +1144,7 @@ L3B3BA:
 	mov word ptr cs:[_word_3A9E0], 0FFFFh
 	push word ptr [bp+6]
 	push cs
-	call _sub_3B37D
+	call _AIL_describe_driver
 	add sp, 2
 	mov es, dx
 	mov di, ax
@@ -1260,24 +1260,24 @@ L3B48D:
 	jmp _sub_3AC24
 	mov ax, 84h
 	jmp _sub_3AC24
-_sub_3B4E8:
+_AIL_state_table_size:
 	mov ax, 96h
 	jmp _sub_3AC24
-_sub_3B4EE:
+_AIL_register_sequence:
 	mov ax, 97h
 	jmp _sub_3AC24
-_sub_3B4F4:
+_AIL_release_sequence_handle:
 	mov ax, 98h
 	jmp _sub_3AC24
-_sub_3B4FA:
+_AIL_default_timbre_cache_size:
 	mov ax, 99h
 	jmp _sub_3AC24
-_sub_3B500:
+_AIL_define_timbre_cache:
 	mov ax, 9Ah
 	jmp _sub_3AC24
 	mov ax, 9Bh
 	jmp _sub_3AC24
-_sub_3B50C:
+_AIL_install_timbre:
 	mov ax, 9Ch
 	jmp _sub_3AC24
 	mov ax, 9Dh
@@ -1286,15 +1286,15 @@ _sub_3B50C:
 	jmp _sub_3AC24
 	mov ax, 9Fh
 	jmp _sub_3AC24
-_sub_3B524:
+_AIL_start_sequence:
 	mov ax, 0AAh
 	jmp _sub_3AC24
-_sub_3B52A:
+_AIL_stop_sequence:
 	mov ax, 0ABh
 	jmp _sub_3AC24
 	mov ax, 0ADh
 	jmp _sub_3AC24
-_sub_3B536:
+_AIL_sequence_status:
 	mov ax, 0AEh
 	jmp _sub_3AC24
 	mov ax, 0AFh

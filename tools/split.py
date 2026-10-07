@@ -26,7 +26,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 from elf16 import (R_386_16, R_386_FAR16, R_386_PC16, R_386_SEG16,  # noqa: E402
                    ElfWriter)
 from project import (ROOT, Exe, IdaExport, SymbolTable, Unit,  # noqa: E402
-                     lin, load_exe, load_ida, load_units)
+                     DUMMY_NAME, lin, load_exe, load_ida, load_units)
 
 DGROUP_SEG = "dseg"
 STACK_SEG = "seg043"
@@ -134,6 +134,10 @@ class Splitter:
             self._data_relocs(w, unit, sec, start, end, covered, pending_seg)
             self._resolve_segs(w, unit, sec, start, pending_seg)
         return w
+
+    def _named_var(self, s) -> bool:
+        return (s is not None and s.kind == "data" and not DUMMY_NAME.match(s.name)
+                and not s.name.startswith("a") and self.dgroup <= s.addr < self.dgroup_end)
 
     def _decode_missed_functions(self) -> None:
         """Make code heads for functions added in symbols.txt that IDA left undefined."""
@@ -250,6 +254,24 @@ class Splitter:
                 s0 = self.syms.get(t)
                 if s0 is not None and s0.kind == "data" and (ins.memory_displacement & 0xFFFF) >= 0x40:
                     targets.append(t)
+            # Addresses of named DGROUP variables IDA left as plain numbers
+            # (push offset music_name, mov cx, offset tab; [bx+tab+2]). Only
+            # hand-named symbols count: a dummy name proves nothing
+            # (C units only: assembly sources were generated without them).
+            # Below 400h an immediate is as likely an I/O port
+            if not unit.lib and not (ROOT / "src" / f"{unit.name}.asm").exists():
+                if co.immediate_size == 2:
+                    v = _word(code, co.immediate_offset)
+                    s0 = self.syms.get(self.dgroup + v)
+                    if v >= 0x400 and self._named_var(s0):
+                        targets.append(self.dgroup + v)
+                if co.displacement_size == 2 and ins.memory_base != ix.Register.BP \
+                        and ins.memory_base != ix.Register.NONE and ins.memory_segment == ix.Register.DS:
+                    t = self.dgroup + (ins.memory_displacement & 0xFFFF)
+                    s0 = self.syms.containing(t, self.dgroup, self.dgroup_end)
+                    if (ins.memory_displacement & 0xFFFF) >= 0x100 and self._named_var(s0) \
+                            and t < s0.addr + max(s0.size, 1):
+                        targets.append(t)
             # Immediates IDA left as numbers (push 3507h): accept them when they
             # are exactly the start of a symbol in the unit's own CONST (strings)
             if co.immediate_size == 2 and ".rodata" in unit.ranges and not unit.lib:
@@ -353,7 +375,7 @@ class Splitter:
             pending_seg.append((r, segv, r))
         # Near pointers given in config/relocs.txt (the address is the word itself)
         for at in sorted(a for a in self.overrides if start <= a < end):
-            if ida.heads.get(at, (0, "C"))[1] == "C" or self.owner_head_kind(at) == "C":
+            if self.owner_head_kind(at) == "C":
                 continue
             ov = self.overrides[at]
             if ov is None or at in covered:
@@ -366,6 +388,18 @@ class Splitter:
             if exe.word(at) != (s.addr + addend - self.frame_of(s.addr)) & 0xFFFF:
                 sys.exit(f"relocs.txt: the word at {at:05X} is not {name}+{addend:#x}")
             self._add(w, sec, start, at, R_386_16, name, addend, covered)
+        # Pointers to the unit's own strings (char *names[] = {"a", ...}):
+        # IDA rarely records these. Accept words that are exactly the start
+        # of a symbol in the unit's .rodata
+        if ".rodata" in unit.ranges and not unit.lib and sec.startswith(".data"):
+            lo, hi = unit.ranges[".rodata"]
+            for at in range(start, end - 1, 2):
+                if at in covered or at + 1 in covered:
+                    continue
+                t = self.dgroup + exe.word(at)
+                if lo <= t < hi and self.syms.get(t) is not None:
+                    sym, add = self.symbol_for(unit, t)
+                    self._add(w, sec, start, at, R_386_16, sym, add, covered)
         # Near pointers in data items, from IDA data xrefs
         for ea in self.heads_in(self.data_heads, start, end):
             targets = ida.drefs.get(ea)
