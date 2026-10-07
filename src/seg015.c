@@ -31,8 +31,8 @@ int sub_3588D(char far *buf, unsigned len);
 int sub_358B3(void);
 
 /* seg019: save game I/O */
-void sub_2E7F9(void *p, int n);
-void sub_2E817(void *p, int n);
+void SaveWrite(void *p, int n);
+void SaveRead(void *p, int n);
 
 extern int timer_busy;
 extern void (_interrupt _far *old_timer)(void);
@@ -628,8 +628,8 @@ void SaveMusicState(void)
 
     seq = music_next;
     strcpy(name, music_name);
-    sub_2E7F9(name, 9);
-    sub_2E7F9(&seq, 2);
+    SaveWrite(name, 9);
+    SaveWrite(&seq, 2);
 }
 
 void LoadMusicState(void)
@@ -637,8 +637,8 @@ void LoadMusicState(void)
     char name[10];
     int seq;
 
-    sub_2E817(name, 9);
-    sub_2E817(&seq, 2);
+    SaveRead(name, 9);
+    SaveRead(&seq, 2);
     if (name[0]) {
         LoadMusic(name);
         PlayMusic(seq, seq);

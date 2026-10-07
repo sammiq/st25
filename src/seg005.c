@@ -9,7 +9,7 @@
 
 void sub_267C7(char *fmt, ...);     /* fatal error */
 void sub_219F6(char *title, char *msg, int a, int b, int c, int d);    /* seg008: message box */
-void sub_2EE0A(int a, int b);       /* seg019: quit dialog */
+void QuitMenu(int a, int b);       /* seg019: quit dialog */
 
 /* seg027: joystick */
 extern int joy_x;
@@ -211,7 +211,7 @@ void PollKeys(void)
         else if (key_code == 0x1910)
             getch();
         else if (key_code == 0x1011)
-            sub_2EE0A(300, 199);
+            QuitMenu(300, 199);
         else if (!mouse_present && key_code == 0x240A) {
             joy_present = 1;
             joy_recal = 1;

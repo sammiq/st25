@@ -61,7 +61,13 @@ typedef struct Obj3D {
             int color;                  /* A6 */
         };
     };
-    char unkB4[0xA0];                   /* B4 */
+    char unkB4[0x5C];                   /* B4 */
+    Vec32 move;                         /* 110 */
+    long move_speed;                    /* 11C */
+    long unk120;                        /* 120 */
+    Vec32 turn;                         /* 124 */
+    long turn_speed;                    /* 130 */
+    char unk134[0x20];                  /* 134 */
     int unk154;                         /* 154 */
     char unk156[0x6A];                  /* 156 */
     int shielded;                       /* 1C0 */

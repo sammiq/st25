@@ -33,9 +33,9 @@ typedef struct Point {
 
 void sub_267C7(char *fmt, ...);     /* fatal error */
 void sub_219F6(char *title, char *msg, int a, int b, int c, int d);    /* seg008: message box */
-void sub_2EE86(void);               /* seg019: game over */
-void sub_2E7F9(void *p, int n);     /* seg019: save game I/O */
-void sub_2E817(void *p, int n);
+void GameOverMenu(void);               /* seg019: game over */
+void SaveWrite(void *p, int n);     /* seg019: save game I/O */
+void SaveRead(void *p, int n);
 void sub_11DCC(int n);              /* seg001 */
 void sub_309FC(int n);
 
@@ -370,7 +370,7 @@ void RenderR3(int statics)
     }
     if (dead) {
         sub_219F6("", "#GENE\\SPACE000#The Enterprise has been destroyed!", 20, 20, 0xB0, 0);
-        sub_2EE86();
+        GameOverMenu();
     }
     if (statics && !player_ship.expl)
         DrawStatic();
@@ -1654,17 +1654,17 @@ void OutlineSpans(Span *s, int c)
 
 void SaveR3(Obj3D *o)
 {
-    sub_2E7F9(o, sizeof(Obj3D));
+    SaveWrite(o, sizeof(Obj3D));
 }
 
 void SaveR3Shot(Obj3D *o)
 {
-    sub_2E7F9(o, 0xA8);
+    SaveWrite(o, 0xA8);
 }
 
 void RestoreR3(Obj3D *o)
 {
-    sub_2E817(o, sizeof(Obj3D));
+    SaveRead(o, sizeof(Obj3D));
     if (o->visible) {
         AddR3(o);
         switch (o->visible) {
@@ -1685,7 +1685,7 @@ void RestoreR3(Obj3D *o)
 
 void RestoreR3Shot(Obj3D *o)
 {
-    sub_2E817(o, 0xA8);
+    SaveRead(o, 0xA8);
     if (o->visible) {
         AddR3(o);
         switch (o->visible) {
@@ -1709,8 +1709,8 @@ void SaveSpace(void)
     SaveR3(&player_ship);
     SaveR3Shot(&shot_obj);
     SaveR3(&dummy_planet);
-    sub_2E7F9(&cam_pos, sizeof(cam_pos));
-    sub_2E7F9(&cam_orient, sizeof(cam_orient));
+    SaveWrite(&cam_pos, sizeof(cam_pos));
+    SaveWrite(&cam_orient, sizeof(cam_orient));
     for (i = 0; i != 4; i++)
         SaveR3(&ships[i]);
 }
@@ -1729,8 +1729,8 @@ void LoadSpace(void)
     RestoreR3(&player_ship);
     RestoreR3Shot(&shot_obj);
     RestoreR3(&dummy_planet);
-    sub_2E817(&cam_pos, sizeof(cam_pos));
-    sub_2E817(&cam_orient, sizeof(cam_orient));
+    SaveRead(&cam_pos, sizeof(cam_pos));
+    SaveRead(&cam_orient, sizeof(cam_orient));
     for (i = 0; i != 4; i++) {
         RestoreR3(&ships[i]);
         ships[i].unk154 = 0;

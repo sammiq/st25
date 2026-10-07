@@ -17,7 +17,7 @@ typedef struct Point {
 #define NUM_STARS 45
 
 void sub_12FFF(void);               /* seg000 */
-void sub_346C6(void);               /* seg025 */
+void WarpOut(void);               /* seg025 */
 void CreatePlanet(Obj3D *o, char *name, int radius, int small, unsigned seed, int pal);
 void RandomPlanet(Obj3D *o);
 
@@ -173,7 +173,7 @@ done:
     ReleaseBitmap(cursor.handle);
     ReleaseBitmap(mouse_sprite.handle);
     SpriteSetBitmap(&mouse_sprite, old_bmp);
-    sub_346C6();
+    WarpOut();
     LoadPalette("bridge");
     sel = star - star_pos;
     SetPlanet(sel);

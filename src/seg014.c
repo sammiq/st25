@@ -15,10 +15,10 @@ void sub_10A91(void);
 void sub_10BE7(void);
 void sub_11DCC(int a);              /* seg001 */
 void sub_227D5(int a, int b);       /* seg008 */
-void sub_2EB19(void);               /* seg019: save game */
-void sub_2EDB6(void);               /* seg019: load game */
-void sub_2EE0A(int x, int y);       /* seg019: quit */
-void sub_2EF1D(int a);
+void SaveMenu(void);               /* seg019: save game */
+void LoadMenu(void);               /* seg019: load game */
+void QuitMenu(int x, int y);       /* seg019: quit */
+void TextModeMenu(int a);
 
 extern int kbd_mouse;
 extern int key_accel;
@@ -237,10 +237,10 @@ void OptionsMenu(int x, int y)
     }
     switch (sel) {
     case 0:
-        sub_2EB19();
+        SaveMenu();
         break;
     case 1:
-        sub_2EDB6();
+        LoadMenu();
         break;
     case 2:
         SetMusicOn(1);
@@ -255,10 +255,10 @@ void OptionsMenu(int x, int y)
         SetSfxOn(0);
         break;
     case 6:
-        sub_2EE0A(20, 20);
+        QuitMenu(20, 20);
         break;
     case 7:
-        sub_2EF1D(1);
+        TextModeMenu(1);
         break;
     }
 }

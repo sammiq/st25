@@ -109,3 +109,31 @@
 1BAAC  aShapeHeightToo
 1BAC2  aShapeWidthTooB
 1BE12  _dither
+
+# seg025 (space cutscenes)
+3470F  _player_ship+0xC
+3471A  _player_ship+0xC
+34810  _player_ship+0xC
+348DF  _player_ship+0xC
+34B04  _player_ship+0xC
+34B0E  _player_ship+0xC
+34B80  _player_ship+0xC
+34D70  _player_ship+0xC
+34D7A  _player_ship+0xC
+34DB7  _player_ship+0xC
+34DC2  _player_ship+0xC
+34E5C  _player_ship+0xC
+34FB4  _player_ship+0xC
+34EF1  _player_ship+0x12
+34FE5  none
+34FEB  none
+35046  none
+
+# seg019 (save games)
+2E7DC  _save_dir+0x6
+2EBCB  _save_dir+0x6
+2EBD5  _save_dir+0x6
+2ED11  _save_dir+0x6
+2ED5A  _save_dir+0x6
+2ED67  _save_dir+0x6
+2EB61  aEmpty_7

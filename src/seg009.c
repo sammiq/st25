@@ -25,8 +25,8 @@ typedef struct InvEntry {
 } InvEntry;
 
 void sub_11DCC(int a);              /* seg001 */
-void sub_2E7F9(void *p, int n);     /* seg019: save game I/O */
-void sub_2E817(void *p, int n);
+void SaveWrite(void *p, int n);     /* seg019: save game I/O */
+void SaveRead(void *p, int n);
 
 /* seg014 */
 int MenuHit(Sprite *s, int n, unsigned x, unsigned y);
@@ -72,7 +72,7 @@ void ItemsSave(void)
 
     for (i = 0; i < NUM_ITEMS; i++) {
         c = items[i].have;
-        sub_2E7F9(&c, 1);
+        SaveWrite(&c, 1);
     }
 }
 
@@ -82,7 +82,7 @@ void ItemsLoad(void)
     unsigned char c;
 
     for (i = 0; i < NUM_ITEMS; i++) {
-        sub_2E817(&c, 1);
+        SaveRead(&c, 1);
         items[i].have = c;
     }
 }

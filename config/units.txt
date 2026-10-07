@@ -44,7 +44,9 @@ seg017                     .rodata  48F96  49120  complete
 seg018                     .text    2D4B8  2E726  complete
 seg018                     .data    46800  46814  complete
 seg018                     .rodata  49120  49246  complete
-seg019                     .text    2E726  2F0D9
+seg019                     .text    2E726  2F0D9  complete
+seg019                     .data    46814  46AB0  complete
+seg019                     .rodata  49246  4959E  complete
 seg020                     .text    2F0DA  3227D
 seg021                     .text    3227E  33838  complete
 seg021                     .data    46C20  46C70  complete
@@ -57,7 +59,8 @@ seg023                     .data    46D24  46D26  complete
 seg023                     .rodata  497B8  497C2  complete
 seg024                     .text    341CE  346C6  complete
 seg024                     .rodata  497C2  497D5  complete
-seg025                     .text    346C6  35052
+seg025                     .text    346C6  35052  complete
+seg025                     .rodata  497D6  497FC  complete
 asm/t35052                 .text    35052  359F5  complete
 lib/crt0                   .text    359F6  35AED  lib=MLIBCR.LIB:crt0.asm
 lib/crt0                   .data    46ED2  46EF0  lib=MLIBCR.LIB:crt0.asm
@@ -237,7 +240,7 @@ data/d45A50                .data    45A50  45C8E
 data/d45D14                .data    45D14  45D2A
 data/d45E62                .data    45E62  4675E
 data/d4676A                .data    4676A  46798
-data/d46814                .data    46814  46C20
+data/d46AB0                .data    46AB0  46C20
 data/d46E42                .data    46E42  46ED2
 data/d46F68                .data    46F68  470AC
 data/d47118                .data    47118  47238
@@ -245,8 +248,8 @@ data/d473E6                .data    473E6  473F0
 data/d47490                .rodata  47490  480C6
 data/d487B5                .rodata  487B5  48A80
 data/d48ABA                .rodata  48ABA  48C72
-data/d49246                .rodata  49246  496AE
-data/d497D6                .rodata  497D6  49C66
+data/d4959E                .rodata  4959E  496AE
+data/d497FC                .rodata  497FC  49C66
 data/d49C6E                .rodata  49C6E  49E56
 data/d49E78                .bss     49E78  53920
 data/stack                 .bss     53920  54820
