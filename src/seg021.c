@@ -76,7 +76,7 @@ void ClearSprites(void)
 void SpriteInit(Sprite *s)
 {
     s->type = 0;
-    s->flags = 0;
+    s->name = 0;
     s->erase = 0;
     s->old.x0 = s->old.y0 = -1;
     s->old.x1 = s->old.y1 = -2;

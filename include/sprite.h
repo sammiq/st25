@@ -28,7 +28,7 @@ typedef struct Sprite {
     int y;                  /* 02 */
     int z;                  /* 04 priority, sort key */
     int layer;              /* 06 second sort key */
-    int flags;              /* 08 */
+    char *name;             /* 08 */
     MemHandle handle;       /* 0A bitmap */
     int type;               /* 0C */
     int colour;             /* 0E text colour */

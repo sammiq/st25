@@ -258,12 +258,14 @@ class Splitter:
             # (push offset music_name, mov cx, offset tab; [bx+tab+2]). Only
             # hand-named symbols count: a dummy name proves nothing
             # (C units only: assembly sources were generated without them).
-            # Below 400h an immediate is as likely an I/O port
+            # Below 400h, mov dx, imm is as likely an I/O port
             if not unit.lib and not (ROOT / "src" / f"{unit.name}.asm").exists():
                 if co.immediate_size == 2:
                     v = _word(code, co.immediate_offset)
                     s0 = self.syms.get(self.dgroup + v)
-                    if v >= 0x400 and self._named_var(s0):
+                    port = ins.mnemonic == ix.Mnemonic.MOV and ins.op0_kind == ix.OpKind.REGISTER \
+                        and ins.op0_register == ix.Register.DX
+                    if (v >= 0x400 or not port) and v >= 0x40 and self._named_var(s0):
                         targets.append(self.dgroup + v)
                 if co.displacement_size == 2 and ins.memory_base != ix.Register.BP \
                         and ins.memory_base != ix.Register.NONE and ins.memory_segment == ix.Register.DS:
