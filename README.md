@@ -96,6 +96,11 @@ If an operand needs a reference that IDA didn't record, or IDA picked the wrong 
 | type conversions | a mismatch (`int` ↔ `unsigned`, `long` ↔ `unsigned long`) shows up as an operand loaded into registers, or copied to a temporary, instead of being used straight from memory. Check which side is converted and fix the declared types |
 | `for` loops | test at the bottom when the condition is a simple comparison (`i < n`, `x == 0`); test at the top when the condition does arithmetic or has side effects (`i < a + b`, `count--`). `while` behaves the same way |
 | returning a struct | copies it into the runtime's `__mbac` buffer and returns its address. The caller copies it out with `rep movsw` |
+| a function ending in an expression statement with no `return` | the expression's value is left in `ax`, and the function "returns" it. QC loads values of assignments, so e.g. `*out = r;` leaves `out` in `ax`. Several `Matrix *` functions rely on this |
+| explicit `return;` at the very end | `jmp` to the epilogue (the next instruction) |
+| `switch` | `jmp` to a compare chain after the cases: `cmp ax, n / jne / jmp case_n` |
+| `far` arrays (`int far tab[N]`) | `mov es, ds:[w]`, where `w` is a segment word QC puts in `CONST` (relocated by the loader), then `es:[bx+offset]` |
+| floating point | emulator calls (`INT 34h`–`3Dh`, shown decoded by `tools/disasm.py`). `double` constants go into `CONST` in order of first use, and constant expressions like `PI / 512` are folded at compile time. An `int` operand is converted at run time with `cwd` + `fild` from a temporary. For `x * 512` the `int` is loaded first and the operands swapped with `fxch`; `512 * x` uses `fmul` from memory instead |
 | `long` multiply | `__aFulmul` with both operands pushed, right one first. `__aFlmul` is the same routine (see `config/aliases.txt`) |
 
 String literals go into `CONST` (`.rodata`), in source order. A unit's strings form a contiguous range of the game's `CONST` area, so assign that range to the unit as `.rodata` in `units.txt`. Each module's `CONST` starts on an even address. If a module's strings have an odd total length, the `00` byte after them is LINK padding, not part of the module, so end the range before it.

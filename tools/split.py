@@ -51,6 +51,8 @@ class Splitter:
         self.data_heads = sorted(ea for ea, (_, k) in ida.heads.items() if k != "C")
         self.relocs_sorted = sorted(exe.relocs)
         self.by_name = {s.name: s for s in syms.by_addr.values()}
+        # DGROUP segment word -> first far address reached through it (QC far data)
+        self.segword_users: dict[int, int] = {}
 
     # ------------------------------------------------------------------ lookup helpers
 
@@ -143,7 +145,10 @@ class Splitter:
     def _code_relocs(self, w: ElfWriter, unit: Unit, sec: str, start: int, end: int,
                      covered: set[int], pending_seg: list) -> None:
         exe, ida = self.exe, self.ida
+        es_frame: tuple[int, int] | None = None    # (segment word, far frame) loaded into ES
         for ea in self.heads_in(self.code_heads, start, end):
+            if ea in ida.funcs:
+                es_frame = None
             size = ida.heads[ea][0]
             code = exe.bytes(ea, ea + size)
             dec = ix.Decoder(16, code, ip=ea - self.frame_of(ea))
@@ -178,6 +183,24 @@ class Splitter:
             if ins.mnemonic == ix.Mnemonic.INT and 0x34 <= ins.immediate8 <= 0x3C:
                 self._emu_operand(w, unit, sec, start, end, ea, ins.immediate8, covered)
                 continue
+
+            # QC far data: mov es, ds:[segword] (a relocated segment value in
+            # DGROUP), then es:[bx+offset] operands address that far segment
+            if ins.op0_kind == ix.OpKind.REGISTER and ins.op0_register == ix.Register.ES:
+                es_frame = None
+                if (ins.mnemonic == ix.Mnemonic.MOV and ins.op1_kind == ix.OpKind.MEMORY
+                        and ins.memory_base == ix.Register.NONE and ins.memory_index == ix.Register.NONE):
+                    word = self.dgroup + (ins.memory_displacement & 0xFFFF)
+                    if word in exe.relocs:
+                        es_frame = (word, lin(exe.relocs[word], 0))
+            elif ins.mnemonic == ix.Mnemonic.LES:
+                es_frame = None
+            if (es_frame is not None and co.displacement_size == 2
+                    and ins.memory_segment == ix.Register.ES):
+                t = es_frame[1] + (ins.memory_displacement & 0xFFFF)
+                self.segword_users.setdefault(es_frame[0], t)
+                sym, add = self.symbol_for(unit, t)
+                self._add(w, sec, start, ea + co.displacement_offset, R_386_16, sym, add, covered)
 
             # Near offsets / memory references (ES: operands are far data, not DGROUP)
             fields = []
@@ -247,7 +270,8 @@ class Splitter:
         segment = "ds"
         if vector == 0x3C:
             seg_bits = self.exe.bytes(ea + 2, ea + 3)[0] >> 6
-            segment = {0: "es", 1: "cs", 2: "ss", 3: "ds"}.get(seg_bits, "ds")
+            # the FIxRQQ/FJxRQQ fixups leave the segment in the top two bits
+            segment = {0: "ds", 1: "ss", 2: "cs", 3: "es"}[seg_bits]
         if pos + 3 > end:
             return
         modrm = self.exe.bytes(pos, pos + 1)[0]
@@ -279,6 +303,14 @@ class Splitter:
             if ida.heads.get(r, (0, "C"))[1] == "C" or self.owner_head_kind(r) == "C":
                 continue
             segv = exe.relocs[r]
+            if ida.heads.get(r, (0, ""))[0] == 2:
+                # a lone segment word (QC far data): name it after what is
+                # reached through it
+                used = self.segword_users.get(r)
+                if used is not None:
+                    sym, _ = self.symbol_for(unit, used)
+                    self._add(w, sec, start, r, R_386_SEG16, sym, 0, covered)
+                    continue
             off_at = r - 2
             if off_at >= start and off_at not in covered:
                 target = lin(segv, exe.word(off_at))

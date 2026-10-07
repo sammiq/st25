@@ -18,6 +18,38 @@ sys.path.insert(0, str(Path(__file__).parent))
 from project import SymbolTable, lin, load_exe, load_ida  # noqa: E402
 
 
+SEG_PREFIX = {0: 0x3E, 1: 0x36, 2: 0x2E, 3: 0x26}   # DS, SS, CS, ES
+
+
+def decode(exe, start: int, end: int, frame: int):
+    """Decode instructions, turning 8087 emulator calls back into x87 ones.
+
+    INT 34h-3Bh: ESC D8-DF + ModRM; INT 3Ch: segment override form (top two
+    bits of the next byte select the segment); INT 3Dh: FWAIT.
+    """
+    pos = start
+    while pos < end:
+        code = exe.bytes(pos, min(end, pos + 16))
+        ins = ix.Decoder(16, code, ip=pos - frame).decode()
+        if ins.mnemonic == ix.Mnemonic.INT and 0x34 <= ins.immediate8 <= 0x3D:
+            v = ins.immediate8
+            if v == 0x3D:
+                raw, extra = bytes([0x9B]), 1
+            elif v == 0x3C:
+                b = code[2]
+                raw, extra = bytes([SEG_PREFIX[b >> 6], (b & 0x3F) | 0xC0]) + code[3:], 1
+            else:
+                raw, extra = bytes([0xD8 + v - 0x34]) + code[2:], 1
+            emu = ix.Decoder(16, raw, ip=pos - frame).decode()
+            if emu.code != ix.Code.INVALID:
+                emu.len = emu.len + extra
+                yield emu, pos
+                pos += emu.len
+                continue
+        yield ins, pos
+        pos += ins.len
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawTextHelpFormatter)
     ap.add_argument("start", help="symbol name or hex address")
@@ -55,8 +87,7 @@ def main() -> None:
     fmt.hex_suffix = "h"
     s0 = syms.get(start)
     print(f"; {s0.name if s0 else hex(start)}  {seg.name}:{start - frame:04X}  ({end - start} bytes)")
-    for ins in ix.Decoder(16, exe.bytes(start, end), ip=start - frame):
-        a = frame + ins.ip
+    for ins, a in decode(exe, start, end, frame):
         if a != start and syms.get(a) is not None:
             print(f"{syms.get(a).name}:")
         refs = []

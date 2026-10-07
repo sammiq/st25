@@ -31,3 +31,6 @@
 183F1  _patch_find+0x1E
 1840A  _patch_find
 1841D  _patch_find+0x1E
+
+# seg010 (fixed point maths)
+24261  _ang_small+2
