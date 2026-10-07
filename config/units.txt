@@ -5,7 +5,8 @@
 seg000                     .text    10000  11DCC
 seg001                     .text    11DCC  160EE
 seg002                     .text    160EE  16E08
-seg003                     .text    16E08  18430
+seg003                     .text    16E08  18430  complete
+seg003                     .rodata  4816C  484A2  complete
 seg004                     .text    18430  18A90  complete
 seg004                     .rodata  484A2  48510  complete
 seg005                     .text    18A90  19720
@@ -109,7 +110,7 @@ lib/stricmp                .text    37A3C  37A7E  lib=MLIBCR.LIB:stricmp.asm
 lib/strnicmp               .text    37A7E  37AD5  lib=MLIBCR.LIB:strnicmp.asm
 lib/strupr                 .text    37AD6  37AF4  lib=MLIBCR.LIB:strupr.asm
 lib/memcpy                 .text    37AF4  37B3C  lib=MLIBCR.LIB:memcpy.asm
-asm/t37B3C                 .text    37B3C  37B68
+lib/mlibcr_memcpy          .text    37B3C  37B68  lib=MLIBCR.LIB:memcpy.asm
 lib/memset                 .text    37B68  37B95  lib=MLIBCR.LIB:memset.asm
 lib/xtoa                   .text    37B96  37BF5  lib=MLIBCR.LIB:xtoa.asm
 lib/_ctype                 .text    37BF6  37C37  lib=MLIBCR.LIB:_ctype.asm
@@ -140,10 +141,15 @@ lib/uldiv                  .text    38066  380C5  lib=LIBH.LIB:uldiv.asm
 lib/ulrem                  .text    380C6  38130  lib=LIBH.LIB:ulrem.asm
 lib/ulshr                  .text    38130  3813B  lib=LIBH.LIB:ulshr.asm
 lib/hmemcpy                .text    3813C  3819A  lib=LIBH.LIB:hmemcpy.asm
-asm/t3819A                 .text    3819A  382A0
+lib/libh_strchr            .text    3819A  381C7  lib=LIBH.LIB:strchr.asm
+lib/libh_strncmp           .text    381C8  38203  lib=LIBH.LIB:strncmp.asm
+lib/libh_strncpy           .text    38204  3822E  lib=LIBH.LIB:strncpy.asm
+lib/libh_strupr            .text    3822E  38252  lib=LIBH.LIB:strupr.asm
+lib/libh_strlen            .text    38252  38269  lib=LIBH.LIB:strlen.asm
+lib/libh_strcpy            .text    3826A  382A0  lib=LIBH.LIB:strcpy.asm
 lib/hmemset                .text    382A0  382E8  lib=LIBH.LIB:hmemset.asm
 lib/strstr                 .text    382E8  3834F  lib=LIBH.LIB:strstr.asm
-asm/t38350                 .text    38350  383A8
+lib/libh_strnicmp          .text    38350  383A8  lib=LIBH.LIB:strnicmp.asm
 lib/87disp                 .text    383A8  384A7  lib=MLIBFP.LIB:87disp.asm
 lib/87disp                 .data    47240  47265  lib=MLIBFP.LIB:87disp.asm
 lib/87tran                 .text    384A8  38620  lib=MLIBFP.LIB:87tran.asm
@@ -204,7 +210,7 @@ data/d45A50                .data    45A50  46ED2
 data/d46F68                .data    46F68  470AC
 data/d47118                .data    47118  47238
 data/d473E6                .data    473E6  473F0
-data/d47490                .rodata  47490  484A2
+data/d47490                .rodata  47490  4816C
 data/d48510                .rodata  48510  48C72
 data/d48DA6                .rodata  48DA6  497C2
 data/d497D6                .rodata  497D6  49C66

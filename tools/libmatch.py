@@ -57,6 +57,10 @@ def _pattern(seg: omf.Segment) -> tuple[re.Pattern[bytes], int]:
     return re.compile(b"".join(parts), re.S), sum(mask)
 
 
+def _module_key(m: omf.Module) -> tuple:
+    return (m.name.lower(), tuple(sorted(p.name for p in m.publics)))
+
+
 def find_modules(exe: Exe, ida: IdaExport, code_segs: list[tuple[int, int]]) -> list[Placement]:
     candidates: list[tuple[str, omf.Module, omf.Segment, list[int], int]] = []
     for lib in LIBS:
@@ -90,12 +94,14 @@ def find_modules(exe: Exe, ida: IdaExport, code_segs: list[tuple[int, int]]) -> 
         placed.append(Placement(lib, m, s, a))
         taken.append((a, a + s.length))
 
-    # Pass 1: unique, sufficiently specific hits. A module may also appear in
-    # several libraries (e.g. MLIBCR and LIBH); the first library wins.
+    # Pass 1: unique, sufficiently specific hits. The same module may appear in
+    # several libraries (the first library wins), but modules that merely share
+    # a name (LIBH's far strchr.asm vs MLIBCR's near one) are told apart by
+    # their publics.
     seen_names: set[str] = set()
     pending = []
     for lib, m, s, hits, fixed in candidates:
-        key = m.name.lower()
+        key = _module_key(m)
         if len(hits) == 1 and fixed >= MIN_FIXED and key not in seen_names and free(hits[0], s.length):
             place(lib, m, s, hits[0])
             seen_names.add(key)
@@ -110,7 +116,7 @@ def find_modules(exe: Exe, ida: IdaExport, code_segs: list[tuple[int, int]]) -> 
         starts = {p.addr for p in placed}
         rest = []
         for lib, m, s, hits, fixed in pending:
-            key = m.name.lower()
+            key = _module_key(m)
             ok = [a for a in hits if key not in seen_names and free(a, s.length)
                   and (a in ends or a + s.length in starts or a + s.length + 1 in starts)]
             if len(ok) == 1:

@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Generate config/symbols.txt and config/units.txt from the IDA export.
 
-Run once to bootstrap the project (or with --force to regenerate). Symbol
-names already present in an existing symbols.txt are preserved unless they
-are IDA dummy names, so this can also be re-run after a fresh IDA export.
+Run once to bootstrap the project. Re-running it (e.g. after a fresh IDA
+export) keeps every existing symbol and name in symbols.txt, only replacing
+IDA placeholder names, and adds newly identified library modules to an
+existing units.txt. --force regenerates units.txt from scratch.
 
   * functions and data labels come from the IDA export
   * C library modules are located in the EXE (tools/libmatch.py); their
@@ -23,7 +24,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 import libmatch  # noqa: E402
 from omf2elf import module_basename  # noqa: E402
 from project import (ALIASES, DUMMY_NAME, SYMBOLS, UNITS, IdaExport, Sym, SymbolTable,  # noqa: E402
-                     Unit, load_exe, load_ida, save_units)
+                     Unit, load_exe, load_ida, load_units, save_units)
 
 TEXT_SEG = "seg026"       # _TEXT: game asm + C runtime
 EMU_SEG = "seg037"        # EMULATOR_TEXT
@@ -84,8 +85,13 @@ def build_symbols(ida: IdaExport, rec: libmatch.Recovered, old: SymbolTable | No
         for s in syms.by_addr.values():
             o = old.get(s.addr)
             if o is not None and not DUMMY_NAME.match(o.name):
-                s.name = o.name
+                if "lib" not in s.flags or "lib" in o.flags:
+                    s.name = o.name
                 s.flags |= o.flags
+        # symbols added by hand
+        for o in old.by_addr.values():
+            if syms.get(o.addr) is None:
+                syms.add(o)
 
     # Data sizes run to the next symbol in the same segment
     addrs = syms.sorted_addrs()
@@ -97,6 +103,41 @@ def build_symbols(ida: IdaExport, rec: libmatch.Recovered, old: SymbolTable | No
         nxt = addrs[i + 1] if i + 1 < len(addrs) else seg.end
         s.size = max(0, min(nxt, seg.end) - a)
     return syms
+
+
+def lib_unit(p: libmatch.Placement, taken: set[str]) -> Unit:
+    name = f"lib/{p.modname}"
+    if name in taken:
+        name = f"lib/{p.lib.split('.')[0].lower()}_{p.modname}"
+    u = Unit(name, flags={f"lib={p.lib}:{module_basename(p.module.name)}"})
+    u.ranges[".text"] = (p.addr, p.end)
+    return u
+
+
+def update_lib_units(exe, ida: IdaExport, units: list[Unit], placed: list[libmatch.Placement]) -> list[Unit]:
+    """Add library modules found since units.txt was written, carving them
+    out of the asm/ units that covered their code."""
+    have = {u.ranges[".text"][0] for u in units if u.lib and ".text" in u.ranges}
+    for p in placed:
+        if p.addr in have:
+            continue
+        host = next((u for u in units if ".text" in u.ranges
+                     and u.ranges[".text"][0] <= p.addr < u.ranges[".text"][1]), None)
+        if host is not None and not host.name.startswith("asm/"):
+            print(f"  skipping {p.modname} at {p.addr:05X}: inside {host.name}")
+            continue
+        units.append(lib_unit(p, {x.name for x in units}))
+        print(f"  added {units[-1].name} {p.addr:05X}-{p.end:05X}")
+        if host is None:
+            continue
+        units.remove(host)
+        lo, hi = host.ranges[".text"]
+        for a, b in ((lo, p.addr), (p.end, hi)):
+            a, b = item_extent(exe, ida, a, b)
+            if b > a and not is_padding(exe, a, b):
+                units.append(Unit(f"asm/t{a:05X}", {".text": (a, b)}))
+    units.sort(key=lambda u: min(r[0] for r in u.ranges.values()))
+    return units
 
 
 def item_extent(exe, ida: IdaExport, start: int, end: int) -> tuple[int, int]:
@@ -127,7 +168,7 @@ def build_units(exe, ida: IdaExport, placed: list[libmatch.Placement],
 
     # Library units: code, plus the module's DGROUP pieces when known
     for p in placed:
-        u = Unit(f"lib/{p.modname}", flags={f"lib={p.lib}:{module_basename(p.module.name)}"})
+        u = lib_unit(p, {x.name for x in units})
         u.ranges[".text"] = (p.addr, p.end)
         claimed.append((p.addr, p.end))
         for segname, sec in (("_DATA", ".data"), ("CONST", ".rodata"), ("_BSS", ".bss")):
@@ -253,7 +294,8 @@ def main() -> None:
     write_aliases(placed, rec, syms)
 
     if UNITS.exists() and not args.force:
-        print(f"{UNITS} exists, not overwriting (use --force)")
+        print(f"updating library units in {UNITS} (use --force to regenerate)")
+        save_units(update_lib_units(exe, ida, load_units(UNITS), placed), UNITS)
         return
     units = build_units(exe, ida, placed, rec, syms)
     save_units(units, UNITS)

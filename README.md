@@ -91,6 +91,11 @@ If an operand needs a reference that IDA didn't record, or IDA picked the wrong 
 | locals | stack slots in declaration order from `[bp-2]` down, word aligned (a `char` still takes 2 bytes); unused locals still take space |
 | `register` local | lives in `si`/`di` but **also** gets a stack slot. A `register` parameter (`f(register char *p)`) is loaded into `si` and has no slot |
 | `max(a, b)` from `<stdlib.h>` | `mov ax, a / cmp ax, b / jg / mov ax, a / jmp / mov ax, b` |
+| locals in nested `{ }` blocks | sibling blocks reuse the same stack slots |
+| compiler temporaries | spill into the frame below the locals live at that point, so the frame can be larger than the declared locals. Sometimes an "extra" local is really a temporary for a subexpression: write the expression inline rather than adding a variable |
+| type conversions | a mismatch (`int` ↔ `unsigned`, `long` ↔ `unsigned long`) shows up as an operand loaded into registers, or copied to a temporary, instead of being used straight from memory. Check which side is converted and fix the declared types |
+| `for` loops | test at the bottom when the condition is a simple comparison (`i < n`, `x == 0`); test at the top when the condition does arithmetic or has side effects (`i < a + b`, `count--`). `while` behaves the same way |
+| returning a struct | copies it into the runtime's `__mbac` buffer and returns its address. The caller copies it out with `rep movsw` |
 | `long` multiply | `__aFulmul` with both operands pushed, right one first. `__aFlmul` is the same routine (see `config/aliases.txt`) |
 
 String literals go into `CONST` (`.rodata`), in source order. A unit's strings form a contiguous range of the game's `CONST` area, so assign that range to the unit as `.rodata` in `units.txt`. Each module's `CONST` starts on an even address. If a module's strings have an odd total length, the `00` byte after them is LINK padding, not part of the module, so end the range before it.
