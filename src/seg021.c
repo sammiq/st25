@@ -12,7 +12,7 @@ void sub_267C7(char *fmt, ...);     /* fatal error */
 extern Sprite *sprite_array[MAX_SPRITES];
 extern Rect dirty_rects[];
 extern int dirty_count;
-extern int video_mode;              /* 0 none, 1 EGA, 2 VGA */
+extern int video_mode;              /* 0 VGA, 1 EGA, 2 Tandy */
 extern Bitmap far *backbuf;         /* sprites are composed here */
 extern Bitmap far *screen;          /* the background without sprites */
 extern unsigned char far *mask_buf; /* EGA priority mask, 2 pixels a byte */
@@ -685,8 +685,8 @@ void DrawTestPattern(void)
     BlitToScreen(&r);
 }
 
-/* Copy r of the back buffer to VGA memory through pal_remap. */
-void BlitVGA(Rect *r)
+/* Copy r of the back buffer to Tandy video memory through pal_remap. */
+void BlitTandy(Rect *r)
 {
     int w;
     int h;
@@ -740,7 +740,7 @@ void BlitToScreen(Rect *r)
         BlitEGA(r);
         return;
     case 2:
-        BlitVGA(r);
+        BlitTandy(r);
         return;
     default:
         break;

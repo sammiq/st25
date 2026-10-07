@@ -70,7 +70,7 @@ void MatchPalette(unsigned char far *pal, int first, int count);
 void LoadRemap(char *name);
 void BlitEGA(Rect *r);
 void DrawTestPattern(void);
-void BlitVGA(Rect *r);
+void BlitTandy(Rect *r);
 void BlitToScreen(Rect *r);
 Sprite *SpriteAt(int x, int y);
 void SpriteSetPos(Sprite *s, int x, int y, unsigned z);

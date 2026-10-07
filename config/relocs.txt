@@ -88,3 +88,7 @@
 330A8  _palette
 46C22  _sprite_array
 46C24  _sprite_count0
+
+# seg007 (video)
+1DC46  _video_mode
+1DFCA  _remap_table

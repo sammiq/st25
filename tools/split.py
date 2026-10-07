@@ -47,6 +47,7 @@ class Splitter:
         # (start, end, unit, section) sorted for address lookup
         self.ranges = sorted((r[0], r[1], u, sec) for u in units for sec, r in u.ranges.items())
         self.range_starts = [r[0] for r in self.ranges]
+        self._decode_missed_functions()
         self.code_heads = sorted(ea for ea, (_, k) in ida.heads.items() if k == "C")
         self.data_heads = sorted(ea for ea, (_, k) in ida.heads.items() if k != "C")
         self.relocs_sorted = sorted(exe.relocs)
@@ -133,6 +134,20 @@ class Splitter:
             self._data_relocs(w, unit, sec, start, end, covered, pending_seg)
             self._resolve_segs(w, unit, sec, start, pending_seg)
         return w
+
+    def _decode_missed_functions(self) -> None:
+        """Make code heads for functions added in symbols.txt that IDA left undefined."""
+        ida = self.ida
+        for s in self.syms.by_addr.values():
+            if s.kind != "func" or ida.heads.get(s.addr, (0, ""))[1] == "C":
+                continue
+            ea, end = s.addr, s.addr + s.size
+            for a in [a for a in ida.heads if ea <= a < end]:
+                del ida.heads[a]
+            dec = ix.Decoder(16, self.exe.bytes(ea, end), ip=ea - self.frame_of(ea))
+            for ins in dec:
+                ida.heads[ea] = (ins.len, "C")
+                ea += ins.len
 
     def _add(self, w: ElfWriter, sec: str, sec_start: int, at: int, rtype: int, sym: str,
              addend: int, covered: set[int]) -> None:

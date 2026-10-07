@@ -121,6 +121,15 @@ def _name_data_targets(w: ElfWriter) -> None:
     """
     data_secs = [n for n, s in w.sections.items() if not n.startswith(".text")]
     targets: dict[str, set[int]] = {n: {0} for n in data_secs}
+    # A reference into a named variable (&tab[2], the segment half of a far
+    # pointer) is written symbol+offset, as the target side names it
+    named = [s for s in w.symbols.values() if s.section in targets and not s.local and s.size]
+    for sec in w.sections.values():
+        for i, (off, rtype, sym, addend) in enumerate(sec.relocs):
+            if sym in targets and rtype != R_386_PC16:
+                inside = [s for s in named if s.section == sym and s.value < addend < s.value + s.size]
+                if inside:
+                    sec.relocs[i] = (off, rtype, inside[0].name, addend - inside[0].value)
     for sec in w.sections.values():
         for off, rtype, sym, addend in sec.relocs:
             if sym in targets and rtype != R_386_PC16:
