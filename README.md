@@ -115,6 +115,8 @@ MASM 5.0 (`tools/MASM50`) assembles `src/<unit>.asm` (`/Ml`, case-sensitive name
 | `switch` | `jmp` to a compare chain after the cases: `cmp ax, n / jne / jmp case_n`. Case values are sorted in the chain whatever the source order; the bodies stay in source order |
 | `switch` with a jump table (`cmp ax, max / jbe / jmp cs:[bx+table]`) | QC only builds the table when the cases are dense. Table slots pointing at the default body are case labels in the source: list them (`case 3: case 4: case 5: default:`), or QC falls back to a compare chain |
 | `void _interrupt _far f(void)` | `pusha / push ds / push es / mov bp, sp / sub sp, n / mov ax, DGROUP / mov ds, ax / cld`, ending in `iret`. Calling an interrupt function pointer is `pushf / call far` |
+| `i++, j++` vs `++i, ++j` in a `for` increment | the postfix form loads the old value of the first operand (`mov ax, [i] / add [i], 1`); the prefix form doesn't |
+| `long` arithmetic with one `unsigned long` and one `long` operand | the converted operand is loaded first (`a + b` loads `b` first if `b` is the one converted). Check the operand types before swapping operands |
 | `x++; if (x == 1)` vs `if (++x == 1)` | the first compares memory (`add [x], 1 / cmp [x], 1`), the second loads `x` |
 | a `long` compared with a converted operand (`cnt > (unsigned long)p->len` where `len` is `long`) | the converted side is loaded into registers before the `cmp`. Plain operands are compared from memory |
 | `far` arrays (`int far tab[N]`) | `mov es, ds:[w]`, where `w` is a segment word QC puts in `CONST` (relocated by the loader), then `es:[bx+offset]` |
