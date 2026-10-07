@@ -218,6 +218,12 @@ class Splitter:
                     # Prefer an explicit xref that agrees with the operand value
                     if not any((t - self.frame_of(t)) & 0xFFFF == op.value & 0xFFFF for t in targets):
                         targets.append(base + (op.value & 0xFFFF))
+            # cs:[bx+disp16] into the unit's own code: tables kept in the code
+            # segment (assembly modules); the 16-bit encoding marks a symbol
+            if co.displacement_size == 2 and ins.segment_prefix == ix.Register.CS:
+                t = self.frame_of(ea) + (ins.memory_displacement & 0xFFFF)
+                if start <= t < end:
+                    targets.append(t)
             # [bx/si/di+disp16] array accesses IDA left as plain numbers: accept
             # the displacement when it is exactly the start of a DGROUP symbol
             if co.displacement_size == 2 and ins.memory_base not in (ix.Register.BP, ix.Register.NONE) \
@@ -375,6 +381,8 @@ class Splitter:
                         best = (d, name)
                 if best:
                     sym = best[1]
+                elif ".text" in unit.ranges and self.frame_of(unit.ranges[".text"][0]) == base:
+                    sym = ".text"       # the unit's own code segment
                 else:
                     seg = self.ida.seg_at(base + 0x10) or self.ida.seg_at(base)
                     sym = f"SEG_{seg.name}" if seg else f"SEG_{segv:04X}"

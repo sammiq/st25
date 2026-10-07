@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Compile a C file with Microsoft C 6.00A under emu2 and convert the result to ELF.
+"""Compile a C file with Microsoft C 6.00A (or assemble a .asm file with
+MASM 5.0) under emu2 and convert the result to ELF.
 
     cc.py SRC OUT.o [--omf OUT.obj] -- [CL flags...]
 
@@ -21,6 +22,7 @@ import omf2elf  # noqa: E402
 from project import ROOT  # noqa: E402
 
 MSC = ROOT / "tools/C600"
+MASM = ROOT / "tools/MASM50"
 EMU2 = os.environ.get("EMU2", "emu2")
 
 
@@ -54,10 +56,16 @@ def main() -> None:
     produced = obj.parent / obj.name.lower()
     produced.unlink(missing_ok=True)
 
-    env = dict(os.environ, EMU2_DRIVE_C=str(MSC), EMU2_DRIVE_D=str(ROOT))
-    cmd = [EMU2, str(MSC / "BIN/CL.EXE"), "/c", "/nologo", *flags,
-           f"/Fo{dos_path(obj)}", dos_path(src),
-           "--", "INCLUDE=C:\\INCLUDE", "PATH=C:\\BIN", "TMP=D:\\BUILD"]
+    if src.suffix.lower() == ".asm":
+        # /Ml: case sensitive names, /t: quiet unless there are errors
+        env = dict(os.environ, EMU2_DRIVE_C=str(MASM), EMU2_DRIVE_D=str(ROOT))
+        cmd = [EMU2, str(MASM / "BIN/MASM.EXE"), "/Ml", "/t", *flags,
+               f"{dos_path(src)},{dos_path(obj)};", "--", "INCLUDE=C:\\INC"]
+    else:
+        env = dict(os.environ, EMU2_DRIVE_C=str(MSC), EMU2_DRIVE_D=str(ROOT))
+        cmd = [EMU2, str(MSC / "BIN/CL.EXE"), "/c", "/nologo", *flags,
+               f"/Fo{dos_path(obj)}", dos_path(src),
+               "--", "INCLUDE=C:\\INCLUDE", "PATH=C:\\BIN", "TMP=D:\\BUILD"]
     res = subprocess.run(cmd, env=env, capture_output=True, text=True, errors="replace")
     # CL echoes the source file name; only show real diagnostics
     msgs = [ln for ln in res.stdout.splitlines() if ln.strip() and ln.strip() != dos_path(src)]

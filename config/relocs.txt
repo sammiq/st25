@@ -54,3 +54,17 @@
 2C43D  _map_tmp
 2C487  _stream_tmp
 2C12A  _voc_path
+
+# asm/t35052: timer interrupt vector (0000:0020) read and set with DS = 0
+353B0  none
+353B3  none
+353C5  none
+353CB  none
+
+# seg023 (starfield)
+33E77  _stars
+33F2B  _cam_matrix
+33F7B  _cam_matrix
+33F36  _cam_pos
+33F68  _cam_pos
+34094  _clip_rect

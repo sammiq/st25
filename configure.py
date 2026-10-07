@@ -80,14 +80,16 @@ def main() -> None:
             bases.append(base)
         else:
             meta["progress_categories"] = ["data" if u.name.startswith(("data/", "far/")) else "game"]
-            src = ROOT / "src" / f"{u.name}.c"
-            if src.exists():
-                flags = UNIT_CFLAGS.get(u.name, CFLAGS)
-                n.build(base, "cc", f"src/{u.name}.c",
+            src = next((ROOT / "src" / f"{u.name}{ext}" for ext in (".c", ".asm")
+                        if (ROOT / "src" / f"{u.name}{ext}").exists()), None)
+            if src is not None:
+                flags = UNIT_CFLAGS.get(u.name, CFLAGS) if src.suffix == ".c" else []
+                rel = str(src.relative_to(ROOT))
+                n.build(base, "cc", rel,
                         implicit=["tools/cc.py", "tools/omf2elf.py", "tools/omf.py", *TOOLS, *headers],
                         variables={"cflags": " ".join(flags), "omf": f"build/obj/{u.name}.obj"})
                 unit["base_path"] = base
-                meta["source_path"] = f"src/{u.name}.c"
+                meta["source_path"] = rel
                 bases.append(base)
         unit["metadata"] = meta
         objdiff_units.append(unit)

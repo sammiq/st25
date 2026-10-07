@@ -9,6 +9,7 @@ __pycache__/
 # Copyrighted inputs - supply your own copies
 orig/
 tools/C600/
+tools/MASM50/
 
 # Locally built tools
 tools/bin/

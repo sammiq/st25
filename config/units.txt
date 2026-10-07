@@ -30,11 +30,13 @@ seg019                     .text    2E726  2F0D9
 seg020                     .text    2F0DA  3227D
 seg021                     .text    3227E  33838
 seg022                     .text    33838  33DD6
-seg023                     .text    33DD6  341CE
+seg023                     .text    33DD6  341CE  complete
+seg023                     .data    46D24  46D26  complete
+seg023                     .rodata  497B8  497C2  complete
 seg024                     .text    341CE  346C6  complete
 seg024                     .rodata  497C2  497D5  complete
 seg025                     .text    346C6  35052
-asm/t35052                 .text    35052  359F5
+asm/t35052                 .text    35052  359F5  complete
 lib/crt0                   .text    359F6  35AED  lib=MLIBCR.LIB:crt0.asm
 lib/crt0                   .data    46ED2  46EF0  lib=MLIBCR.LIB:crt0.asm
 lib/crt0dat                .text    35AEE  35C76  lib=MLIBCR.LIB:crt0dat.asm
@@ -76,7 +78,7 @@ lib/open                   .text    36D62  36F1E  lib=MLIBCR.LIB:open.asm
 lib/read                   .text    36F1E  37007  lib=MLIBCR.LIB:read.asm
 lib/write                  .text    37008  37148  lib=MLIBCR.LIB:write.asm
 lib/stackava               .text    37148  3715C  lib=MLIBCR.LIB:stackava.asm
-asm/t3715C                 .text    3715C  37167
+asm/t3715C                 .text    3715C  37167  complete
 lib/nmalloc                .text    37168  371B1  lib=MLIBCR.LIB:nmalloc.asm
 lib/searchsg               .text    371B2  3722E  lib=MLIBCR.LIB:searchsg.asm
 lib/growseg                .text    3722E  3732B  lib=MLIBCR.LIB:growseg.asm
@@ -190,9 +192,10 @@ lib/fltusedc               .text    39E4C  39E60  lib=MLIBFP.LIB:fltusedc.asm
 lib/fltusedc               .data    47478  47490  lib=MLIBFP.LIB:fltusedc.asm
 lib/matherr                .text    39E60  39E6F  lib=MLIBFP.LIB:matherr.asm
 lib/cvtld                  .text    39E70  3A200  lib=MLIBFP.LIB:cvtld.c
-asm/t3A200                 .text    3A200  3A223
-seg027                     .text    3A224  3A831
-seg028                     .text    3A832  3C136
+asm/t3A200                 .text    3A200  3A223  complete
+seg027                     .text    3A224  3A831  complete
+seg027                     .data    46D26  46E42  complete
+seg028                     .text    3A832  3C136  complete
 seg029                     .text    3C136  3CB25
 seg030                     .text    3CB26  3DDDA
 seg031                     .text    3DDDA  3E8D3
@@ -201,14 +204,15 @@ seg033                     .text    3F59A  3FEDB
 seg034                     .text    3FEDC  4074D
 seg035                     .text    4074E  40E66
 seg036                     .text    40E66  41E1E
-asm/t41E20                 .text    41E20  41E22
+asm/t41E20                 .text    41E20  41E22  complete
 lib/emulator               .text    41E30  4448F  lib=EM.LIB:emulator.asm
 lib/emoem                  .text    44490  44510  lib=EM.LIB:emoem.asm
 far/seg038                 .data    44510  44720
 far/seg039                 .data    44720  44B70
 far/seg040                 .data    44B70  44CE0
 far/seg041                 .data    44CE0  45A50
-data/d45A50                .data    45A50  46ED2
+data/d45A50                .data    45A50  46D24
+data/d46E42                .data    46E42  46ED2
 data/d46F68                .data    46F68  470AC
 data/d47118                .data    47118  47238
 data/d473E6                .data    473E6  473F0
@@ -216,7 +220,7 @@ data/d47490                .rodata  47490  4816C
 data/d48510                .rodata  48510  48A84
 data/d48ABA                .rodata  48ABA  48C72
 data/d48DA6                .rodata  48DA6  48EDC
-data/d48F96                .rodata  48F96  497C2
+data/d48F96                .rodata  48F96  497B8
 data/d497D6                .rodata  497D6  49C66
 data/d49C6E                .rodata  49C6E  49E56
 data/d49E78                .bss     49E78  53920

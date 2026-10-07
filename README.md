@@ -72,6 +72,16 @@ Flags can be overridden per unit in `UNIT_CFLAGS` in `configure.py`.
 
 If an operand needs a reference that IDA didn't record, or IDA picked the wrong symbol (one past the end of an array is a common case), add a line to `config/relocs.txt`.
 
+### Assembly units
+
+MASM 5.0 (`tools/MASM50`) assembles `src/<unit>.asm` (`/Ml`, case-sensitive names). For hand-written assembly modules, generate the source rather than typing it:
+
+```sh
+.venv/bin/python tools/asmgen.py seg028        # writes src/seg028.asm
+```
+
+`asmgen.py` builds the source from the unit's target object, so references come out as symbols (`OFFSET DGROUP:sym`, `SEG sym`, `call FAR PTR sym`, `cs:[bx+label]`). It then assembles the result and compares it with the EXE. An instruction MASM encodes differently first has its operands swapped (`test`/`xchg`, where the order picks the encoding); if that doesn't help, it's emitted as `DB` bytes. This repeats until the object matches. Labels that fall inside another instruction (self-modifying code) become `label EQU $-n`. Names come from `config/symbols.txt`, so rename there and regenerate. Re-running overwrites the file, so regenerate before hand-editing.
+
 ### Quick-compile (`/qc`) code patterns
 
 `/qc` does almost no optimisation, so the code shape follows the source closely. Patterns found so far (`src/seg004.c` has examples of each):
@@ -151,4 +161,4 @@ On the compiled side, the 8087 emulator fixups (`FIDRQQ` and friends) and other 
 - **One name per address:** `symbols.txt` holds a single name per address, so aliased library publics (`__chkstk` / `__aFchkstk`) can mismatch.
 - **Segment-only fixups** (`mov ax, seg func`) on the target side are named after a nearby offset reference, if there is one.
 - **The runtime isn't quite 100%:** a few library functions stay just short (e.g. the emulator, which mixes code and data). Those units are still marked complete.
-- **No relinking yet:** the project doesn't rebuild a full EXE. That needs an assembler (JWasm/UASM, or MASM if you have it) for the assembly units, plus a link step.
+- **No relinking yet:** the project doesn't rebuild a full EXE. Every unit now has an assembler or compiler, so what's missing is a link step with the original segment order.
