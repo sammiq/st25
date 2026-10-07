@@ -5,6 +5,13 @@
 
 #include "mem.h"
 
+typedef struct BitmapHdr {
+    int x;
+    int y;
+    unsigned w;
+    unsigned h;
+} BitmapHdr;
+
 typedef struct Bitmap {
     int x;                  /* 00 */
     int y;                  /* 02 */

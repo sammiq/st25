@@ -18,6 +18,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 import omf  # noqa: E402
+from omf2elf import ABSOLUTE_SYMBOLS  # noqa: E402
 from project import LOAD_BASE, ROOT, Exe, IdaExport, lin  # noqa: E402
 
 # Search order matters: a module name is only placed once, from the first library.
@@ -175,7 +176,7 @@ def recover(exe: Exe, placed: list[Placement], dgroup: int,
                 disp = f.disp + existing
             if f.target_method == omf.T_EXTDEF:
                 ext = m.ext(f.target_index)
-                if ext.communal:
+                if ext.communal or ext.name in ABSOLUTE_SYMBOLS:
                     continue
                 kind = "func" if f.loc == omf.LOC_POINTER or not f.seg_relative else "data"
                 if disp == 0:

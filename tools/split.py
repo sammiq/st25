@@ -226,6 +226,14 @@ class Splitter:
                 s0 = self.syms.get(t)
                 if s0 is not None and s0.kind == "data" and (ins.memory_displacement & 0xFFFF) >= 0x40:
                     targets.append(t)
+            # Immediates IDA left as numbers (push 3507h): accept them when they
+            # are exactly the start of a symbol in the unit's own CONST (strings)
+            if co.immediate_size == 2 and ".rodata" in unit.ranges and not unit.lib:
+                v = _word(code, co.immediate_offset)
+                t = self.dgroup + v
+                lo, hi = unit.ranges[".rodata"]
+                if lo <= t < hi and self.syms.get(t) is not None and t not in targets:
+                    targets.append(t)
             for at, value, _is_mem in fields:
                 hit = None
                 for t in targets:

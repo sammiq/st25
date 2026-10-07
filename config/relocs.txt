@@ -34,3 +34,23 @@
 
 # seg010 (fixed point maths)
 24261  _ang_small+2
+
+# seg016 (resource cache)
+2B1F0  _cache_list
+2B236  _cache_list
+2B419  _cache_list
+2B427  _cache_list
+2B59A  _cache_list
+2B5A8  _cache_list
+2B777  _cache_list
+2B798  _cache_list
+2B840  _cache_list
+2B861  _cache_list
+2B1FB  _cache_entries
+2C0E6  _ems_files
+2C324  _ems_files
+2C503  _ems_files
+2C5FA  _ems_files
+2C43D  _map_tmp
+2C487  _stream_tmp
+2C12A  _voc_path

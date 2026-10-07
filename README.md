@@ -101,6 +101,10 @@ If an operand needs a reference that IDA didn't record, or IDA picked the wrong 
 | `switch` | `jmp` to a compare chain after the cases: `cmp ax, n / jne / jmp case_n` |
 | `far` arrays (`int far tab[N]`) | `mov es, ds:[w]`, where `w` is a segment word QC puts in `CONST` (relocated by the loader), then `es:[bx+offset]` |
 | floating point | emulator calls (`INT 34h`–`3Dh`, shown decoded by `tools/disasm.py`). `double` constants go into `CONST` in order of first use, and constant expressions like `PI / 512` are folded at compile time. An `int` operand is converted at run time with `cwd` + `fild` from a temporary. For `x * 512` the `int` is loaded first and the operands swapped with `fxch`; `512 * x` uses `fmul` from memory instead |
+| `long` `x += y` vs `x = x + y` | `+=` adds into memory (`add [x], ax / adc [x+2], dx`); `x = x + y` loads `x`, adds and stores. The source uses both |
+| `tolower`, `toupper`, `isdigit`… | `<ctype.h>` defines macros that expand inline. A `call _tolower` means the original declared the function itself and didn't include `<ctype.h>` |
+| `if (a && !(b && c) && …)` | a negated group jumps straight to the false branch on `c`: `cmp c, 0 / je next_term / jmp false`. A chain of `if (b && c) continue;` looks different |
+| a block of `jmp` with an empty "then" | `if (x) ; else { … }`. It really occurs (`LoadSpriteBitmap`) |
 | `long` multiply | `__aFulmul` with both operands pushed, right one first. `__aFlmul` is the same routine (see `config/aliases.txt`) |
 
 String literals go into `CONST` (`.rodata`), in source order. A unit's strings form a contiguous range of the game's `CONST` area, so assign that range to the unit as `.rodata` in `units.txt`. Each module's `CONST` starts on an even address. If a module's strings have an odd total length, the `00` byte after them is LINK padding, not part of the module, so end the range before it.
