@@ -89,7 +89,7 @@ If an operand needs a reference that IDA didn't record, or IDA picked the wrong 
 | `return a == b;` | `mov ax, 1 / jmp / mov ax, 0` then `jmp epilogue` |
 | a function containing `_asm` | the usual `push si / push di` and `enter` frame |
 
-String literals go into `CONST` (`.rodata`), in source order. A unit's strings form a contiguous range of the game's `CONST` area, so assign that range to the unit as `.rodata` in `units.txt`.
+String literals go into `CONST` (`.rodata`), in source order. A unit's strings form a contiguous range of the game's `CONST` area, so assign that range to the unit as `.rodata` in `units.txt`. Each module's `CONST` starts on an even address. If a module's strings have an odd total length, the `00` byte after them is LINK padding, not part of the module, so end the range before it.
 
 The `seg004` code calls functions without prototypes in places, e.g. `MemSet(near_ptr, …)` where other files pass a far pointer. Leave such calls unprototyped in that file to keep the original argument sizes.
 

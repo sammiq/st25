@@ -86,12 +86,6 @@ def convert(mod: omf.Module) -> ElfWriter:
             w.add_symbol(p.name, sec, p.offset, end - p.offset, kind, local=p.local)
             public_loc[p.name] = (segi, p.offset)
 
-    # objdiff only compares data up to the end of the last symbol in a section,
-    # and string literals/statics have none, so cover each data section
-    for segi, sec in secname.items():
-        if not sec.startswith(".text"):
-            w.add_symbol(f"${sec[1:]}", sec, 0, mod.seg(segi).length, "object", local=True)
-
     for seg in mod.segments:
         if seg.index not in secname:
             continue
@@ -99,7 +93,37 @@ def convert(mod: omf.Module) -> ElfWriter:
         own_group = mod.group_of(seg.index)
         for f in seg.fixups:
             _apply_fixup(w, mod, seg, sec, own_group, f, secname, public_loc)
+    _name_data_targets(w)
     return w
+
+
+def _name_data_targets(w: ElfWriter) -> None:
+    """Give unnamed data (string literals, statics) local symbols.
+
+    References to them are section relative. Each referenced offset gets a
+    symbol ($rodata_00AC) so relocations compare by address like the target's
+    named symbols, and offset 0 always gets one: objdiff only compares data
+    up to the end of the last symbol in a section.
+    """
+    data_secs = [n for n, s in w.sections.items() if not n.startswith(".text")]
+    targets: dict[str, set[int]] = {n: {0} for n in data_secs}
+    for sec in w.sections.values():
+        for off, rtype, sym, addend in sec.relocs:
+            if sym in targets and rtype != R_386_PC16:
+                targets[sym].add(addend)
+    for name, offs in targets.items():
+        size = w.sections[name].size
+        taken = {s.value for s in w.symbols.values() if s.section == name}
+        offs = sorted(o for o in offs if 0 <= o < size)
+        for i, off in enumerate(offs):
+            end = offs[i + 1] if i + 1 < len(offs) else size
+            if off not in taken:
+                w.add_symbol(f"${name[1:]}_{off:04X}", name, off, end - off, "object", local=True)
+    for sec in w.sections.values():
+        for i, (off, rtype, sym, addend) in enumerate(sec.relocs):
+            local = f"${sym[1:]}_{addend:04X}"
+            if sym in targets and local in w.symbols:
+                sec.relocs[i] = (off, rtype, local, 0)
 
 
 def _apply_fixup(w: ElfWriter, mod: omf.Module, seg: omf.Segment, sec: str,

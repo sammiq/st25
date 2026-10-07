@@ -9,3 +9,6 @@
 184AB  _ems_blocks
 18871  _ems_blocks
 1887D  _ems_blocks+0xE00
+
+# seg013 (memory)
+2743A  _lpPoolCurrent
