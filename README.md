@@ -92,7 +92,7 @@ MASM 5.0 (`tools/MASM50`) assembles `src/<unit>.asm` (`/Ml`, case-sensitive name
 | `if (c) { … }` (body runs on to the end) | `jcc_true short body; jmp past_if` |
 | `if (!f()) return;` vs `if (f()) { … }` | the two shapes above. Pick whichever matches; nested `if` blocks are more common than `continue` |
 | `for (b = arr; b != arr + N; b++)` | increment and test at the top of the loop |
-| `for (b = arr; b != &arr[N]; b++)` | bottom-tested loop (doesn't match) |
+| `for (b = arr; b != &arr[N]; b++)` | test at the bottom of the loop. Use whichever form matches; both occur |
 | `i++` as a statement or in a `for` | loads the old value into `ax` first. Use `++i` when there's no load |
 | `if ((n = f()) == 0)` | `mov [n], ax; cmp ax, 0` (testing `n` separately gives `cmp word ptr [n], 0`) |
 | argument type differs from the parameter (`unsigned` → `int`, `long` → `unsigned long`) | loaded into registers before the `push`. A direct `push word ptr [..]` means the types agree |
@@ -120,7 +120,12 @@ MASM 5.0 (`tools/MASM50`) assembles `src/<unit>.asm` (`/Ml`, case-sensitive name
 | `x++; if (x == 1)` vs `if (++x == 1)` | the first compares memory (`add [x], 1 / cmp [x], 1`), the second loads `x` |
 | a `long` compared with a converted operand (`cnt > (unsigned long)p->len` where `len` is `long`) | the converted side is loaded into registers before the `cmp`. Plain operands are compared from memory |
 | `far` arrays (`int far tab[N]`) | `mov es, ds:[w]`, where `w` is a segment word QC puts in `CONST` (relocated by the loader), then `es:[bx+offset]` |
-| floating point | emulator calls (`INT 34h`–`3Dh`, shown decoded by `tools/disasm.py`). `double` constants go into `CONST` in order of first use, and constant expressions like `PI / 512` are folded at compile time. An `int` operand is converted at run time with `cwd` + `fild` from a temporary. For `x * 512` the `int` is loaded first and the operands swapped with `fxch`; `512 * x` uses `fmul` from memory instead |
+| floating point | emulator calls (`INT 34h`–`3Dh`, shown decoded by `tools/disasm.py`). `double` constants go into `CONST` in order of first use, and constant expressions like `PI / 512` are folded at compile time. An `int` operand is converted at run time with `cwd` + `fild` from a temporary, even a constant: `f = 50;` (float `f`) is `mov ax, 32h / cwd / fild`, and `if (k > 10)` converts the `10` the same way. For `x * 512` the `int` is loaded first and the operands swapped with `fxch`; `512 * x` uses `fmul` from memory instead. A `cwd` before the `fild` of a call's result means the function returns `int` there (`(int)FixMul2(...)`) |
+| `fwait` after every FP store at the end of a line, even when the next line starts with an FP instruction | the unit was compiled with line numbers (`/Zd`). Without it QC drops the `fwait` unless the next instruction is a CPU one or a jump target. seg006 is built with `/Zd` (`UNIT_CFLAGS`) |
+| a function returning `double` | `return a / b;` stores into the runtime's `__fac` and returns its address in `ax`; the caller does `mov si, ax / fld qword ptr [si]` |
+| `imul` then `idiv` with no `cwd` between (a 32-bit intermediate) | no C expression gives this, so it is inline assembly: `_asm { mov ax, a / imul b / idiv c / mov r, ax }` |
+| temporaries between two block locals | temporaries go below the locals declared so far. FP conversion temporaries take 8-byte slots, `int` ones 2 bytes. If a temporary used while computing one local sits where the next local lives, that next local is declared in an inner block (`{ double w; w = ...; { double h; ... } }`) |
+| `lea bx, [bp-n] / mov cx, ss / mov es, cx / ... es:[bx+2]` | `FP_SEG(p)` on a local far pointer, with the `<dos.h>` style macro `(*((unsigned _far *)&(p) + 1))` (`FP_OFF` without the `+ 1`) |
 | `long` `x += y` vs `x = x + y` | `+=` adds into memory (`add [x], ax / adc [x+2], dx`); `x = x + y` loads `x`, adds and stores. The source uses both |
 | `tolower`, `toupper`, `isdigit`… | `<ctype.h>` defines macros that expand inline. A `call _tolower` means the original declared the function itself and didn't include `<ctype.h>` |
 | `if (a && !(b && c) && …)` | a negated group jumps straight to the false branch on `c`: `cmp c, 0 / je next_term / jmp false`. A chain of `if (b && c) continue;` looks different |
@@ -128,12 +133,14 @@ MASM 5.0 (`tools/MASM50`) assembles `src/<unit>.asm` (`/Ml`, case-sensitive name
 | `a + b`, `a \| b`, `a * b` with both sides non-trivial | usually the **right** operand is evaluated first (spilled to a temporary if needed), then the left (`dy * w + dx` evaluates `dx` first), but not always: two array lookups of the same shape go left first. If the diff shows the halves swapped, swap them in the source |
 | `a = 0, b = 7;` (comma expression) | both stores, then the value of the last one loaded into `al`/`ax`. Two separate statements don't load it |
 | `x = y` storing a parameter into a struct field | `mov bx, s` then `mov ax, y` normally; when `y` is converted (an `unsigned` parameter into an `int` field) the value is loaded first |
-| `_asm` | self-modifying code works: `mov word ptr cs:l_patch+3, ax` patches the displacement of the instruction at `l_patch`. Plain `jmp` is always near (`E9`). Conditional jumps aren't lengthened: an out-of-range `jne l` must be written `je skip / jmp l` (the original shows the pair). A local subroutine reached with `call l` needs a near return, written `_emit 0C3h`. Use `mov bx, offset var` for an address as an immediate. `xlat ss:[bx]` loses its segment prefix: write `_emit 36h` and `xlat [bx]`. Locals reached through `ds:` after changing `ss` are written `push ds:w` |
+| `_asm` | self-modifying code works: `mov word ptr cs:l_patch+3, ax` patches the displacement of the instruction at `l_patch`. Plain `jmp` is always near (`E9`). Conditional jumps aren't lengthened: an out-of-range `jne l` must be written `je skip / jmp l` (the original shows the pair). A local subroutine reached with `call l` needs a near return, written `_emit 0C3h`. Use `mov bx, offset var` for an address as an immediate. `xlat ss:[bx]` loses its segment prefix: write `_emit 36h` and `xlat [bx]`. Locals reached through `ds:` after changing `ss` are written `push ds:w`. `jmp short l` gives an `EB` jump. C struct members work as operands (`cmp ax, clip_rect.x1`), as do the halves of a far pointer local (`mov ds, word ptr p+2`). A local named like a register (`dx`) can't be used in `_asm`; rename it |
 | `long` multiply | `__aFulmul` with both operands pushed, right one first. `__aFlmul` is the same routine (see `config/aliases.txt`) |
 
-String literals go into `CONST` (`.rodata`), in source order. A unit's strings form a contiguous range of the game's `CONST` area, so assign that range to the unit as `.rodata` in `units.txt`. Each module's `CONST` starts on an even address. If a module's strings have an odd total length, the `00` byte after them is LINK padding, not part of the module, so end the range before it.
+String literals go into `CONST` (`.rodata`), in source order, except that a call's arguments are evaluated right to left: `f("a", "b")` stores `"b"` first. A unit's strings form a contiguous range of the game's `CONST` area, so assign that range to the unit as `.rodata` in `units.txt`. Each module's `CONST` starts on an even address. If a module's strings have an odd total length, the `00` byte after them is LINK padding, not part of the module, so end the range before it.
 
 The `seg004` code calls functions without prototypes in places, e.g. `MemSet(near_ptr, …)` where other files pass a far pointer. Leave such calls unprototyped in that file to keep the original argument sizes.
+
+MSC 6 accepts anonymous structs and unions inside a struct. `Obj3D` (`include/obj3d.h`) uses them for the planet and shot fields that share offsets.
 
 ### Data
 

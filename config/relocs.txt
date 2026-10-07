@@ -104,3 +104,8 @@
 
 # seg018 (planets)
 2E160  none
+
+# seg006 (space view)
+1BAAC  aShapeHeightToo
+1BAC2  aShapeWidthTooB
+1BE12  _dither

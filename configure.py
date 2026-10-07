@@ -25,6 +25,8 @@ OBJDIFF_CLI = "tools/bin/objdiff-cli"
 CFLAGS = ["/AM", "/G2", "/qc", "/Gs", "/Zp1", "/W3", "/ID:\\INCLUDE"]
 UNIT_CFLAGS: dict[str, list[str]] = {
     # "seg000": ["/AM", "/G2", "/Os", "/Gs"],
+    # line numbers: QC then ends every line with an fwait after an FP store
+    "seg006": CFLAGS + ["/Zd"],
 }
 
 TOOLS = ["tools/project.py", "tools/elf16.py", "config/aliases.txt"]
