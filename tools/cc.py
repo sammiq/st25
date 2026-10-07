@@ -53,8 +53,12 @@ def main() -> None:
     obj.parent.mkdir(parents=True, exist_ok=True)
     out.parent.mkdir(parents=True, exist_ok=True)
     # emu2 creates lower-case file names
+    # (or reuses an existing file of any case, so remove those first)
     produced = obj.parent / obj.name.lower()
-    produced.unlink(missing_ok=True)
+    if obj.parent.exists():
+        for old in obj.parent.iterdir():
+            if old.name.lower() == produced.name:
+                old.unlink()
 
     if src.suffix.lower() == ".asm":
         # /Ml: case sensitive names, /t: quiet unless there are errors

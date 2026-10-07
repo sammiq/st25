@@ -157,9 +157,12 @@ class Splitter:
                 continue
             co = dec.get_constant_offsets(ins)
 
+            # An override names one operand; any other operand is still
+            # relocated below ("none" suppresses them all)
             if ea in self.overrides:
+                if self.overrides[ea] is None:
+                    continue
                 self._override(w, sec, start, ea, ins, co, code, covered)
-                continue
 
             # Segment fixups from the MZ table
             for r in self.mz_relocs_in(ea, ea + size):
@@ -333,6 +336,21 @@ class Splitter:
                     self._add(w, sec, start, off_at, R_386_FAR16, sym, add, covered)
                     continue
             pending_seg.append((r, segv, r))
+        # Near pointers given in config/relocs.txt (the address is the word itself)
+        for at in sorted(a for a in self.overrides if start <= a < end):
+            if ida.heads.get(at, (0, "C"))[1] == "C" or self.owner_head_kind(at) == "C":
+                continue
+            ov = self.overrides[at]
+            if ov is None or at in covered:
+                covered.update((at, at + 1))
+                continue
+            name, addend = ov
+            s = self.by_name.get(name)
+            if s is None:
+                sys.exit(f"relocs.txt: unknown symbol {name} at {at:05X}")
+            if exe.word(at) != (s.addr + addend - self.frame_of(s.addr)) & 0xFFFF:
+                sys.exit(f"relocs.txt: the word at {at:05X} is not {name}+{addend:#x}")
+            self._add(w, sec, start, at, R_386_16, name, addend, covered)
         # Near pointers in data items, from IDA data xrefs
         for ea in self.heads_in(self.data_heads, start, end):
             targets = ida.drefs.get(ea)

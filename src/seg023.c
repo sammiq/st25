@@ -44,7 +44,7 @@ void Vec32Sub(Vec32 *a, Vec32 *b);
 void MatTVecMul32(Vec32 *v, int *m, Vec32 *out);
 int Project(long a, long z);
 
-int sub_1E0AF(Rect *out, Rect *a, Rect *b);     /* seg007: clip a to b */
+int ClipRect(Rect *out, Rect *a, Rect *b);      /* seg007: clip a to b */
 
 MemHandle star_bmp = 0;
 Star stars[NUM_STARS];
@@ -113,7 +113,7 @@ void DrawStars(void)
             r.y0 = view_cy - Project(v2.y, v2.z);
             r.x1 = r.x0 + bmp->w - 1;
             r.y1 = r.y0 + bmp->h - 1;
-            if (sub_1E0AF(&rc, &r, &clip_rect))
+            if (ClipRect(&rc, &r, &clip_rect))
                 BlitClipped(bmp, &r, &rc);
         } else
             s->active = 0;

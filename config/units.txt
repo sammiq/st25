@@ -28,7 +28,9 @@ seg017                     .text    2C64A  2D4B8
 seg018                     .text    2D4B8  2E726
 seg019                     .text    2E726  2F0D9
 seg020                     .text    2F0DA  3227D
-seg021                     .text    3227E  33838
+seg021                     .text    3227E  33838  complete
+seg021                     .data    46C20  46C70  complete
+seg021                     .rodata  496AE  4971E  complete
 seg022                     .text    33838  33DD6
 seg023                     .text    33DD6  341CE  complete
 seg023                     .data    46D24  46D26  complete
@@ -211,7 +213,8 @@ far/seg038                 .data    44510  44720
 far/seg039                 .data    44720  44B70
 far/seg040                 .data    44B70  44CE0
 far/seg041                 .data    44CE0  45A50
-data/d45A50                .data    45A50  46D24
+data/d45A50                .data    45A50  46C20
+data/d46C70                .data    46C70  46D24
 data/d46E42                .data    46E42  46ED2
 data/d46F68                .data    46F68  470AC
 data/d47118                .data    47118  47238
@@ -220,7 +223,8 @@ data/d47490                .rodata  47490  4816C
 data/d48510                .rodata  48510  48A84
 data/d48ABA                .rodata  48ABA  48C72
 data/d48DA6                .rodata  48DA6  48EDC
-data/d48F96                .rodata  48F96  497B8
+data/d48F96                .rodata  48F96  496AE
+data/d4971E                .rodata  4971E  497B8
 data/d497D6                .rodata  497D6  49C66
 data/d49C6E                .rodata  49C6E  49E56
 data/d49E78                .bss     49E78  53920

@@ -68,3 +68,23 @@
 33F36  _cam_pos
 33F68  _cam_pos
 34094  _clip_rect
+
+# seg021 (sprites)
+322B0  _sprite_array
+322B6  _sprite_count0
+324AE  _dirty_rects
+324DD  _dirty_rects
+32509  _dirty_rects
+32544  _dirty_rects
+3256B  _dirty_rects
+325A2  _dirty_rects
+3264B  _dirty_rects
+32717  _dirty_rects
+335DA  _mouse_sprite
+32F9B  _ega_palette
+32FBD  _ega_palette
+32FDA  _palette
+33093  _palette
+330A8  _palette
+46C22  _sprite_array
+46C24  _sprite_count0
