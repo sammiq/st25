@@ -356,7 +356,7 @@ class Splitter:
         for r in self.mz_relocs_in(start, end):
             if r in covered:
                 continue
-            if ida.heads.get(r, (0, "C"))[1] == "C" or self.owner_head_kind(r) == "C":
+            if ida.heads.get(r, (0, ""))[1] == "C" or self.owner_head_kind(r) == "C":
                 continue
             segv = exe.relocs[r]
             if ida.heads.get(r, (0, ""))[0] == 2:

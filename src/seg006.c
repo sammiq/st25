@@ -37,7 +37,7 @@ void GameOverMenu(void);               /* seg019: game over */
 void SaveWrite(void *p, int n);     /* seg019: save game I/O */
 void SaveRead(void *p, int n);
 void sub_11DCC(int n);              /* seg001 */
-void sub_309FC(int n);
+void SetRepair(int n);
 
 /* seg023 */
 void StarsReset(void);
@@ -408,10 +408,10 @@ int LoadShotShape(Obj3D *o)
     switch (o->kind) {
     case 3:
         strcpy(name, "expl0X");
-        name[5] = (3 & o->sub) + '0';
+        name[5] = (3 & o->life) + '0';
         o->r3s = CacheLoad(name, "shp");
         o->r3s_type = 0;
-        if (o->sub == 5)
+        if (o->life == 5)
             sub_11DCC(0x26);
         break;
     case 1:
@@ -419,7 +419,7 @@ int LoadShotShape(Obj3D *o)
         break;
     case 0:
         strcpy(name, "shotX");
-        name[4] = (1 & o->sub) + '1';
+        name[4] = (1 & o->life) + '1';
         o->r3s = CacheLoad(name, "shp");
         o->r3s_type = 0;
         break;
@@ -837,13 +837,13 @@ void DrawR3Shape(Obj3D *o)
                 inc bh
                 loop l_clear
             }
-            if (o->visible == R3_SHIP && o->shielded) {
-                if (o->shield_up)
-                    o->shield = max(0, min(o->shield + 1, 28));
+            if (o->visible == R3_SHIP && o->has_shields) {
+                if (o->shields_on)
+                    o->shield_glow = max(0, min(o->shield_glow + 1, 28));
                 else
-                    o->shield = max(0, min(o->shield - 1, 28));
-                if (o->shield >= 20)
-                    CopyRectRemap(buf, 2, 2, hdr, 0, 0, w, h, o->shield - 20);
+                    o->shield_glow = max(0, min(o->shield_glow - 1, 28));
+                if (o->shield_glow >= 20)
+                    CopyRectRemap(buf, 2, 2, hdr, 0, 0, w, h, o->shield_glow - 20);
                 else
                     CopyRect(buf, 2, 2, hdr, 0, 0, w, h);
             } else
@@ -1733,7 +1733,7 @@ void LoadSpace(void)
     SaveRead(&cam_orient, sizeof(cam_orient));
     for (i = 0; i != 4; i++) {
         RestoreR3(&ships[i]);
-        ships[i].unk154 = 0;
+        ships[i].ai_busy = 0;
     }
-    sub_309FC(-1);
+    SetRepair(-1);
 }

@@ -15,10 +15,10 @@
 
 void sub_11DCC(int n);              /* seg001 */
 void sub_12FFF(void);               /* seg000 */
-void sub_2F4C3(void);               /* seg020 */
-void sub_2F50C(void);
-void sub_2FDF2(Obj3D *o, int a, int b);
-void sub_3152F(Vec32 *from, Vec32 *to, int *pitch, int *yaw);
+void ClearShots(void);               /* seg020 */
+void UpdateShips(void);
+void SetSpeed(Obj3D *o, long speed);
+void Bearing(Obj3D *o, Vec32 *to, int *pitch, int *yaw);
 
 /* seg006 */
 void CamReset(void);
@@ -55,7 +55,7 @@ void WarpOut(void)
     Obj3D obj;
 
     MemSet(&obj, sizeof(obj), 0);
-    sub_2F4C3();
+    ClearShots();
     FadeOut();
     player_ship.pos.x = 0;
     player_ship.pos.y = 0;
@@ -116,7 +116,7 @@ void WarpOut(void)
             obj.r3s_type = 0;
         }
         FadeUp();
-        sub_2F50C();
+        UpdateShips();
         RenderR3(0);
         SpriteErase(&mouse_sprite);
         UpdateSprites();
@@ -151,7 +151,7 @@ void OrbitArrive(void)
     long t;
     Obj3D obj;
 
-    sub_2F4C3();
+    ClearShots();
     player_ship.pos = dummy_planet.pos;
     player_ship.pos.x += 550;
     player_ship.pos.z -= 2050;
@@ -167,7 +167,7 @@ void OrbitArrive(void)
         t = GetTicks();
         player_ship.pos.z += speed;
         speed -= 2;
-        sub_3152F(&obj.pos, &player_ship.pos, &pitch, &yaw);
+        Bearing(&obj, &player_ship.pos, &pitch, &yaw);
         MatRotYPre(yaw, &obj.orient);
         cam_orient = obj.orient;
         if (i < 32)
@@ -206,7 +206,7 @@ void OrbitDepart(void)
     Matrix m;
     Vec32 d;
 
-    sub_2F4C3();
+    ClearShots();
     player_ship.pos = dummy_planet.pos;
     player_ship.pos.x -= 300;
     player_ship.pos.z -= 550;
@@ -245,12 +245,12 @@ void OrbitDepart(void)
     StopShip(&player_ship);
     cam_pos = player_ship.pos;
     cam_orient = player_ship.orient;
-    sub_2FDF2(&player_ship, 0, 25);
+    SetSpeed(&player_ship, 25L << 16);
     FlushEvents();
 }
 
 void StopShip(Obj3D *o)
 {
-    o->move.x = o->move.y = o->move.z = o->move_speed = 0;
-    o->turn.x = o->turn.y = o->turn.z = o->turn_speed = 0;
+    o->mo.target_speed = o->mo.turn_target[0] = o->mo.turn_target[1] = o->mo.turn_target[2] = 0;
+    o->mo.speed = o->mo.turn_rate[0] = o->mo.turn_rate[1] = o->mo.turn_rate[2] = 0;
 }
