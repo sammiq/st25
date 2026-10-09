@@ -40,7 +40,7 @@ void EndAnim(int n);
 void BoostEnd(void);
 void InitShips(char *name);
 /* seg033 */
-void sub_3F59A(void);
+void FeatherArrive(void);
 
 void MuddArrive(void);
 void MuddHarlequin(void);
@@ -302,7 +302,7 @@ void MuddReturn(void)
     } else if (m.type == 5 && m.arg == 4) {
         ShuttleEnd();
         Orbit(0, 0);
-        bridge_tick = sub_3F59A;
+        bridge_tick = FeatherArrive;
         bridge_ticks = 0;
         msg_head = (msg_head + 1) % 16;
         StartAnim(1, "bstndsp", 0, 0, 256);

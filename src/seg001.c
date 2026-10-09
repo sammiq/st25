@@ -48,9 +48,9 @@ void LoveReturn(void);
 void MuddArrive(void);
 void MuddHarlequin(void);
 void MuddReturn(void);
-void sub_3F59A(void);
-void sub_3FA2E(void);
-void sub_3FEC1(void);
+void FeatherArrive(void);
+void FeatherKenka(void);
+void FeatherAttack(void);
 void sub_3FEDC(void);
 void sub_400B5(void);
 void sub_401C1(void);
@@ -276,7 +276,7 @@ void (far *tick_fns[32])(void) = {
     TugArrive, TugPirates, TugDisabled, TugOrbit, TugReturn,
     LoveArrive, LoveTravel, LoveRomulans, LoveOrbit, LoveAway, LoveReturn,
     MuddArrive, MuddHarlequin, MuddReturn,
-    sub_3F59A, sub_3FA2E, sub_3FEC1,
+    FeatherArrive, FeatherKenka, FeatherAttack,
     sub_3FEDC, sub_400B5, sub_401C1, sub_402EA, sub_403F1, sub_4058A,
     sub_40E66, sub_41434,
     sub_4074E, sub_40A47

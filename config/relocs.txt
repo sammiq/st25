@@ -349,3 +349,29 @@
 3F4C0  aXstndsp_2
 3F4D4  aXstndmc_3
 3F56B  aBstndsp_3
+
+# seg033: strings pushed as bare immediates
+3F5CA  aBridgeb
+3F5DA  aFeather_2
+3F618  aFea0Flyby
+3F61B  aFeather_3
+3F6D0  aKlingon_1
+3F6FF  aKlingon_2
+3F794  aKlg1_0
+3F7B4  aTaraz
+3F809  aTaraz_0
+3F87F  aTaraz_1
+3F95B  aTaraz_2
+3F95E  aKlg1_1
+3FB95  aKlg2_0
+3FBB5  aAdmiralKenka
+3FC0A  aAdmiralKenka_0
+3FC4C  aAdmiralKenka_1
+3FCA1  aAdmiralKenka_2
+3FD0F  aAdmiralKenka_3
+3FD1F  aWoman_4
+3FD3F  aAdmiral_4
+3FE3B  aKLrta
+3FEC7  aKlingon_3
+3F693  _ships+0xA0
+3F6A2  _ships+0xA0
