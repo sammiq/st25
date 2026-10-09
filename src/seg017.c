@@ -18,7 +18,7 @@
 /* Called here with the rectangle passed whole. */
 void SpriteAddRect(Sprite *s, MemHandle h, Rect r);
 
-void sub_11F1D(void);               /* seg001 */
+void ClearScreen(void);               /* seg001 */
 
 /* seg006 */
 void CamReset(void);
@@ -85,7 +85,7 @@ void Intro(void)
     obj.draw = 0;
     obj.free = 0;
     obj.r3s_type = 0;
-    sub_11F1D();
+    ClearScreen();
     FadeOut();
     LoadPalette("gold");
     LoadFilePacked("goldlogo", "bmp", screen);
@@ -123,7 +123,7 @@ void Intro(void)
     }
     FadeOut();
     LoadPalette("bridge");
-    sub_11F1D();
+    ClearScreen();
     LoadMusic("title");
     t = GetTicks();
     for (frame = 0; frame != 384 || MusicPlaying() && !quit; frame = min(frame + 1, 390)) {

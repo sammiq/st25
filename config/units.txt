@@ -4,7 +4,9 @@
 
 seg000                     .text    10000  11DCC  complete
 seg000                     .rodata  474C8  47586  complete
-seg001                     .text    11DCC  160EE
+seg001                     .text    11DCC  160EE  complete
+seg001                     .data    45A92  45C8E  complete
+seg001                     .rodata  47586  480C5  complete
 seg002                     .text    160EE  16E08  complete
 seg002                     .data    45C8E  45D14  complete
 seg002                     .rodata  480C6  4816C  complete
@@ -241,7 +243,7 @@ far/seg038                 .data    44510  44720
 far/seg039                 .data    44720  44B70
 far/seg040                 .data    44B70  44CE0
 far/seg041                 .data    44CE0  45A50
-data/d45A50                .data    45A50  45C8E
+data/d45A50                .data    45A50  45A92
 data/d45D14                .data    45D14  45D2A
 data/d45E62                .data    45E62  4675E
 data/d46794                .data    46794  46798
@@ -250,7 +252,6 @@ data/d46F68                .data    46F68  470AC
 data/d47118                .data    47118  47238
 data/d473E6                .data    473E6  473F0
 data/d47490                .rodata  47490  474C8
-data/d47586                .rodata  47586  480C6
 data/d487B5                .rodata  487B5  48A80
 data/d497FC                .rodata  497FC  49C66
 data/d49C6E                .rodata  49C6E  49E56

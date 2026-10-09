@@ -13,7 +13,7 @@
 void UpdateActors(void);               /* seg000 */
 void DrawBans(void);
 void UpdateBans(void);
-void sub_11DCC(int a);              /* seg001 */
+void BridgeSfx(int a);              /* seg001 */
 void sub_227D5(int a, int b);       /* seg008 */
 void SaveMenu(void);               /* seg019: save game */
 void LoadMenu(void);               /* seg019: load game */
@@ -466,7 +466,7 @@ int ActionPanel(void)
             }
         }
     }
-    sub_11DCC(16);
+    BridgeSfx(16);
     SpriteErase(&panel);
     UpdateSprites();
     DelSprite(&panel);
@@ -746,7 +746,7 @@ int MenuLoop(unsigned long timeout, int keys)
         }
     }
 done:
-    sub_11DCC(16);
+    BridgeSfx(16);
     return result;
 }
 
@@ -821,7 +821,7 @@ int MenuWait(unsigned long timeout)
         }
     }
 done:
-    sub_11DCC(16);
+    BridgeSfx(16);
     return result;
 }
 

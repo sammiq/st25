@@ -33,13 +33,13 @@ void BoostInit(void);               /* seg020 */
 void SaveNew(void);                 /* seg019 */
 void TextModeMenu(int ask);
 void FreeActors(void);              /* seg000 */
-void sub_11F1D(void);               /* seg001 */
-void sub_121EC(void);
-void sub_128D8(int a);
-void sub_12945(void);
-void sub_12FFF(void);
-void sub_1484B(char *name);
-void sub_15C61(void);
+void ClearScreen(void);               /* seg001 */
+void BridgeLoop(void);
+void BridgeEnter(int a);
+void BridgeLeave(void);
+void CyclePalette(void);
+void Transport(char *name);
+void ResetMsgs(void);
 void sub_1F097(void);               /* seg008 */
 void sub_1F0FE(void);
 void sub_1F14D(void);
@@ -145,7 +145,7 @@ void main(int argc, char **argv)
     game_mode = -1;
     SaveNew();
     LoadPalette("bridge");
-    sub_11F1D();
+    ClearScreen();
     FadeIn();
     TextModeMenu(0);
     FadeOut();
@@ -160,7 +160,7 @@ void main(int argc, char **argv)
             if (prev_mode != -1) {
                 switch (prev_mode) {
                 case 1:
-                    sub_12945();
+                    BridgeLeave();
                     break;
                 case 2:
                     sub_1F14D();
@@ -174,7 +174,7 @@ void main(int argc, char **argv)
             switch (game_mode) {
             case 1:
                 LoadMusic("bridge");
-                sub_128D8(1);
+                BridgeEnter(1);
                 break;
             case 2:
                 sub_1F097();
@@ -182,13 +182,13 @@ void main(int argc, char **argv)
             case 3:
                 byte_52DD4 = 0;
                 LoadMusic("ground");
-                sub_1484B("teled");
+                Transport("teled");
                 game_mode = 2;
                 continue;
             case 4:
-                sub_1484B("teleb");
+                Transport("teleb");
                 game_mode = 1;
-                sub_15C61();
+                ResetMsgs();
                 DigiShutdown();
                 PlaySfx("bridloop");
                 continue;
@@ -196,7 +196,7 @@ void main(int argc, char **argv)
         }
         switch (game_mode) {
         case 1:
-            sub_121EC();
+            BridgeLoop();
             break;
         case 2:
             sub_1F0FE();
@@ -495,7 +495,7 @@ void Turbolift(int unused, int deck)
                 break;
             case EV_TICK:
                 blink_count++;
-                sub_12FFF();
+                CyclePalette();
                 UpdateSprites();
                 break;
             case EV_DOWN1:

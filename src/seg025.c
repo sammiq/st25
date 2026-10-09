@@ -13,8 +13,8 @@
 
 #define VGA_MEM ((char far *)0xA0000000L)
 
-void sub_11DCC(int n);              /* seg001 */
-void sub_12FFF(void);               /* seg000 */
+void BridgeSfx(int n);              /* seg001 */
+void CyclePalette(void);               /* seg000 */
 void ClearShots(void);               /* seg020 */
 void UpdateShips(void);
 void SetSpeed(Obj3D *o, long speed);
@@ -95,7 +95,7 @@ void WarpOut(void)
         if (i == 52)
             DelR3(&player_ship);
         if (i == 44)
-            sub_11DCC(0x29);
+            BridgeSfx(0x29);
         if (i == 48) {
             obj.size = 21;
             obj.reach = 225;
@@ -120,7 +120,7 @@ void WarpOut(void)
         RenderR3(0);
         SpriteErase(&mouse_sprite);
         UpdateSprites();
-        sub_12FFF();
+        CyclePalette();
         ++blink_count;
         while ((unsigned long)t == GetTicks())
             ;
@@ -177,7 +177,7 @@ void OrbitArrive(void)
         RenderR3(0);
         SpriteErase(&mouse_sprite);
         UpdateSprites();
-        sub_12FFF();
+        CyclePalette();
         ++blink_count;
         while ((unsigned long)t == GetTicks())
             ;
@@ -235,7 +235,7 @@ void OrbitDepart(void)
         RenderR3(0);
         SpriteErase(&mouse_sprite);
         UpdateSprites();
-        sub_12FFF();
+        CyclePalette();
         ++blink_count;
         while ((unsigned long)t == GetTicks())
             ;

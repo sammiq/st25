@@ -16,7 +16,7 @@ typedef struct Point {
 
 #define NUM_STARS 45
 
-void sub_12FFF(void);               /* seg000 */
+void CyclePalette(void);               /* seg000 */
 void WarpOut(void);               /* seg025 */
 void CreatePlanet(Obj3D *o, char *name, int radius, int small, unsigned seed, int pal);
 void RandomPlanet(Obj3D *o);
@@ -139,7 +139,7 @@ int StarMap(void)
         if ((e = PeekEvent()) != 0) {
             switch (e->type) {
             case EV_TICK:
-                sub_12FFF();
+                CyclePalette();
                 blink_count++;
                 break;
             case EV_KEY:

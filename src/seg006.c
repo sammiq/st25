@@ -36,7 +36,7 @@ void sub_219F6(char *title, char *msg, int a, int b, int c, int d);    /* seg008
 void GameOverMenu(void);               /* seg019: game over */
 void SaveWrite(void *p, int n);     /* seg019: save game I/O */
 void SaveRead(void *p, int n);
-void sub_11DCC(int n);              /* seg001 */
+void BridgeSfx(int n);              /* seg001 */
 void SetRepair(int n);
 
 /* seg023 */
@@ -412,7 +412,7 @@ int LoadShotShape(Obj3D *o)
         o->r3s = CacheLoad(name, "shp");
         o->r3s_type = 0;
         if (o->life == 5)
-            sub_11DCC(0x26);
+            BridgeSfx(0x26);
         break;
     case 1:
         DrawBeam(o);

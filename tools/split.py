@@ -182,6 +182,8 @@ class Splitter:
                 if self.overrides[ea] is None:
                     continue
                 self._override(w, sec, start, ea, ins, co, code, covered)
+                if ea in OVERRIDE_ONLY:
+                    continue
 
             # Segment fixups from the MZ table
             for r in self.mz_relocs_in(ea, ea + size):
@@ -252,7 +254,7 @@ class Splitter:
                     and ins.memory_segment == ix.Register.DS:
                 t = self.dgroup + (ins.memory_displacement & 0xFFFF)
                 s0 = self.syms.get(t)
-                if s0 is not None and s0.kind == "data" and (ins.memory_displacement & 0xFFFF) >= 0x40:
+                if s0 is not None and s0.kind == "data" and (ins.memory_displacement & 0xFFFF) >= LOW_DGROUP:
                     targets.append(t)
             # Addresses of named DGROUP variables IDA left as plain numbers
             # (push offset music_name, mov cx, offset tab; [bx+tab+2]). Only
@@ -265,13 +267,13 @@ class Splitter:
                     s0 = self.syms.get(self.dgroup + v)
                     port = ins.mnemonic == ix.Mnemonic.MOV and ins.op0_kind == ix.OpKind.REGISTER \
                         and ins.op0_register == ix.Register.DX
-                    if (v >= 0x400 or not port) and v >= 0x40 and self._named_var(s0):
+                    if (v >= 0x400 or not port) and v >= LOW_DGROUP and self._named_var(s0):
                         targets.append(self.dgroup + v)
                 if co.displacement_size == 2 and ins.memory_base != ix.Register.BP \
                         and ins.memory_base != ix.Register.NONE and ins.memory_segment == ix.Register.DS:
                     t = self.dgroup + (ins.memory_displacement & 0xFFFF)
                     s0 = self.syms.containing(t, self.dgroup, self.dgroup_end)
-                    if (ins.memory_displacement & 0xFFFF) >= 0x100 and self._named_var(s0) \
+                    if (ins.memory_displacement & 0xFFFF) >= LOW_DGROUP and self._named_var(s0) \
                             and t < s0.addr + max(s0.size, 1):
                         targets.append(t)
             # Immediates IDA left as numbers (push 3507h): accept them when they
@@ -462,8 +464,18 @@ def _word(code: bytes, off: int) -> int:
     return code[off] | (code[off + 1] << 8)
 
 
+# DGROUP offsets below this (the C runtime's and seg001's _DATA) are as
+# likely structure offsets or small constants (o->expl is [bx+1C8h]) as
+# variable addresses, so unmarked operands there are never taken as
+# references; use config/relocs.txt for the real ones
+LOW_DGROUP = 0x240
+
+# Instructions whose override is their only reference ("SYMBOL only")
+OVERRIDE_ONLY: set[int] = set()
+
+
 def load_overrides(path: Path = ROOT / "config/relocs.txt") -> dict[int, tuple[str, int] | None]:
-    """config/relocs.txt:  INSN_ADDR  SYMBOL[+ADDEND] | none"""
+    """config/relocs.txt:  INSN_ADDR  SYMBOL[+ADDEND] [only] | none"""
     out: dict[int, tuple[str, int] | None] = {}
     if not path.exists():
         return out
@@ -471,7 +483,10 @@ def load_overrides(path: Path = ROOT / "config/relocs.txt") -> dict[int, tuple[s
         line = line.split("#", 1)[0].strip()
         if not line:
             continue
-        addr, ref = line.split()[:2]
+        parts = line.split()
+        addr, ref = parts[:2]
+        if parts[2:3] == ["only"]:
+            OVERRIDE_ONLY.add(int(addr, 16))
         if ref == "none":
             out[int(addr, 16)] = None
             continue

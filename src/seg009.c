@@ -24,7 +24,7 @@ typedef struct InvEntry {
     int code;                   /* 0E */
 } InvEntry;
 
-void sub_11DCC(int a);              /* seg001 */
+void BridgeSfx(int a);              /* seg001 */
 void SaveWrite(void *p, int n);     /* seg019: save game I/O */
 void SaveRead(void *p, int n);
 
@@ -199,7 +199,7 @@ int PickItem(int x, int y, int restore)
             PopEvent();
         }
     }
-    sub_11DCC(16);
+    BridgeSfx(16);
     if (sel >= 0)
         DrawButtonFrame(sprites[sel].handle, 0);
     for (i = 0; i != count; i++)

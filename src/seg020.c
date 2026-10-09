@@ -26,8 +26,8 @@ typedef struct DmgEntry {
 void Fatal(char *fmt, ...);     /* fatal error */
 void sub_219F6(char *title, char *msg, int a, int b, int c, int d);    /* seg008: message box */
 void sub_20099(int msg, int who, int a, int b);                     /* seg008: report */
-void sub_11DCC(int n);              /* seg001: sound effect */
-void sub_14ADE(Obj3D *o);           /* seg001 */
+void BridgeSfx(int n);              /* seg001: sound effect */
+void RepairAll(Obj3D *o);           /* seg001 */
 long sub_3A35E(long x, long y, long z);  /* seg027: length */
 void Vec32Add(Vec32 *a, Vec32 *b);  /* seg027 */
 
@@ -44,7 +44,7 @@ extern Obj3D player_ship;
 extern Obj3D ships[4];
 extern Shot shots[MAX_SHOTS];
 extern unsigned long blink_count;
-extern int word_45AAA;
+extern int under_attack;
 extern char *off_45AA0;
 extern int kbd_mouse;
 extern Obj3D *last_target;          /* last ship the player hit */
@@ -224,11 +224,11 @@ void UpdateShips(void)
 {
     Obj3D *o;
 
-    word_45AAA = 0;
+    under_attack = 0;
     for (o = ships; o != &ships[4]; o++)
         if (o->visible) {
             ShipAI(o);
-            word_45AAA = 1;
+            under_attack = 1;
         }
 }
 
@@ -1009,7 +1009,7 @@ void FireAll(Obj3D *o, Vec32 v, Vec32 *dir)
         for (i = 0; i != 4; ++i, ++p)
             fired |= FireShot(o, &o->weapons[i], dir, p);
         if (fired)
-            sub_11DCC(0x25);
+            BridgeSfx(0x25);
     }
 }
 
@@ -1044,7 +1044,7 @@ void BoostEnd(void)
 {
     boost_active = 0;
     SetPower(0, 0);
-    sub_14ADE(&player_ship);
+    RepairAll(&player_ship);
     SetRepair(-1);
 }
 

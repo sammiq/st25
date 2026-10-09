@@ -1,6 +1,8 @@
 # Reference overrides for the target objects.
 #   INSN_ADDR  SYMBOL[+ADDEND]   force a reference from the instruction at INSN_ADDR
 #   INSN_ADDR  none              no reference at all
+#   INSN_ADDR  SYMBOL[+ADDEND] only   that reference, and no other operand of the
+#                                 instruction relocated
 # The operand (immediate or displacement) whose value equals the symbol's
 # offset is relocated. Use this where IDA did not mark an operand as an offset
 # or chose the wrong symbol (e.g. one past the end of an array).
@@ -248,3 +250,20 @@
 2637C  _word_51142
 25D90  none
 25D9F  none
+
+# seg001 (bridge)
+1227D  _player_ship+0xC
+129F0  _sub_41434
+13B4F  _repair_names
+13B5F  _repair_names
+13BEF  _dummy_planet+0xC
+13FAC  _ships+0x738
+14D87  _player_ship+0xC4
+14DB5  _player_ship+0xA0
+157C6  _cam_tab2+0x4 only
+157FB  _player_ship+0xC
+15806  _player_ship+0xC
+15798  aElasi+0x35
+15837  aElasi+0x3E
+15873  aElasi+0x44
+12C5A  _radar_colors
