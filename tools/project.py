@@ -10,6 +10,7 @@ from __future__ import annotations
 import bisect
 import re
 import struct
+import sys
 from dataclasses import dataclass, field
 from typing import Callable
 from pathlib import Path
@@ -215,6 +216,18 @@ class SymbolTable:
                 continue
             f = line.split()
             syms.append(Sym(int(f[0], 16), f[1], int(f[2], 16), f[3], set(f[4:])))
+        # Tools look symbols up by name (relocs.txt, rename.py, fdiff.py) and
+        # by address, so both must be unique.
+        dups = []
+        for key, what in ((lambda s: s.name, "name"), (lambda s: s.addr, "address")):
+            seen: dict = {}
+            for s in syms:
+                k = key(s)
+                if k in seen:
+                    dups.append(f"duplicate {what}: {seen[k].addr:05X} {seen[k].name} / {s.addr:05X} {s.name}")
+                seen[k] = s
+        if dups:
+            sys.exit(f"{path}:\n  " + "\n  ".join(dups))
         return cls(syms)
 
     def save(self, path: Path = SYMBOLS) -> None:

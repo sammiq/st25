@@ -45,9 +45,9 @@ void LoveRomulans(void);
 void LoveOrbit(void);
 void LoveAway(void);
 void LoveReturn(void);
-void sub_3E8D4(void);
-void sub_3EBA4(void);
-void sub_3F08B(void);
+void MuddArrive(void);
+void MuddHarlequin(void);
+void MuddReturn(void);
 void sub_3F59A(void);
 void sub_3FA2E(void);
 void sub_3FEC1(void);
@@ -275,7 +275,7 @@ void (far *tick_fns[32])(void) = {
     DemonArrive, DemonFight, DemonHail, DemonTravel, DemonReturn,
     TugArrive, TugPirates, TugDisabled, TugOrbit, TugReturn,
     LoveArrive, LoveTravel, LoveRomulans, LoveOrbit, LoveAway, LoveReturn,
-    sub_3E8D4, sub_3EBA4, sub_3F08B,
+    MuddArrive, MuddHarlequin, MuddReturn,
     sub_3F59A, sub_3FA2E, sub_3FEC1,
     sub_3FEDC, sub_400B5, sub_401C1, sub_402EA, sub_403F1, sub_4058A,
     sub_40E66, sub_41434,

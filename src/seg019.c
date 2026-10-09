@@ -78,7 +78,7 @@ void RestoreNew(void);
 char *SlotName(int n, char *title, char *out);
 char *MenuText(int n, char **list, char *out);
 void SaveMenu(void);
-void LoadMenu(void);
+void LoadGameMenu(void);
 void QuitMenu(int x, int y);
 void GameOverMenu(void);
 void TextModeMenu(int ask);
@@ -292,7 +292,7 @@ void SaveMenu(void)
     }
 }
 
-void LoadMenu(void)
+void LoadGameMenu(void)
 {
     int i;
 
@@ -355,7 +355,7 @@ void GameOverMenu(void)
             Fatal("#GENE\\GENER021#Restore new game failed.");
         case 0:
             FadeOut();
-            LoadMenu();
+            LoadGameMenu();
         case -1:
             continue;
         case 2:

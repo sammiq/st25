@@ -325,3 +325,27 @@
 3E673  aXstndsp_1
 3E687  aXstndmc_2
 3E86B  aBstndsp_2
+
+# seg032: strings pushed as bare immediates
+3E93D  aBridge_9
+3E94D  aMudd_0
+3E985  aMud0Flyby
+3E988  aAnother
+3EA4F  aAdmiral_3
+3EA52  aWoman_3
+3ECD9  aVoice
+3EDE7  aElasiPirate
+3EDEA  aPira_3
+3EDF5  aOrion_2
+3EE00  aOrion_3
+3EE55  aMudd_1
+3EE75  aHarryMudd
+3EEBC  aHarryMudd_0
+3F149  aMudd_2
+3F169  aHarryMudd_1
+3F1B0  aHarryMudd_2
+3F1F5  aHarryMudd_3
+3F23C  aHarryMudd_4
+3F4C0  aXstndsp_2
+3F4D4  aXstndmc_3
+3F56B  aBstndsp_3

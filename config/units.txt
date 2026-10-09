@@ -237,7 +237,8 @@ seg030                     .data    46E42  46E88  complete
 seg030                     .rodata  49898  498FD  complete
 seg031                     .text    3DDDA  3E8D3  complete
 seg031                     .rodata  498FE  499B0  complete
-seg032                     .text    3E8D4  3F599
+seg032                     .text    3E8D4  3F599  complete
+seg032                     .rodata  499B0  49A65  complete
 seg033                     .text    3F59A  3FEDB
 seg034                     .text    3FEDC  4074D
 seg035                     .text    4074E  40E66
@@ -257,7 +258,7 @@ data/d46F68                .data    46F68  470AC
 data/d47118                .data    47118  47238
 data/d473E6                .data    473E6  473F0
 data/d47490                .rodata  47490  474C8
-data/d499B0                .rodata  499B0  49C66
+data/d49A66                .rodata  49A66  49C66
 data/d49C6E                .rodata  49C6E  49E56
 data/d49E78                .bss     49E78  53920
 data/stack                 .bss     53920  54820

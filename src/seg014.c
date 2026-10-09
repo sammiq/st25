@@ -16,7 +16,7 @@ void UpdateBans(void);
 void BridgeSfx(int a);              /* seg001 */
 void ActionCursor(int a, int b);       /* seg008 */
 void SaveMenu(void);               /* seg019: save game */
-void LoadMenu(void);               /* seg019: load game */
+void LoadGameMenu(void);           /* seg019: load game */
 void QuitMenu(int x, int y);       /* seg019: quit */
 void TextModeMenu(int a);
 
@@ -240,7 +240,7 @@ void OptionsMenu(int x, int y)
         SaveMenu();
         break;
     case 1:
-        LoadMenu();
+        LoadGameMenu();
         break;
     case 2:
         SetMusicOn(1);

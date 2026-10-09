@@ -77,7 +77,7 @@ def main() -> None:
 
     # Symbols starting inside the range: keep their names; one running past
     # the end leaves a symbol at `hi` for the rest.
-    keep: dict[int, str] = {}
+    keep: dict[int, tuple[str, int]] = {}
     tail: tuple[int, int, str] | None = None
     out_lines = []
     for l in lines:
@@ -85,19 +85,25 @@ def main() -> None:
         if m and m.group(2) == "data":
             a, n, name = int(m.group(1), 16), int(m.group(3), 16), m.group(4)
             if lo <= a < hi:
-                keep[a] = name
+                keep[a] = (name, n)
                 if a + n > hi:
                     tail = (hi, a + n - hi, name)
                 continue
             if a < lo < a + n:          # covers the start of the range
                 l = f"{a:05X}  data   {lo - a:06X}  {name}"
-                if a + n > hi:
-                    tail = (hi, a + n - hi, name)
+                if a + n > hi:              # the head keeps the name
+                    tail = (hi, a + n - hi, make_name("", taken))
         out_lines.append(l)
 
     new: dict[int, tuple[int, str]] = {}
     for a, n, text in strings:
-        new[a] = (n, keep.get(a) or make_name(text, taken))
+        # Keep a name only where it named just this string; a symbol that
+        # ran on over others (a leftover blob) keeps its name for the tail.
+        old = keep.get(a)
+        if old and old[1] <= n and not (tail and tail[2] == old[0]):
+            new[a] = (n, old[0])
+        else:
+            new[a] = (n, make_name(text, taken))
     if tail:
         new[tail[0]] = (tail[1], tail[2])
 

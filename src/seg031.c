@@ -37,7 +37,7 @@ void EndAnim(int n);
 void BoostEnd(void);
 void InitShips(char *name);
 /* seg032 */
-void sub_3E8D4(void);
+void MuddArrive(void);
 
 void LoveArrive(void);
 void LoveTravel(void);
@@ -332,7 +332,7 @@ void LoveReturn(void)
             msg_head = (msg_head + 1) % 16;
             ShuttleEnd();
             Orbit(0, 0);
-            bridge_tick = sub_3E8D4;
+            bridge_tick = MuddArrive;
             bridge_ticks = 0;
             StartAnim(1, "bstndsp", 0, 0, 256);
             EndAnim(2);
