@@ -948,11 +948,11 @@
 3BB33  func   0000D7  _sub_3BB33
 3BC0A  func   000080  _sub_3BC0A
 3C0E3  func   000044  _sub_3C0E3
-3C136  func   00017B  _sub_3C136
-3C2B1  func   000230  _sub_3C2B1
-3C4E1  func   000161  _sub_3C4E1
-3C642  func   0002A3  _sub_3C642
-3C8E5  func   000240  _sub_3C8E5  near
+3C136  func   00017B  _DemonArrive
+3C2B1  func   000230  _DemonFight
+3C4E1  func   000161  _DemonHail
+3C642  func   0002A3  _DemonTravel
+3C8E5  func   000240  _DemonReturn  near
 3CB26  func   00024E  _sub_3CB26
 3CD74  func   0002EC  _sub_3CD74
 3D060  func   00011D  _sub_3D060
@@ -2161,7 +2161,17 @@
 49804  data   000006  aDemon
 4980A  data   00000B  aDem0Flyby
 49815  data   000006  aDemon_0
-4981B  data   0000B2  aCaptainSLog_1
+4981B  data   00000E  aCaptainSLog_1
+49829  data   000009  aEnterpri_0
+49832  data   000034  aLoweringShields
+49866  data   000008  aAdmiral_2
+4986E  data   000006  aWoman_0
+49874  data   000007  aPriest
+4987B  data   000005  aPrst
+49880  data   000008  aXstndsp
+49888  data   000008  aXstndmc_0
+49890  data   000008  aBstndsp_0
+49898  data   000035  aBridge_10
 498CD  data   000385  _a2933911977363829
 49C52  data   00000D  aSfxGeneeulo
 49C5F  data   000007  aBridge_9
@@ -2424,4 +2434,3 @@
 538E8  data   000034  _bspr4
 5391C  data   000004  _stream_play_pos
 53920  data   000F00  _end  lib
-

@@ -29,11 +29,11 @@ void Fatal();
 void PostRoomMsg(int msg, int who, int a, int b);     /* seg008: report */
 void MsgBox(char *title, char *msg, int a, int b, int c, int d);    /* seg008: message box */
 /* mission bridge handlers, seg029 - seg036 */
-void sub_3C136(void);
-void sub_3C2B1(void);
-void sub_3C4E1(void);
-void sub_3C642(void);
-void sub_3C8E5(void);
+void DemonArrive(void);
+void DemonFight(void);
+void DemonHail(void);
+void DemonTravel(void);
+void DemonReturn(void);
 void sub_3CB26(void);
 void sub_3CD74(void);
 void sub_3D060(void);
@@ -265,14 +265,14 @@ int kbd_mouse = 0;                  /* the pointer steers the ship */
 int in_orbit = 0;                 /* in orbit */
 int under_attack = 0;
 int encounter_kind = 0;                 /* encounter: 1 Klingon, 2 Romulan, 3 Elasi */
-void (far *bridge_tick)(void) = sub_3C136;    /* the bridge tick */
+void (far *bridge_tick)(void) = DemonArrive;    /* the bridge tick */
 int word_45AB2 = -1;
 int word_45AB4 = 18;
 int magnify = 6;                 /* magnification */
 int view_dir = 0;                 /* view direction, -1 forward */
 int word_45ABA = 0;
 void (far *tick_fns[32])(void) = {
-    sub_3C136, sub_3C2B1, sub_3C4E1, sub_3C642, sub_3C8E5,
+    DemonArrive, DemonFight, DemonHail, DemonTravel, DemonReturn,
     sub_3CB26, sub_3CD74, sub_3D060, sub_3D17D, sub_3D474,
     sub_3DDDA, sub_3DF4F, sub_3E10E, sub_3E34B, sub_3E462, sub_3E63B,
     sub_3E8D4, sub_3EBA4, sub_3F08B,

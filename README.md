@@ -167,6 +167,7 @@ MASM 5.0 (`tools/MASM50`) assembles `src/<unit>.asm` (`/Ml`, case-sensitive name
 | `inc [i] / test [p] / jne +3 / jmp exit / jmp top` | an empty `while` body with a comma condition: `while (i++, *p++) ;` |
 | `switch` on `ax` straight after `mov [k], ax` | the assignment is in the `switch`: `switch (k = (ev.key >> 8) & 0xFF)` |
 | a function that only copies its argument (`mov [m], ax / mov [m+2], dx`) and then `jmp` to its epilogue | an empty `switch (m) { }`, left over from debug code compiled out (`TraceMsg`) |
+| a `switch` whose compare chain is a single `jmp` | the `switch` has only a `default:` (`DemonHail` in `src/seg029.c`) |
 | an empty string literal pushed as a bare number | IDA didn't mark it as an offset. Add `aEmpty_N` symbols for each `""` in `symbols.txt`, shrink the string before it, and add `config/relocs.txt` entries for the pushes |
 
 String literals go into `CONST` (`.rodata`), in source order, except that a call's arguments are evaluated right to left: `f("a", "b")` stores `"b"` first. A unit's strings form a contiguous range of the game's `CONST` area, so assign that range to the unit as `.rodata` in `units.txt`. Each module's `CONST` starts on an even address. If a module's strings have an odd total length, the `00` byte after them is LINK padding, not part of the module, so end the range before it.

@@ -285,3 +285,10 @@
 20B95  aEmpty_20
 20E5B  aEmpty_21
 20F10  aEmpty_22
+
+# seg029: strings pushed as bare immediates
+3C225  aEnterpri_0
+3C3C7  aLoweringShields
+3C77E  aPriest
+3C781  aPrst
+3C3D6  _ships+0xD0
