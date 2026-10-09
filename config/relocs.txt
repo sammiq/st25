@@ -246,8 +246,8 @@
 11D5A  _walk+0x2
 
 # seg012 (main, puzzles)
-25E70  _byte_52DDA+0x5
-2637C  _word_51142
+25E70  _room+0x29
+2637C  _room_mission
 25D90  none
 25D9F  none
 
@@ -267,3 +267,21 @@
 15837  aElasi+0x3E
 15873  aElasi+0x44
 12C5A  _radar_colors
+
+# seg008 (away team)
+2370E  _room+0x14
+23735  _room+0x25
+23780  _room+0x25
+
+# seg008: empty strings pushed as bare immediates
+208E8  aEmpty_12
+20916  aEmpty_13
+20938  aEmpty_14
+2095A  aEmpty_15
+2097C  aEmpty_16
+2099B  aEmpty_17
+209F2  aEmpty_18
+20A14  aEmpty_19
+20B95  aEmpty_20
+20E5B  aEmpty_21
+20F10  aEmpty_22

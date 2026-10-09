@@ -32,7 +32,7 @@ typedef struct Point {
 } Point;
 
 void Fatal(char *fmt, ...);     /* fatal error */
-void sub_219F6(char *title, char *msg, int a, int b, int c, int d);    /* seg008: message box */
+void MsgBox(char *title, char *msg, int a, int b, int c, int d);    /* seg008: message box */
 void GameOverMenu(void);               /* seg019: game over */
 void SaveWrite(void *p, int n);     /* seg019: save game I/O */
 void SaveRead(void *p, int n);
@@ -369,7 +369,7 @@ void RenderR3(int statics)
         }
     }
     if (dead) {
-        sub_219F6("", "#GENE\\SPACE000#The Enterprise has been destroyed!", 20, 20, 0xB0, 0);
+        MsgBox("", "#GENE\\SPACE000#The Enterprise has been destroyed!", 20, 20, 0xB0, 0);
         GameOverMenu();
     }
     if (statics && !player_ship.expl)

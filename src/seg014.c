@@ -14,7 +14,7 @@ void UpdateActors(void);               /* seg000 */
 void DrawBans(void);
 void UpdateBans(void);
 void BridgeSfx(int a);              /* seg001 */
-void sub_227D5(int a, int b);       /* seg008 */
+void ActionCursor(int a, int b);       /* seg008 */
 void SaveMenu(void);               /* seg019: save game */
 void LoadMenu(void);               /* seg019: load game */
 void QuitMenu(int x, int y);       /* seg019: quit */
@@ -310,7 +310,7 @@ int ActionPanel(void)
     SetPointer(mouse_x, mouse_y);
     AddSprite(&panel);
     SpriteSetPos(&panel, x, y, 15);
-    sub_227D5(sel, 0);
+    ActionCursor(sel, 0);
     UpdateSprites();
     panel.layer = 8;
     running = 1;
@@ -482,7 +482,7 @@ int ActionPanel(void)
         SetPointer(mouse_x, mouse_y);
     } else if (sel == 1 && clicked)
         PostEvent(&e);
-    sub_227D5(sel, 0);
+    ActionCursor(sel, 0);
     key_accel = old_accel;
     return sel;
 }

@@ -24,8 +24,8 @@ typedef struct DmgEntry {
 } DmgEntry;
 
 void Fatal(char *fmt, ...);     /* fatal error */
-void sub_219F6(char *title, char *msg, int a, int b, int c, int d);    /* seg008: message box */
-void sub_20099(int msg, int who, int a, int b);                     /* seg008: report */
+void MsgBox(char *title, char *msg, int a, int b, int c, int d);    /* seg008: message box */
+void PostRoomMsg(int msg, int who, int a, int b);                     /* seg008: report */
 void BridgeSfx(int n);              /* seg001: sound effect */
 void RepairAll(Obj3D *o);           /* seg001 */
 long sub_3A35E(long x, long y, long z);  /* seg027: length */
@@ -483,7 +483,7 @@ void UpdatePower(Obj3D *o)
             o->power -= 10;
             o->shields_pwr = 1;
         } else if (o->shields_pwr) {
-            sub_20099(2, o != &player_ship, 0, 0);
+            PostRoomMsg(2, o != &player_ship, 0, 0);
             o->shields_pwr = 0;
         }
     } else
@@ -503,7 +503,7 @@ void UpdatePower(Obj3D *o)
             o->power -= 10;
             o->weapons_pwr = 1;
         } else if (o->weapons_pwr) {
-            sub_20099(3, o != &player_ship, 0, 0);
+            PostRoomMsg(3, o != &player_ship, 0, 0);
             o->weapons_pwr = 0;
         }
     } else
@@ -645,7 +645,7 @@ void SetRepair(int sys)
 {
     repair_sys = sys;
     if (sys != -1)
-        sub_219F6(off_45AA0, "#BRID\\BRID_S22#Aye Sir.", 0x40, 0x64, 0xA1, 0);
+        MsgBox(off_45AA0, "#BRID\\BRID_S22#Aye Sir.", 0x40, 0x64, 0xA1, 0);
 }
 
 /* Every 32 frames: recharge the shields and repair the systems a little. */
@@ -669,7 +669,7 @@ void Repair(Obj3D *o)
         case 6:
             p = &o->systems[repair_sys];
             if (p->cur == p->max) {
-                sub_20099(7, repair_sys, 0, 0);
+                PostRoomMsg(7, repair_sys, 0, 0);
                 repair_sys = -1;
             } else
                 p->cur = min(p->cur + 1, p->max);
@@ -694,7 +694,7 @@ void Repair(Obj3D *o)
                 else
                     p->cur = min(p->cur + 1, p->max);
             if (left == 0) {
-                sub_20099(7, repair_sys, 0, 0);
+                PostRoomMsg(7, repair_sys, 0, 0);
                 repair_sys = -1;
             }
             break;

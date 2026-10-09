@@ -18,6 +18,7 @@
 #include "resource.h"
 #include "fixmath.h"
 #include "obj3d.h"
+#include "room.h"
 #undef FindCD
 
 int getch(void);
@@ -40,13 +41,13 @@ void BridgeLeave(void);
 void CyclePalette(void);
 void Transport(char *name);
 void ResetMsgs(void);
-void sub_1F097(void);               /* seg008 */
-void sub_1F0FE(void);
-void sub_1F14D(void);
-void sub_1F222(void *p, int room);
-void sub_1F487(int a);
-void sub_1FF30(void);
-void sub_219F6(char *title, char *msg, int a, int b, int c, int d);    /* seg008: message box */
+void StartAway(void);               /* seg008 */
+void AwayLoop(void);
+void EndAway(void);
+void LoadRoom(char *mission, int n);
+void EnterRoom(int a);
+void FreeRoom(void);
+void MsgBox(char *title, char *msg, int a, int b, int c, int d);    /* seg008: message box */
 
 void main(int argc, char **argv);
 void InitScreens(void);
@@ -77,10 +78,7 @@ extern Obj3D dummy_planet;
 extern char sfx_name[];
 extern int sb_port;
 extern int sb_irq;
-extern char byte_52DD4;
-extern char byte_52DDA[];
 extern char room_name[];
-extern int word_51142[];
 extern jmp_buf game_jmp;            /* back to the main loop */
 extern jmp_buf room_jmp;
 extern int game_mode;               /* 1 bridge, 2 away team; 3, 4 beaming */
@@ -163,7 +161,7 @@ void main(int argc, char **argv)
                     BridgeLeave();
                     break;
                 case 2:
-                    sub_1F14D();
+                    EndAway();
                     break;
                 case 3:
                 case 4:
@@ -177,10 +175,10 @@ void main(int argc, char **argv)
                 BridgeEnter(1);
                 break;
             case 2:
-                sub_1F097();
+                StartAway();
                 break;
             case 3:
-                byte_52DD4 = 0;
+                room.redshirt_dead = 0;
                 LoadMusic("ground");
                 Transport("teled");
                 game_mode = 2;
@@ -199,7 +197,7 @@ void main(int argc, char **argv)
             BridgeLoop();
             break;
         case 2:
-            sub_1F0FE();
+            AwayLoop();
             break;
         case 3:
         case 4:
@@ -416,7 +414,7 @@ void Turbolift(int unused, int deck)
     int unk4a;
     int done;
     int shown;
-    int room;
+    int num;
     int dir;
     int timeout;
     char *p;
@@ -434,7 +432,7 @@ void Turbolift(int unused, int deck)
     shown = 0;
     FreeActors();
     SetSpriteList(list, &count);
-    p = &byte_52DDA[5];
+    p = room.vars;
     if (p[9] == 0) {
         LoadFilePacked("veng9b", "bmp", screen);
         MemCpy(backbuf->data, screen->data, 0xFA00);
@@ -505,10 +503,10 @@ void Turbolift(int unused, int deck)
                     done = 1;
                 else if (hit == 6) {
                     sprintf(msg, "#GENE\\GENE_F14#Turbolift access is blocked by an extremely high radiation level.");
-                    sub_219F6(0, msg, 50, 50, 176, 0);
+                    MsgBox(0, msg, 50, 50, 176, 0);
                 } else if (hit == 7) {
                     sprintf(msg, "#GENE\\GENE_F15#This Turbolift cannot reach that area of the ship.");
-                    sub_219F6(0, msg, 50, 50, 176, 0);
+                    MsgBox(0, msg, 50, 50, 176, 0);
                 }
                 break;
             case EV_MOVE:
@@ -540,31 +538,31 @@ void Turbolift(int unused, int deck)
     FreeMemPtr(s);
     RESTORE_ROOM();
     if (hit == 1) {
-        room = 0;
+        num = 0;
         dir = 1;
     } else if (hit == 2) {
-        room = 1;
+        num = 1;
         dir = 1;
     } else if (hit == 3 && deck == 0) {
-        room = 3;
+        num = 3;
         dir = 1;
     } else if (hit == 3 && deck == 1) {
-        room = 3;
+        num = 3;
         dir = 0;
     } else if (hit == 4) {
-        room = 5;
+        num = 5;
         dir = 1;
     } else if (hit == 5) {
-        room = 7;
+        num = 7;
         dir = 1;
     } else {
-        room = 0;
+        num = 0;
         dir = 1;
     }
-    sub_1FF30();
+    FreeRoom();
     LoadMusic("ground");
-    sub_1F222(word_51142, room);
-    sub_1F487(dir % 6);
+    LoadRoom(room_mission, num);
+    EnterRoom(dir % 6);
     longjmp(room_jmp, 1);
     return;
 }

@@ -10,8 +10,8 @@
 #include "event.h"
 
 int isprint(int c);
-void sub_219F6(char *title, char *msg, int a, int b, int c, int d);   /* seg008: message box */
-void sub_21B8C(char *(far *get)(int, void *, char *), void *data, int a, int b, int c, int d,
+void MsgBox(char *title, char *msg, int a, int b, int c, int d);   /* seg008: message box */
+void TextBox(char *(far *get)(int, void *, char *), void *data, int a, int b, int c, int d,
                int e, int f);                                        /* seg008: list box */
 void TrackMouse(Event *e);                                            /* seg012 */
 
@@ -129,9 +129,9 @@ void Computer(void)
             CacheRelease(h);
         }
         if (list.count)
-            sub_21B8C(GetDBEntry, &list, 20, 20, 176, 0, 0, 0);
+            TextBox(GetDBEntry, &list, 20, 20, 176, 0, 0, 0);
         else
-            sub_219F6("Spock", "#COMP\\COMPUNOT#Topic not available, Captain.", 294, 106, 44, 0);
+            MsgBox("Spock", "#COMP\\COMPUNOT#Topic not available, Captain.", 294, 106, 44, 0);
     }
 }
 

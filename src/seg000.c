@@ -31,12 +31,12 @@ void qsort();
 void Fatal(char *fmt, ...);     /* fatal error */
 void SaveWrite(void *p, unsigned n);    /* seg019 */
 void SaveRead(void *p, unsigned n);
-int sub_22E93(int x, int y);        /* seg008: is (x, y) blocked */
-void sub_22C2D(int x, int y);       /* seg008 */
-void sub_20099(int msg, int who, int a, int b);     /* seg008: report */
-int sub_2006A(int y);               /* seg008: depth for y */
-int sub_1FFB6(int y);               /* seg008: scale for y */
-void sub_239D2(Actor *a, int n);    /* seg008 */
+int WalkBlocked(int x, int y);        /* seg008: is (x, y) blocked */
+void CheckRegions(int x, int y);       /* seg008 */
+void PostRoomMsg(int msg, int who, int a, int b);     /* seg008: report */
+int DepthPri(int y);               /* seg008: depth for y */
+int DepthScale(int y);               /* seg008: scale for y */
+void StandUp(Actor *a, int n);    /* seg008 */
 
 extern Bitmap far *screen;
 extern Bitmap far *backbuf;
@@ -162,7 +162,7 @@ int StartWalk(int n, char *name, int x, int y, int dx, int dy)
 
     a = &actors[n];
     a->notify = 0;
-    if (sub_22E93(dx, dy))
+    if (WalkBlocked(dx, dy))
         return 0;
     if (a->state)
         release_anim(a);
@@ -234,7 +234,7 @@ void AnimStep(int n)
         if (a->frame != next && next == a->nframes - 1) {
             a->loops++;
             if (a->notify)
-                sub_20099(10, a->notify_arg, 0, 0);
+                PostRoomMsg(10, a->notify_arg, 0, 0);
         }
         a->frame = next;
         if (a->frame >= a->nframes) {
@@ -261,7 +261,7 @@ void AnimStep(int n)
             data = LockMem(a->anim);
             f = data;
             f += a->frame;
-            z = sub_2006A(a->y + f->y) + f->z;
+            z = DepthPri(a->y + f->y) + f->z;
             SpriteSetPos(s, a->x + f->x, a->y + f->y, z);
             a->next_time = f->delay + blink_count;
             UnlockMem(a->anim);
@@ -284,12 +284,12 @@ void WalkStep(int n)
     if (blink_count >= a->next_time) {
         s = &a->sprite;
         if (n == 0)
-            sub_22C2D(actors[0].x, actors[0].y);
+            CheckRegions(actors[0].x, actors[0].y);
         if (a->steps) {
             int i;
             int k;
 
-            if (sub_1FFB6((a->fy + 0x8000) >> 16) < 160)
+            if (DepthScale((a->fy + 0x8000) >> 16) < 160)
                 k = 1;
             else
                 k = 2;
@@ -309,7 +309,7 @@ void WalkStep(int n)
         } else if (a->walk_node == -1) {
             if (a->notify) {
                 a->notify = 0;
-                sub_20099(12, a->notify_arg & 0xFF, 0, 0);
+                PostRoomMsg(12, a->notify_arg & 0xFF, 0, 0);
             }
             FreeSpriteBitmap(s->handle, a->scale);
             SetWalkFrame(a, (a->fx + 0x8000) >> 16, (a->fy + 0x8000) >> 16);
@@ -885,7 +885,7 @@ void InitAnim(Actor *a, char *name, int x, int y, int scale, int add)
     a->scale = scale;
     data = LockMem(a->anim);
     f = data;
-    z = sub_2006A(a->y + f->y) + f->z;
+    z = DepthPri(a->y + f->y) + f->z;
     SpriteSetPos(s, a->x + f->x, a->y + f->y, z);
     UnlockMem(a->anim);
     a->state = 1;
@@ -928,12 +928,12 @@ void init_stand_anim(int n)
     a = &actors[n];
     if (a->state == 0)
         Fatal("init_stand_anim: dead anim");
-    sub_239D2(a, n);
+    StandUp(a, n);
     if (a->dir)
         sprintf(name, "%s%c", a->stand, a->dir);
     else
         sprintf(name, "%ss", a->stand);
-    StartAnim(n, name, a->x, a->y, sub_1FFB6(a->y));
+    StartAnim(n, name, a->x, a->y, DepthScale(a->y));
     a->type = ANIM_STAND;
 }
 
@@ -942,12 +942,12 @@ void SetWalkFrame(Actor *a, int x, int y)
 {
     char name[16];
 
-    a->scale = sub_1FFB6(y);
+    a->scale = DepthScale(y);
     sprintf(name, "%s%02d", a->walk_name, a->step & 7);
     SpriteSetBitmap(&a->sprite, LoadSpriteBitmap(name, a->scale));
     strncpy(a->bitmap, name, 9);
     a->bitmap[9] = 0;
-    SpriteSetPos(&a->sprite, x, y, sub_2006A(y));
+    SpriteSetPos(&a->sprite, x, y, DepthPri(y));
     a->next_time = blink_count;
     a->x = x;
     a->y = y;
@@ -1008,12 +1008,12 @@ int CanWalk(int x0, int y0, int x1, int y1)
     }
     x = (long)x0 << 16;
     y = (long)y0 << 16;
-    if (sub_22E93((x + 0x8000) >> 16, (y + 0x8000) >> 16))
+    if (WalkBlocked((x + 0x8000) >> 16, (y + 0x8000) >> 16))
         return 0;
     while (n--) {
         x += dx;
         y += dy;
-        if (sub_22E93((x + 0x8000) >> 16, (y + 0x8000) >> 16))
+        if (WalkBlocked((x + 0x8000) >> 16, (y + 0x8000) >> 16))
             return 0;
     }
     return 1;

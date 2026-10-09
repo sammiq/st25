@@ -19,14 +19,15 @@
 #include "obj3d.h"
 #include "actor.h"
 #include "menu.h"
+#include "room.h"
 
 /* Called here with the rectangle passed whole. */
 void SpriteAddRect(Sprite *s, MemHandle h, Rect r);
 
 int getch(void);
 void Fatal();
-void sub_20099(int msg, int who, int a, int b);     /* seg008: report */
-void sub_219F6(char *title, char *msg, int a, int b, int c, int d);    /* seg008: message box */
+void PostRoomMsg(int msg, int who, int a, int b);     /* seg008: report */
+void MsgBox(char *title, char *msg, int a, int b, int c, int d);    /* seg008: message box */
 /* mission bridge handlers, seg029 - seg036 */
 void sub_3C136(void);
 void sub_3C2B1(void);
@@ -83,7 +84,7 @@ void SetRepair(int sys);
 void Vec32Add(Vec32 *a, Vec32 *b);
 /* others */
 int StarMap(void);                  /* seg023 */
-void sub_23239(char *buf, int n, char *name);   /* seg008 */
+void CrewAnim(char *buf, int n, char *name);   /* seg008 */
 void InitShips(char *name);         /* seg020 */
 void ClearShots(void);
 int tolower(int c);
@@ -92,7 +93,7 @@ void FreeShotShape(Obj3D *o);
 void DelR3(Obj3D *o);
 void StopShip(Obj3D *o);            /* seg025 */
 void RandomPlanet(Obj3D *o);
-void sub_21625(int x, char far *name, int n);   /* seg008 */
+void ChoiceTitle(int x, char far *name, int n);   /* seg008 */
 void StarsReset(void);
 void OrbitArrive(void);             /* seg025 */
 void OrbitDepart(void);
@@ -232,7 +233,6 @@ extern int boost_power;
 extern int boost_time;
 extern int encounter_delay;
 extern int word_51156;
-extern char byte_52DD4;
 extern Bitmap far *backbuf;
 extern Obj3D shot_obj;
 extern int small_planets;
@@ -469,7 +469,7 @@ void BridgeLoop(void)
         }
         switch (ev.type) {
         case EV_TICK:
-            sub_20099(0, (int)bridge_ticks & 0xFF, (int)(bridge_ticks >> 8) & 0xFF, (int)(bridge_ticks >> 16) & 0xFF);
+            PostRoomMsg(0, (int)bridge_ticks & 0xFF, (int)(bridge_ticks >> 8) & 0xFF, (int)(bridge_ticks >> 16) & 0xFF);
             blink_count++;
             bridge_ticks++;
             if (in_orbit == 0) {
@@ -490,14 +490,14 @@ void BridgeLoop(void)
             break;
         case EV_DOWN2:
             if (word_45AA2 == 0 && kbd_mouse)
-                sub_20099(1, 2, 0, 0);
+                PostRoomMsg(1, 2, 0, 0);
             break;
         case EV_DOWN1:
             if (word_45AA2 == 0) {
                 if (kbd_mouse == 0)
                     ClickCrew(ev.x, ev.y);
                 else
-                    sub_20099(1, 1, 0, 0);
+                    PostRoomMsg(1, 1, 0, 0);
             }
             break;
         case EV_KEY:
@@ -952,7 +952,7 @@ void CrewMenu(char *name, int x, int y)
     r = MenuLoop(0, 0);
     MenuClose();
     if (r >= 0)
-        sub_20099(1, r & 0xFF, 0, 0);
+        PostRoomMsg(1, r & 0xFF, 0, 0);
     kbd_mouse = kbd;
     ReleaseBitmap(mouse_sprite.handle);
     SpriteSetBitmap(&mouse_sprite, bmp);
@@ -1011,10 +1011,10 @@ void BridgeKey(Event e)
         ClampPointer();
         break;
     case 31:
-        sub_20099(1, 0x51, 0, 0);
+        PostRoomMsg(1, 0x51, 0, 0);
         break;
     case 17:
-        sub_20099(1, 0x61, 0, 0);
+        PostRoomMsg(1, 0x61, 0, 0);
         break;
     case 41:
         if (in_orbit == 0)
@@ -1036,12 +1036,12 @@ void BridgeKey(Event e)
     case 28:
     case 59:
         if (kbd_mouse)
-            sub_20099(1, 1, 0, 0);
+            PostRoomMsg(1, 1, 0, 0);
         break;
     case 57:
     case 60:
         if (kbd_mouse)
-            sub_20099(1, 2, 0, 0);
+            PostRoomMsg(1, 2, 0, 0);
         break;
     case 76:
         player_ship.mo.turn_target[0] = player_ship.mo.turn_target[1] = player_ship.mo.turn_target[2] = 0;
@@ -1053,31 +1053,31 @@ void BridgeKey(Event e)
         }
         break;
     case 49:
-        sub_20099(1, 0x60, 0, 0);
+        PostRoomMsg(1, 0x60, 0, 0);
         break;
     case 30:
-        sub_20099(1, 0x77, 0, 0);
+        PostRoomMsg(1, 0x77, 0, 0);
         break;
     case 32:
-        sub_20099(1, 0x30, 0, 0);
+        PostRoomMsg(1, 0x30, 0, 0);
         break;
     case 18:
-        sub_20099(1, 0x31, 0, 0);
+        PostRoomMsg(1, 0x31, 0, 0);
         break;
     case 35:
-        sub_20099(1, 0x40, 0, 0);
+        PostRoomMsg(1, 0x40, 0, 0);
         break;
     case 20:
-        sub_20099(1, 0x20, 0, 0);
+        PostRoomMsg(1, 0x20, 0, 0);
         break;
     case 37:
-        sub_20099(1, 0, 0, 0);
+        PostRoomMsg(1, 0, 0, 0);
         break;
     case 24:
-        sub_20099(1, 0x50, 0, 0);
+        PostRoomMsg(1, 0x50, 0, 0);
         break;
     case 47:
-        sub_20099(1, 3, 0, 0);
+        PostRoomMsg(1, 3, 0, 0);
         break;
     case 51:
         if (magnify == 4)
@@ -1090,7 +1090,7 @@ void BridgeKey(Event e)
         magnify = min(magnify + 1, 8);
     mag:
         sprintf(buf, "Magnification %d", magnify - 3);
-        sub_219F6(crew_names[4], buf, 0x7A, 0x74, 0xB0, 0);
+        MsgBox(crew_names[4], buf, 0x7A, 0x74, 0xB0, 0);
         if (full_view)
             SetView(2, 2, 319, 199, 512 / magnify);
         else
@@ -1100,7 +1100,7 @@ void BridgeKey(Event e)
         view_key = 1;
         break;
     case 46:
-        sub_20099(1, 0x21, 0, 0);
+        PostRoomMsg(1, 0x21, 0, 0);
         break;
     }
 }
@@ -1137,16 +1137,16 @@ void BridgeMsg(void)
         break;
     case 2:
         if (m.arg == 0 && player_ship.expl == 0)
-            sub_219F6(crew_names[7], "#BRID\\BRID_S45#The shields are falling!", 0, 0xA0, 0xA1, 0);
+            MsgBox(crew_names[7], "#BRID\\BRID_S45#The shields are falling!", 0, 0xA0, 0xA1, 0);
         else
             break;
     case 3:
         if (m.arg == 0 && player_ship.expl == 0)
-            sub_219F6(crew_names[7], "#BRID\\BRID_S37#Our weapons are off-line!", 0, 0xA0, 0xA1, 0);
+            MsgBox(crew_names[7], "#BRID\\BRID_S37#Our weapons are off-line!", 0, 0xA0, 0xA1, 0);
         break;
     case 4:
         if (m.arg == 0 && player_ship.expl == 0)
-            sub_219F6(crew_names[7], "#BRID\\BRID_S47#We can't maintain our speed!", 0, 0xA0, 0xA1, 0);
+            MsgBox(crew_names[7], "#BRID\\BRID_S47#We can't maintain our speed!", 0, 0xA0, 0xA1, 0);
         break;
     case 5:
         break;
@@ -1164,7 +1164,7 @@ void BridgeMsg(void)
         for (i = 0; i != 7; i++)
             if (repair_names[i].sys == m.arg) {
                 sprintf(buf, "%s repaired, Captain.", repair_names[i].name);
-                sub_219F6(crew_names[7], buf, 0x40, 0x64, 0xA1, 0);
+                MsgBox(crew_names[7], buf, 0x40, 0x64, 0xA1, 0);
                 break;
             }
         break;
@@ -1290,7 +1290,7 @@ void CrewOrder(int cmd)
         break;
     case 0x77:
         if (target_analysis ^= 1) {
-            sub_219F6(crew_names[4], "#BRID\\B_344#Target Analysis On.", 0x7A, 0x74, 0xB0, 0);
+            MsgBox(crew_names[4], "#BRID\\B_344#Target Analysis On.", 0x7A, 0x74, 0xB0, 0);
             last_target = 0;
             for (o = ships; o != &ships[4]; o++)
                 if (o->visible) {
@@ -1298,7 +1298,7 @@ void CrewOrder(int cmd)
                     break;
                 }
         } else {
-            sub_219F6(crew_names[4], "#BRID\\B_343#Target Analysis Off.", 0x7A, 0x74, 0xB0, 0);
+            MsgBox(crew_names[4], "#BRID\\B_343#Target Analysis Off.", 0x7A, 0x74, 0xB0, 0);
             last_target = 0;
         }
         break;
@@ -1307,24 +1307,24 @@ void CrewOrder(int cmd)
         break;
     case 0x11:
         if (player_ship.shields_pwr)
-            sub_219F6(crew_names[4], "#BRID\\B_332#Captain, the shields are up.", 0x7A, 0x74, 0xA1, 0);
+            MsgBox(crew_names[4], "#BRID\\B_332#Captain, the shields are up.", 0x7A, 0x74, 0xA1, 0);
         else if (in_orbit == 0)
-            sub_219F6(crew_names[4], "#BRID\\B_350#We're not in orbit, Captain.", 0x7A, 0x74, 0xA1, 0);
+            MsgBox(crew_names[4], "#BRID\\B_350#We're not in orbit, Captain.", 0x7A, 0x74, 0xA1, 0);
         else if (word_45AB2 == word_45AB4) {
             if (strcmpi(mission, "veng") && strcmpi(mission, "feather"))
-                sub_219F6(crew_names[0], "#BRID\\C_060#Spock, come with me. Mr Scott, you have the conn.", 0xA0, 0x82, 0xB0, 0);
+                MsgBox(crew_names[0], "#BRID\\C_060#Spock, come with me. Mr Scott, you have the conn.", 0xA0, 0x82, 0xB0, 0);
             else if (strcmpi(mission, "feather") == 0)
-                sub_219F6(crew_names[0], "#BRID\\C_006#Assemble a landing party. Unless we find this so-called criminal, we're going to war.", 0xA0, 0x82, 0xB0, 0);
+                MsgBox(crew_names[0], "#BRID\\C_006#Assemble a landing party. Unless we find this so-called criminal, we're going to war.", 0xA0, 0x82, 0xB0, 0);
             FadeOut();
             longjmp(game_jmp, 3);
         } else
-            sub_219F6(crew_names[4], "#BRID\\B_346#This isn't our destination.", 0x7A, 0x74, 0xB0, 0);
+            MsgBox(crew_names[4], "#BRID\\B_346#This isn't our destination.", 0x7A, 0x74, 0xB0, 0);
         break;
     case 0x12:
         OptionsMenu(60, 65);
         break;
     case 0x20:
-        sub_219F6(crew_names[1], "#BRID\\B_155#Nothing to report, Captain.", 0x126, 0x6A, 0x2C, 0);
+        MsgBox(crew_names[1], "#BRID\\B_155#Nothing to report, Captain.", 0x126, 0x6A, 0x2C, 0);
         break;
     case 0x21:
         Computer();
@@ -1334,34 +1334,34 @@ void CrewOrder(int cmd)
         break;
     case 0x31:
         if (BoostStart())
-            sub_219F6(crew_names[7], "#BRID\\BRID_S32#I don't know how long she can take it, Captain.", 0x40, 0x64, 0xA1, 0);
+            MsgBox(crew_names[7], "#BRID\\BRID_S32#I don't know how long she can take it, Captain.", 0x40, 0x64, 0xA1, 0);
         else
-            sub_219F6(crew_names[7], "#BRID\\BRID_S41#She can't take it, Captain.", 0x40, 0x64, 0xA1, 0);
+            MsgBox(crew_names[7], "#BRID\\BRID_S41#She can't take it, Captain.", 0x40, 0x64, 0xA1, 0);
         break;
     case 0x40:
-        sub_219F6(crew_names[6], "#BRID\\BRIDU016#Hailing frequencies open.", 0x12A, 0x96, 0xA1, 0);
+        MsgBox(crew_names[6], "#BRID\\BRIDU016#Hailing frequencies open.", 0x12A, 0x96, 0xA1, 0);
         break;
     case 0x50:
         if (under_attack)
-            sub_219F6(crew_names[4], "#BRID\\B_348#Unable to comply, Captain. We're under attack.", 0x7A, 0x74, 0xB0, 0);
+            MsgBox(crew_names[4], "#BRID\\B_348#Unable to comply, Captain. We're under attack.", 0x7A, 0x74, 0xB0, 0);
         else if (word_45AB2 == word_45AB4 && in_orbit == 0)
             Orbit(in_orbit == 0, 1);
         else
-            sub_219F6(crew_names[4], "#BRID\\B_338#May I respectfully remind the Captain that we haven't accomplished our mission, Sir.", 0x7A, 0x74, 0x2C, 0);
+            MsgBox(crew_names[4], "#BRID\\B_338#May I respectfully remind the Captain that we haven't accomplished our mission, Sir.", 0x7A, 0x74, 0x2C, 0);
         break;
     case 0x51:
         if (player_ship.shields_req ^= 1)
-            sub_219F6(crew_names[4], "#BRID\\B_340#Raising shields.", 0x7A, 0x74, 0xB0, 0);
+            MsgBox(crew_names[4], "#BRID\\B_340#Raising shields.", 0x7A, 0x74, 0xB0, 0);
         else
-            sub_219F6(crew_names[4], "#BRID\\B_337#Lowering shields, Captain.", 0x7A, 0x74, 0xB0, 0);
+            MsgBox(crew_names[4], "#BRID\\B_337#Lowering shields, Captain.", 0x7A, 0x74, 0xB0, 0);
         break;
     case 0x60:
         if (under_attack)
-            sub_219F6(crew_names[4], "#BRID\\B_348#Unable to comply, Captain.  We're under attack.", 0x7A, 0x74, 0xB0, 0);
+            MsgBox(crew_names[4], "#BRID\\B_348#Unable to comply, Captain.  We're under attack.", 0x7A, 0x74, 0xB0, 0);
         else if (word_45AB2 == word_45AB4)
-            sub_219F6(crew_names[4], "#BRID\\B_338#May I respectfully remind the Captain that we haven't accomplished our mission, Sir.", 0x7A, 0x74, 0x2C, 0);
+            MsgBox(crew_names[4], "#BRID\\B_338#May I respectfully remind the Captain that we haven't accomplished our mission, Sir.", 0x7A, 0x74, 0x2C, 0);
         else if (in_orbit)
-            sub_219F6(crew_names[4], "#BRID\\B_349#We must first leave orbit, Sir.", 0x7A, 0x74, 0xB0, 0);
+            MsgBox(crew_names[4], "#BRID\\B_349#We must first leave orbit, Sir.", 0x7A, 0x74, 0xB0, 0);
         else {
             if ((word_45AB2 = StarMapGo()) != word_45AB4)
                 StartEncounter();
@@ -1372,9 +1372,9 @@ void CrewOrder(int cmd)
         break;
     case 0x61:
         if (player_ship.weapons_req ^= 1)
-            sub_219F6(crew_names[5], "#BRID\\B_351#Arming weapons.", 0xC4, 0x74, 0xB0, 0);
+            MsgBox(crew_names[5], "#BRID\\B_351#Arming weapons.", 0xC4, 0x74, 0xB0, 0);
         else
-            sub_219F6(crew_names[5], "#BRID\\B_354#Disarming weapons.", 0xC4, 0x74, 0xB0, 0);
+            MsgBox(crew_names[5], "#BRID\\B_354#Disarming weapons.", 0xC4, 0x74, 0xB0, 0);
         SetPower(player_ship.shields_req, player_ship.weapons_req);
         break;
     case 0x70:
@@ -1462,7 +1462,7 @@ void Orbit(int arrive, int say)
     RenderR3(0);
     UpdateSprites();
     if (say)
-        sub_219F6(crew_names[4], msg, 0x7A, 0x74, 0xB0, 0);
+        MsgBox(crew_names[4], msg, 0x7A, 0x74, 0xB0, 0);
     in_orbit = arrive;
     magnify = mag;
 }
@@ -1493,7 +1493,7 @@ void CamPath(long *out, int which, int n)
 void SendScript(int n)
 {
     if (n)
-        sub_20099(5, n & 0xFF, 0, 0);
+        PostRoomMsg(5, n & 0xFF, 0, 0);
 }
 
 /* Show name on the main screen. */
@@ -1537,7 +1537,7 @@ int last_mission = -1;                /* last mission completed */
 void HailSay(char *name, char *title, char *text)
 {
     HailShow(name);
-    sub_219F6(title, text, 0xA0, 0xBE, 0x2C, -7);
+    MsgBox(title, text, 0xA0, 0xBE, 0x2C, -7);
     HailEnd();
 }
 
@@ -1558,9 +1558,9 @@ void Transport(char *name)
     LoadPalette("palette");
     MemCpy(backbuf->data, screen->data, 0xFA00);
     BlitToScreen(&screen_rect);
-    n = byte_52DD4 ? 3 : 4;
+    n = room.redshirt_dead ? 3 : 4;
     for (i = 0; i != n; i++) {
-        sub_23239(buf, i, name);
+        CrewAnim(buf, i, name);
         StartAnim(i, buf, beam_pos[i].x, beam_pos[i].y, 256);
         actors[i].stand[0] = 0;
     }
@@ -1661,8 +1661,8 @@ void Debrief(int n, int msg, int score, int max)
     sprintf(text, GetText(msg), voice1, voice2, pct, rank);
     FreeText(0);
     HailShow("woman");
-    sub_219F6("Admiral", text, 0xA0, 0xBE, 0x2C, -7);
-    sub_219F6("Admiral", verdict, 0xA0, 0xBE, 0x2C, -7);
+    MsgBox("Admiral", text, 0xA0, 0xBE, 0x2C, -7);
+    MsgBox("Admiral", verdict, 0xA0, 0xBE, 0x2C, -7);
     if (n != 6)
         HailEnd();
     FreeMemPtr(text);
@@ -1750,7 +1750,7 @@ void CaptainsLog(void)
     wait = voc_wait;
     voc_wait = 0;
     if (last_mission == -1)
-        sub_219F6("Captain's Log", "#BRID\\C_007#No recent missions have been completed.", 0xA0, 0x82, 0xB0, 0);
+        MsgBox("Captain's Log", "#BRID\\C_007#No recent missions have been completed.", 0xA0, 0x82, 0xB0, 0);
     else {
         total = 0;
         for (i = last_mission; i != -1; i--)
@@ -1770,7 +1770,7 @@ void CaptainsLog(void)
                 strcpy(buf, ":  1 point.\n\n");
             strcat(log, buf);
         }
-        sub_219F6("Captain's Log", log, 0xA0, 0x82, 0xB0, 0);
+        MsgBox("Captain's Log", log, 0xA0, 0x82, 0xB0, 0);
     }
     voc_wait = wait;
 }
@@ -1843,19 +1843,19 @@ void EncounterTick(void)
         char *who;
 
         --encounter_delay;
-        sub_219F6(crew_names[5], GetText(0), 0xC4, 0x74, 0xB0, 0);
-        sub_219F6(crew_names[1], GetText(1), 0x126, 0x6A, 0x2C, 0);
+        MsgBox(crew_names[5], GetText(0), 0xC4, 0x74, 0xB0, 0);
+        MsgBox(crew_names[1], GetText(1), 0x126, 0x6A, 0x2C, 0);
         if (encounter_kind == 1)
             who = crew_names[1];
         else if (encounter_kind == 3)
             who = crew_names[0];
         else
             who = crew_names[4];
-        sub_219F6(who, GetText(2), 0x7A, 0x74, 0xB0, 0);
-        sub_219F6(crew_names[7], GetText(3), 0x40, 0x64, 0xA1, 0);
+        MsgBox(who, GetText(2), 0x7A, 0x74, 0xB0, 0);
+        MsgBox(crew_names[7], GetText(3), 0x40, 0x64, 0xA1, 0);
         BridgeSfx(34);
-        sub_219F6(crew_names[6], GetText(4), 0x12A, 0x96, 0xA1, 0);
-        sub_219F6(crew_names[0], GetText(5), 0xA0, 0x82, 0xB0, 0);
+        MsgBox(crew_names[6], GetText(4), 0x12A, 0x96, 0xA1, 0);
+        MsgBox(crew_names[0], GetText(5), 0xA0, 0x82, 0xB0, 0);
         title = "Captain";
         switch (encounter_kind) {
         case 1:
@@ -1876,11 +1876,11 @@ void EncounterTick(void)
 
         m = *PeekMsg();
         if (m.type == 1 && m.arg == 0x20) {
-            sub_219F6(crew_names[1], GetText(7), 0x126, 0x6A, 0x2C, 0);
+            MsgBox(crew_names[1], GetText(7), 0x126, 0x6A, 0x2C, 0);
             msg_head = (msg_head + 1) % 16;
             return;
         } else if (m.type == 1 && m.arg == 0x40) {
-            sub_219F6(crew_names[6], GetText(8), 0x12A, 0x96, 0xA1, 0);
+            MsgBox(crew_names[6], GetText(8), 0x12A, 0x96, 0xA1, 0);
             msg_head = (msg_head + 1) % 16;
             return;
         } else {
@@ -1960,7 +1960,7 @@ void ShuttleEnd(void)
 void SayLines(Line *p, int n)
 {
     while (n--) {
-        sub_219F6(crew_names[p->who], p->text, p->x, p->y, p->c, p->d);
+        MsgBox(crew_names[p->who], p->text, p->x, p->y, p->c, p->d);
         ++p;
     }
 }
@@ -2101,9 +2101,9 @@ char *GetChoice(int n, int *list, int x)
     if (list[n] == -1)
         return 0;
     if (list[1] == -1)
-        sub_21625(x, crew_names[0], 0);
+        ChoiceTitle(x, crew_names[0], 0);
     else
-        sub_21625(x, crew_names[0], n + 1);
+        ChoiceTitle(x, crew_names[0], n + 1);
     len = strlen(GetText(list[n])) + 1;
     FreeText(0);
     buf = AllocMemPtr(len);
@@ -2115,7 +2115,7 @@ char *GetChoice(int n, int *list, int x)
 void ResetMsgs(void)
 {
     msg_head = msg_tail = 0;
-    sub_20099(6, 0, 0, 0);
+    PostRoomMsg(6, 0, 0, 0);
 }
 
 /* The weapon, engine and speed gauges. */

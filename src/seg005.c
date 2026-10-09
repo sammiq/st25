@@ -8,7 +8,7 @@
 #include "event.h"
 
 void Fatal(char *fmt, ...);     /* fatal error */
-void sub_219F6(char *title, char *msg, int a, int b, int c, int d);    /* seg008: message box */
+void MsgBox(char *title, char *msg, int a, int b, int c, int d);    /* seg008: message box */
 void QuitMenu(int a, int b);       /* seg019: quit dialog */
 
 /* seg027: joystick */
@@ -140,14 +140,14 @@ void PollInput(void)
 {
     if (sound_closed) {
         sound_closed = 0;
-        sub_219F6("Warning",
+        MsgBox("Warning",
                   "#GENE\\GENER027#Insufficient memory to continue playing music and sound effects.",
                   300, 199, 176, 0);
     }
     if (joy_recal == 1) {
         joy_recal = 0;
         JoyCalibrate();
-        sub_219F6("Joystick",
+        MsgBox("Joystick",
                   "Move the joystick from upper-left to lower-right and then press <ENTER>.",
                   300, 199, 176, 0);
     }

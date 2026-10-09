@@ -17,12 +17,12 @@ typedef struct SaveDir {
     unsigned char slot[MAX_SAVES];  /* N for each game */
 } SaveDir;
 
-void sub_219F6(char *title, char *msg, int a, int b, int c, int d);    /* seg008: message box */
-int sub_21B8C(char *(far *get)(int, void *, char *), void *data, int a, int b, int c, int d,
+void MsgBox(char *title, char *msg, int a, int b, int c, int d);    /* seg008: message box */
+int TextBox(char *(far *get)(int, void *, char *), void *data, int a, int b, int c, int d,
               int e, int f);                                        /* seg008: list box */
-void sub_215C4(char *out, char *title);                             /* seg008 */
-void sub_1EB12(void);               /* seg008: write the game state */
-void sub_1EECF(void);               /* seg008: read the game state */
+void CentreLine(char *out, char *title);                             /* seg008 */
+void SaveGameState(void);               /* seg008: write the game state */
+void LoadGameState(void);               /* seg008: read the game state */
 void Fatal(char *fmt, ...);     /* fatal error */
 char *InputDescription(void);       /* seg002 */
 
@@ -132,7 +132,7 @@ void SaveGame(void)
     SaveWrite(save_desc, 25);
     save_version = SAVE_VERSION;
     SaveWrite(&save_version, 2);
-    sub_1EB12();
+    SaveGameState();
     fclose(save_fp);
 }
 
@@ -142,9 +142,9 @@ void LoadGame(void)
     SaveRead(save_desc, 25);
     SaveRead(&save_version, 2);
     if (save_version != SAVE_VERSION)
-        sub_219F6("Load Game", "#GENE\\GENER025#Unable to load game.  Game was saved by an older version of this program.", 20, 20, 0xB0, 0);
+        MsgBox("Load Game", "#GENE\\GENER025#Unable to load game.  Game was saved by an older version of this program.", 20, 20, 0xB0, 0);
     else
-        sub_1EECF();
+        LoadGameState();
     fclose(save_fp);
 }
 
@@ -187,7 +187,7 @@ char *SlotName(int n, char *title, char *out)
     label = "Description:\n";
     if (n > save_dir.count)
         return 0;
-    sub_215C4(out, title);
+    CentreLine(out, title);
     if (n == save_dir.count) {
         s = AllocMemPtr(strlen(cancel) + 1);
         strcpy(s, cancel);
@@ -213,7 +213,7 @@ char *MenuText(int n, char **list, char *out)
     e = list[n + 1];
     if (e == 0 || *e == 0)
         return 0;
-    sub_215C4(out, list[0]);
+    CentreLine(out, list[0]);
     s = AllocMemPtr(strlen(e) + 1);
     strcpy(s, e);
     return s;
@@ -235,11 +235,11 @@ void SaveMenu(void)
 
     LoadSaveDir();
     for (;;) {
-        choice = sub_21B8C(MenuText, save_menu, 20, 20, 0xB0, 1, 0, 1);
+        choice = TextBox(MenuText, save_menu, 20, 20, 0xB0, 1, 0, 1);
         switch (choice) {
         case 0:
             if (save_dir.count == MAX_SAVES) {
-                sub_219F6("", "#GENE\\GENER024#Too many games saved.  Replace or delete a previous game.", 20, 20, 0xB0, 0);
+                MsgBox("", "#GENE\\GENER024#Too many games saved.  Replace or delete a previous game.", 20, 20, 0xB0, 0);
                 continue;
             } else {
                 unsigned long bit;
@@ -265,14 +265,14 @@ void SaveMenu(void)
                 return;
             }
         case 1:
-            i = sub_21B8C(SlotName, "Save Game", 20, 20, 0xB0, 1, 0, 1);
+            i = TextBox(SlotName, "Save Game", 20, 20, 0xB0, 1, 0, 1);
             if (i != -1 && i != save_dir.count) {
                 SavePath(i);
                 SaveGame();
             }
             return;
         case 2:
-            i = sub_21B8C(SlotName, "Delete Game", 20, 20, 0xB0, 1, 0, 1);
+            i = TextBox(SlotName, "Delete Game", 20, 20, 0xB0, 1, 0, 1);
             if (i != -1 && i != save_dir.count) {
                 int j;
 
@@ -297,7 +297,7 @@ void LoadMenu(void)
     int i;
 
     LoadSaveDir();
-    i = sub_21B8C(SlotName, "Load Game", 20, 20, 0xB0, 1, 0, 1);
+    i = TextBox(SlotName, "Load Game", 20, 20, 0xB0, 1, 0, 1);
     if (i != -1 && i != save_dir.count) {
         SavePath(i);
         LoadGame();
@@ -320,7 +320,7 @@ void QuitMenu(int x, int y)
     if (menu_busy)
         return;
     menu_busy = 1;
-    r = sub_21B8C(MenuText, quit_menu, x, y, 0xB0, 1, 0, 1);
+    r = TextBox(MenuText, quit_menu, x, y, 0xB0, 1, 0, 1);
     menu_busy = 0;
     switch (r) {
     case 0:
@@ -346,7 +346,7 @@ void GameOverMenu(void)
 
     for (;;) {
         menu_busy = 1;
-        r = sub_21B8C(MenuText, gameover_menu, 20, 20, 0xB0, 1, 0, 1);
+        r = TextBox(MenuText, gameover_menu, 20, 20, 0xB0, 1, 0, 1);
         menu_busy = 0;
         switch (r) {
         case 1:
@@ -379,7 +379,7 @@ void TextModeMenu(int ask)
     int r;
 
     if (ask || (r = ReadTextMode()) == -1) {
-        r = sub_21B8C(MenuText, text_menu, 20, 30, 0xB0, 1, 0, 1);
+        r = TextBox(MenuText, text_menu, 20, 30, 0xB0, 1, 0, 1);
         WriteTextMode(r);
     }
     switch (r) {
