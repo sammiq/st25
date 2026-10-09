@@ -2,7 +2,8 @@
 # Address ranges are IDA linear addresses, end exclusive. Units map to
 # src/<unit>.c (or .asm); lib=<LIB>:<module> units are built from the C library.
 
-seg000                     .text    10000  11DCC
+seg000                     .text    10000  11DCC  complete
+seg000                     .rodata  474C8  47586  complete
 seg001                     .text    11DCC  160EE
 seg002                     .text    160EE  16E08  complete
 seg002                     .data    45C8E  45D14  complete
@@ -246,7 +247,8 @@ data/d46E42                .data    46E42  46ED2
 data/d46F68                .data    46F68  470AC
 data/d47118                .data    47118  47238
 data/d473E6                .data    473E6  473F0
-data/d47490                .rodata  47490  480C6
+data/d47490                .rodata  47490  474C8
+data/d47586                .rodata  47586  480C6
 data/d487B5                .rodata  487B5  48A80
 data/d48ABA                .rodata  48ABA  48C72
 data/d497FC                .rodata  497FC  49C66

@@ -10,9 +10,9 @@
 #include "sound.h"
 #include "menu.h"
 
-void sub_10492(void);               /* seg000 */
-void sub_10A91(void);
-void sub_10BE7(void);
+void UpdateActors(void);               /* seg000 */
+void DrawBans(void);
+void UpdateBans(void);
 void sub_11DCC(int a);              /* seg001 */
 void sub_227D5(int a, int b);       /* seg008 */
 void SaveMenu(void);               /* seg019: save game */
@@ -725,10 +725,10 @@ int MenuLoop(unsigned long timeout, int keys)
                     menu_sel = hit;
                 }
                 SpriteSetPos(&mouse_sprite, mouse_x, mouse_y, 15);
-                sub_10492();
-                sub_10A91();
+                UpdateActors();
+                DrawBans();
                 UpdateSprites();
-                sub_10BE7();
+                UpdateBans();
                 MusicTick();
                 if (stream_done) {
                     stream_done = 0;
@@ -800,10 +800,10 @@ int MenuWait(unsigned long timeout)
                 goto done;
             case EV_TICK:
                 SpriteSetPos(&mouse_sprite, mouse_x, mouse_y, 15);
-                sub_10492();
-                sub_10A91();
+                UpdateActors();
+                DrawBans();
                 UpdateSprites();
-                sub_10BE7();
+                UpdateBans();
                 MusicTick();
                 if (stream_done) {
                     stream_done = 0;

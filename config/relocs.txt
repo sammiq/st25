@@ -231,3 +231,14 @@
 46BE8  _dmg_t3
 46BEA  _dmg_t4
 46BEC  _dmg_t5
+
+# seg000 (actors): walk graph fields
+10421  _walk+0x2
+10433  _walk+0x2
+10A0E  _walk+0x82
+10A5D  _walk+0x2
+10A6F  _walk+0x2
+11C6B  _walk+0x82
+11CAA  _walk+0x2
+11D49  _walk+0x2
+11D5A  _walk+0x2
