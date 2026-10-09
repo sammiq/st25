@@ -59,8 +59,8 @@ void TrialKallarax(void);
 void TrialFight(void);
 void sub_40E66(void);
 void sub_41434(void);
-void sub_4074E(void);
-void sub_40A47(void);
+void SinsArrive(void);
+void SinsProxima(void);
 void FreeActors(void);              /* seg000 */
 void UpdateActors(void);
 
@@ -279,7 +279,7 @@ void (far *tick_fns[32])(void) = {
     FeatherArrive, FeatherKenka, FeatherAttack,
     TrialArrive, TrialKenka, TrialSpock, TrialSulu, TrialKallarax, TrialFight,
     sub_40E66, sub_41434,
-    sub_4074E, sub_40A47
+    SinsArrive, SinsProxima
 };
 char byte_45B3C = 1;
 Rect top_rects[3] = {

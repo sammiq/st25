@@ -39,7 +39,7 @@ void InitShips(char *name);
 /* seg025 */
 void WarpOut(void);
 /* seg035 */
-void sub_4074E(void);
+void SinsArrive(void);
 
 void TrialArrive(void);
 void TrialKenka(void);
@@ -277,6 +277,6 @@ void TrialEnd(void)
     SetSteering(1);
     Debrief(4, 26, mission_vars[1] + word_50CA6, mission_vars[2] + word_52C1E);
     bridge_ticks = 0;
-    bridge_tick = sub_4074E;
+    bridge_tick = SinsArrive;
     word_45AA2 = 0;
 }

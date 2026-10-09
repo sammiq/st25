@@ -386,3 +386,14 @@
 40505  aSetCourseForDigifalM
 405CF  aKallarax_1
 40615  aKLrta_0
+
+# seg035: strings pushed as bare immediates
+4077E  aBridge_12
+4078E  aSins
+407C6  aSin0Flyby
+407C9  aDevilmon
+40830  aAdmiral_5
+40833  aWoman_5
+40C88  aXstndsp_3
+40C9C  aXstndmc_4
+40E07  aBstndsp_4
