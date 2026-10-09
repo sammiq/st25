@@ -13,7 +13,7 @@ int isprint(int c);
 void sub_219F6(char *title, char *msg, int a, int b, int c, int d);   /* seg008: message box */
 void sub_21B8C(char *(far *get)(int, void *, char *), void *data, int a, int b, int c, int d,
                int e, int f);                                        /* seg008: list box */
-void sub_26829(Event *e);                                            /* seg012 */
+void TrackMouse(Event *e);                                            /* seg012 */
 
 /* Topics found for a search: 8 character file names. */
 typedef struct DBList {
@@ -235,7 +235,7 @@ int InputBox(int x, int y, char *prompt)
     running = 1;
     while (running) {
         if (GetEvent(&e)) {
-            sub_26829(&e);
+            TrackMouse(&e);
             switch (e.type) {
             case EV_TICK:
                 FadeUp();

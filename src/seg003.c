@@ -10,7 +10,7 @@
 #include "mem.h"
 #include "resource.h"
 
-void sub_267C7(char *fmt, ...);     /* fatal error */
+void Fatal(char *fmt, ...);     /* fatal error */
 
 /* Locate the speech directory: ./voc if installed, else on the CD. */
 void FindCD(void)
@@ -456,7 +456,7 @@ void ReadFile(int fd, void far *buf, unsigned len)
     unsigned got;
 
     if (ReadChunk(fd, buf, len, &got))
-        sub_267C7("error reading in _lread");
+        Fatal("error reading in _lread");
 }
 
 /* Read through the far buffer in 2K pieces. */
@@ -470,7 +470,7 @@ unsigned ReadChunk(int fd, char far *buf, unsigned len, unsigned *pread)
     while (len != 0) {
         chunk = min(len, 0x800);
         if ((err = _dos_read(fd, file_buf, chunk, &got)) != 0)
-            sub_267C7("error reading in _lread");
+            Fatal("error reading in _lread");
         _fmemcpy(buf, file_buf, got);
         len -= chunk;
         buf += chunk;
@@ -488,7 +488,7 @@ void OpenDataFiles(void)
 
     if (data_not_open == -1) {
         if ((fd = open("data.dir", O_RDONLY | O_BINARY)) == -1)
-            sub_267C7("Can't open data.dir.");
+            Fatal("Can't open data.dir.");
         dir_size = filelength(fd);
         dir_count = dir_size / sizeof(DirEntry);
         dir_handle = AllocMemAbort(dir_size, 1);
@@ -497,7 +497,7 @@ void OpenDataFiles(void)
         UnlockMem(dir_handle);
         close(fd);
         if ((fd = open("data.run", O_RDONLY | O_BINARY)) == -1)
-            sub_267C7("Can't open data.run.");
+            Fatal("Can't open data.run.");
         len = filelength(fd);
         run_handle = AllocMemAbort(len, 1);
         run = LockMem(run_handle);
@@ -505,7 +505,7 @@ void OpenDataFiles(void)
         UnlockMem(run_handle);
         close(fd);
         if ((data_fd = open("data.001", O_RDONLY | O_BINARY)) == -1)
-            sub_267C7("Can't open data.001.");
+            Fatal("Can't open data.001.");
         data_not_open = 0;
         ScanPatches();
     }
@@ -626,11 +626,11 @@ int LoadPatch(char *name, char *ext, char far *buf)
     CopyName(fname, name);
     sprintf(path, "patches/%s.%s", fname, ext);
     if ((fd = open(path, O_RDONLY | O_BINARY)) == -1)
-        sub_267C7("Not found patches/%s.%s", fname, ext);
+        Fatal("Not found patches/%s.%s", fname, ext);
     if (ReadChunk(fd, (char far *)&size, 2, &got))
-        sub_267C7("error reading patches/%s.%s", fname, ext);
+        Fatal("error reading patches/%s.%s", fname, ext);
     if (ReadChunk(fd, buf, (unsigned)filelength(fd) - 2, &got))
-        sub_267C7("error reading patches/%s.%s", fname, ext);
+        Fatal("error reading patches/%s.%s", fname, ext);
     close(fd);
     return 1;
 }
@@ -650,14 +650,14 @@ int LoadPatchPacked(char *name, char *ext, unsigned char far *dst)
     CopyName(fname, name);
     sprintf(path, "patches/%s.%s", fname, ext);
     if ((fd = open(path, O_RDONLY | O_BINARY)) == -1)
-        sub_267C7("Not found patches/%s.%s", fname, ext);
+        Fatal("Not found patches/%s.%s", fname, ext);
     if (ReadChunk(fd, (char far *)&size, 2, &got))
-        sub_267C7("error reading patches/%s.%s", fname, ext);
+        Fatal("error reading patches/%s.%s", fname, ext);
     left = filelength(fd) - 2;
     have = 0;
     while (left != 0) {
         if (ReadChunk(fd, buf + have, min(sizeof(buf) - have, left), &got))
-            sub_267C7("error reading %s.%s", fname, ext);
+            Fatal("error reading %s.%s", fname, ext);
         n = UnpackChunk(buf, &dst, have + got);
         left -= got;
         have += got - n;
@@ -679,7 +679,7 @@ long GetPatchSize(char *name, char *ext)
     CopyName(fname, name);
     sprintf(path, "patches/%s.%s", fname, ext);
     if ((fd = open(path, O_RDONLY | O_BINARY)) == -1)
-        sub_267C7("Not found patches/%s.%s", fname, ext);
+        Fatal("Not found patches/%s.%s", fname, ext);
     ReadChunk(fd, (char far *)&size, 2, &got);
     close(fd);
     return size;
@@ -695,7 +695,7 @@ int GetPatchSizes(char *name, char *ext, unsigned *psize, unsigned *ppacked)
     CopyName(fname, name);
     sprintf(path, "patches/%s.%s", fname, ext);
     if ((fd = open(path, O_RDONLY | O_BINARY)) == -1)
-        sub_267C7("Not found patches/%s.%s", fname, ext);
+        Fatal("Not found patches/%s.%s", fname, ext);
     ReadChunk(fd, psize, 2, &got);
     *ppacked = filelength(fd) - 2;
     close(fd);
@@ -715,11 +715,11 @@ void LoadFile(char *name, char *ext, char far *buf)
         if (LoadPatch(name, ext, buf))
             return;
         else
-            sub_267C7("File not found: %s %s\n", name, ext);
+            Fatal("File not found: %s %s\n", name, ext);
     }
     lseek(data_fd, fi.offset, SEEK_SET);
     if (ReadChunk(data_fd, buf, fi.packed, &got))
-        sub_267C7("error reading %s.%s", fname, ext);
+        Fatal("error reading %s.%s", fname, ext);
 }
 
 void LoadFilePacked(char *name, char *ext, unsigned char far *dst)
@@ -738,14 +738,14 @@ void LoadFilePacked(char *name, char *ext, unsigned char far *dst)
         if (LoadPatchPacked(name, ext, dst))
             return;
         else
-            sub_267C7("File not found: %s %s\n", name, ext);
+            Fatal("File not found: %s %s\n", name, ext);
     }
     lseek(data_fd, fi.offset, SEEK_SET);
     left = fi.packed;
     have = 0;
     while (left != 0) {
         if (ReadChunk(data_fd, buf + have, min(sizeof(buf) - have, left), &got))
-            sub_267C7("error reading %s.%s", fname, ext);
+            Fatal("error reading %s.%s", fname, ext);
         n = UnpackChunk(buf, &dst, have + got);
         left -= got;
         have += got - n;

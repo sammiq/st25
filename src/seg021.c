@@ -7,7 +7,7 @@
 #include "resource.h"
 #include "sprite.h"
 
-void sub_267C7(char *fmt, ...);     /* fatal error */
+void Fatal(char *fmt, ...);     /* fatal error */
 
 extern Sprite *sprite_array[MAX_SPRITES];
 extern Rect dirty_rects[];
@@ -88,7 +88,7 @@ void AddSprite(Sprite *s)
         SpriteInit(s);
         sprite_list[(*sprite_count)++] = s;
     } else
-        sub_267C7("AddSprite: fatal: too many sprites.");
+        Fatal("AddSprite: fatal: too many sprites.");
 }
 
 void DelSprite(Sprite *s)
@@ -101,7 +101,7 @@ void DelSprite(Sprite *s)
             return;
         }
     }
-    sub_267C7("DelSprite: fatal: sprite not in list.");
+    Fatal("DelSprite: fatal: sprite not in list.");
 }
 
 void SpriteErase(Sprite *s)
@@ -251,7 +251,7 @@ void DrawSprite(Sprite *s, Rect *clip)
     w = clip->x1 - clip->x0 + 1;
     h = clip->y1 - clip->y0 + 1;
     if (w <= 0 || h <= 0)
-        sub_267C7("DrawSprite: w/h <= 0");
+        Fatal("DrawSprite: w/h <= 0");
     prio = s->z;
     dst = backbuf->data + clip->y0 * 320 + clip->x0;
     dstskip = 320 - w;

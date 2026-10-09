@@ -10,7 +10,7 @@
 #include "sprite.h"
 #include "gfx.h"
 
-void sub_267C7(char *fmt, ...);     /* fatal error */
+void Fatal(char *fmt, ...);     /* fatal error */
 
 extern unsigned char far *cur_glyph;
 
@@ -216,7 +216,7 @@ void InitVideo(void)
         InitTandyMode();
         return;
     default:
-        sub_267C7("Unsupport display type");
+        Fatal("Unsupport display type");
     }
     _asm {
         push bp

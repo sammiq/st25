@@ -4,7 +4,7 @@
 #include "mem.h"
 #include "bitmap.h"
 
-void sub_267C7(char *fmt, ...);     /* fatal error */
+void Fatal(char *fmt, ...);     /* fatal error */
 
 /* Scale a bitmap by scale/256, returning a new bitmap. */
 MemHandle ScaleBitmap(MemHandle handle, int scale)
@@ -171,7 +171,7 @@ void BuildScaler(register char *p, int dw, int sw)
         *p++ = 0xCB;                            /* retf */
     }
     if (p > start + SCALE_CODE_MAX)
-        sub_267C7("too many inst %d.\n", p - start);
+        Fatal("too many inst %d.\n", p - start);
 }
 
 /* Call the generated code with es:di = dst, ds:si = src. */

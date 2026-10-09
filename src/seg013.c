@@ -8,7 +8,7 @@
 
 extern unsigned _aseghi;    /* C runtime: highest segment in use */
 
-void sub_267C7(char *msg);  /* fatal error */
+void Fatal(char *msg);  /* fatal error */
 int sub_2B676(int ems);     /* release cached memory, 0 if nothing left */
 
 void *AllocMemPtr(int size)
@@ -16,7 +16,7 @@ void *AllocMemPtr(int size)
     void *p;
 
     if ((p = malloc(size)) == 0)
-        sub_267C7("Near memory allocation failure, game over.");
+        Fatal("Near memory allocation failure, game over.");
     return p;
 }
 
@@ -38,7 +38,7 @@ void InitPMem(void)
         intdos(&in, &out);
     }
     if (out.x.cflag || in.x.bx < 1)
-        sub_267C7("Can't allocate P memory space");
+        Fatal("Can't allocate P memory space");
     FP_SEG(lpPoolStart) = out.x.ax;
     FP_OFF(lpPoolStart) = 0;
     pool_free_mem = in.x.bx;
@@ -73,7 +73,7 @@ void CompactPMem(void)
         dst->size = FP_SEG(src) - FP_SEG(dst);
         dst->handle = 0;
     } else
-        sub_267C7("CompactPMem didn't leave any free memory");
+        Fatal("CompactPMem didn't leave any free memory");
     lpPoolCurrent = dst;
 }
 
@@ -88,7 +88,7 @@ void far *PushMem(unsigned size)
     for (paras = ((size + 15) >> 4) + 1; pool_free_mem <= paras; ) {
         if (!sub_2B676(0)) {
             sprintf(buf, "Can't push %d bytes of FAR memory", size);
-            sub_267C7(buf);
+            Fatal(buf);
         }
     }
     if (lpPoolCurrent == lpPoolEnd)
@@ -118,7 +118,7 @@ void far *PushMem(unsigned size)
 void PopMem(void)
 {
     if (pool_stack_size == 0)
-        sub_267C7("PopMem without PushMem.");
+        Fatal("PopMem without PushMem.");
     --pool_stack_size;
     pool_free_mem += lpPoolEnd->size;
     lpPoolEnd->handle = 0;
@@ -148,7 +148,7 @@ MemHandle AllocMemHandle(void far *p)
 
     for (; mem_handle_free_list == 0; ) {
         if (!sub_2B676(1))
-            sub_267C7("Out of memory handles!");
+            Fatal("Out of memory handles!");
     }
     h = mem_handle_free_list;
     mem_handle_free_list = mem_handle_free_list->next;
@@ -175,7 +175,7 @@ MemHandle AllocMem(unsigned size, int ems)
     paras = ((size + 15) >> 4) + 1;
     failed = 0;
     if (pool_lock_count != 0)
-        sub_267C7("Memory locked in AllocMem!");
+        Fatal("Memory locked in AllocMem!");
     for (;;) {
         if (ems != 0) {
             if ((e = EMSAlloc((long)size)) != 0)
@@ -221,7 +221,7 @@ MemHandle AllocMem(unsigned size, int ems)
                 CompactPMem();
                 p = lpPoolCurrent;
                 if (p->size < paras)
-                    sub_267C7("Internal error in AllocMem");
+                    Fatal("Internal error in AllocMem");
             }
             if (paras != p->size) {
                 n = p;
@@ -249,7 +249,7 @@ MemHandle AllocMemAbort(unsigned size, int ems)
     h = AllocMem(size, ems);
     if (h != 0)
         return h;
-    sub_267C7("out of FAR memory");
+    Fatal("out of FAR memory");
 }
 
 int IsMemEMS(MemHandle h)
@@ -267,7 +267,7 @@ void UnlockMem(MemHandle h)
 {
     --pool_lock_count;
     if (pool_lock_count < 0)
-        sub_267C7("LockCount < 0!");
+        Fatal("LockCount < 0!");
     EMSDeaccess(h->ptr);
 }
 
@@ -276,7 +276,7 @@ void FreeMem(MemHandle h)
     PoolHdr far *p;
 
     if (pool_lock_count != 0)
-        sub_267C7("Memory locked in FreeMem");
+        Fatal("Memory locked in FreeMem");
     if (IsEMSMemory(h->ptr))
         EMSFree(h->ptr);
     else {

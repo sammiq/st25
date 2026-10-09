@@ -7,7 +7,7 @@ extern unsigned _aseghi;    /* C runtime: highest segment in use */
 
 /* No prototypes in this file in the original: the pointer is passed near. */
 int MemSet();
-void sub_267C7();           /* fatal error */
+void Fatal();           /* fatal error */
 
 void EMSInit(void)
 {
@@ -96,7 +96,7 @@ void far *EMSAccess(void far *handle)
     if (!IsEMSMemory(handle))
         return handle;
     if (ems_lock_ptr != 0)
-        sub_267C7("EMS: multiple access.");
+        Fatal("EMS: multiple access.");
     ems_lock_ptr = handle;
     page = (addr >> 14) & 0xFF;
     for (i = 0; i != 4; ++i, ++page)
@@ -110,7 +110,7 @@ void EMSDeaccess(void far *handle)
         return;
     if (IsEMSMemory(handle)) {
         if (ems_lock_ptr == 0)
-            sub_267C7("EMS: multiple deaccess.");
+            Fatal("EMS: multiple deaccess.");
         ems_lock_ptr = 0;
     }
 }
@@ -127,7 +127,7 @@ void far *EMSUnlock(void)
 void EMSRestore(void far *handle)
 {
     if (ems_lock_ptr != 0)
-        sub_267C7("EMSRestore while EMS locked.");
+        Fatal("EMSRestore while EMS locked.");
     if (handle != 0)
         EMSAccess(handle);
 }
@@ -147,7 +147,7 @@ void EMSFree(void far *handle)
             return;
         }
     }
-    sub_267C7("EMSFree: invalid address.");
+    Fatal("EMSFree: invalid address.");
 }
 
 EMSBlock *EMSNewBlock(void)

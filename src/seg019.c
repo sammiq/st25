@@ -23,7 +23,7 @@ int sub_21B8C(char *(far *get)(int, void *, char *), void *data, int a, int b, i
 void sub_215C4(char *out, char *title);                             /* seg008 */
 void sub_1EB12(void);               /* seg008: write the game state */
 void sub_1EECF(void);               /* seg008: read the game state */
-void sub_267C7(char *fmt, ...);     /* fatal error */
+void Fatal(char *fmt, ...);     /* fatal error */
 char *InputDescription(void);       /* seg002 */
 
 extern SaveDir save_dir;
@@ -352,7 +352,7 @@ void GameOverMenu(void)
         case 1:
             FadeOut();
             RestoreNew();
-            sub_267C7("#GENE\\GENER021#Restore new game failed.");
+            Fatal("#GENE\\GENER021#Restore new game failed.");
         case 0:
             FadeOut();
             LoadMenu();

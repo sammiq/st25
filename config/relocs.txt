@@ -242,3 +242,9 @@
 11CAA  _walk+0x2
 11D49  _walk+0x2
 11D5A  _walk+0x2
+
+# seg012 (main, puzzles)
+25E70  _byte_52DDA+0x5
+2637C  _word_51142
+25D90  none
+25D9F  none

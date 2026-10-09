@@ -28,7 +28,7 @@ typedef struct NodeDist {
 
 int rand(void);
 void qsort();
-void sub_267C7(char *fmt, ...);     /* fatal error */
+void Fatal(char *fmt, ...);     /* fatal error */
 void SaveWrite(void *p, unsigned n);    /* seg019 */
 void SaveRead(void *p, unsigned n);
 int sub_22E93(int x, int y);        /* seg008: is (x, y) blocked */
@@ -128,7 +128,7 @@ int StartAnim(int n, char *name, int x, int y, int scale)
             if (a->state == 0)
                 break;
         if (n == MAX_ACTORS)
-            sub_267C7("All anims in use.");
+            Fatal("All anims in use.");
     } else
         a = &actors[n];
     if (a->state) {
@@ -212,7 +212,7 @@ void UpdateActors(void)
                 WalkStep(i);
                 break;
             default:
-                sub_267C7("invalid anim type.");
+                Fatal("invalid anim type.");
             }
         }
     }
@@ -902,7 +902,7 @@ void release_anim(Actor *a)
         FreeWalk(a);
         break;
     default:
-        sub_267C7("release_anim:invalid anim type.");
+        Fatal("release_anim:invalid anim type.");
     }
     a->state = 0;
 }
@@ -927,7 +927,7 @@ void init_stand_anim(int n)
 
     a = &actors[n];
     if (a->state == 0)
-        sub_267C7("init_stand_anim: dead anim");
+        Fatal("init_stand_anim: dead anim");
     sub_239D2(a, n);
     if (a->dir)
         sprintf(name, "%s%c", a->stand, a->dir);
@@ -1062,7 +1062,7 @@ int NearestNode(int x, int y)
         }
     FreeMemPtr(list);
     return -1;
-    sub_267C7("impossible walk");
+    Fatal("impossible walk");
 }
 
 int CompareDist(NodeDist *a, NodeDist *b)

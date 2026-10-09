@@ -54,6 +54,19 @@ typedef struct Motion {
     int timer;                          /* 40 */
 } Motion;
 
+/* A ship's .dsc file. */
+typedef struct ShipDesc {
+    int kind;                   /* 00 */
+    int reach;                  /* 02 */
+    int size;                   /* 04 */
+    ShipPart shields[6];        /* 06 */
+    ShipPart systems[10];       /* 2A */
+    Motion mo;                  /* 66 */
+    long range;                 /* A8 */
+    int has_shields;            /* AC */
+    Weapon weapons[4];          /* AE */
+} ShipDesc;
+
 /* The fields every object in the view has. */
 #define R3_FIELDS \
     Vec32 pos;                          /* 00 world position */ \

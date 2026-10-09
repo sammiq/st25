@@ -23,20 +23,7 @@ typedef struct DmgEntry {
     int sys;
 } DmgEntry;
 
-/* A ship's .dsc file. */
-typedef struct ShipDesc {
-    int kind;                   /* 00 */
-    int reach;                  /* 02 */
-    int size;                   /* 04 */
-    ShipPart shields[6];        /* 06 */
-    ShipPart systems[10];       /* 2A */
-    Motion mo;                  /* 66 */
-    long range;                 /* A8 */
-    int has_shields;            /* AC */
-    Weapon weapons[4];          /* AE */
-} ShipDesc;
-
-void sub_267C7(char *fmt, ...);     /* fatal error */
+void Fatal(char *fmt, ...);     /* fatal error */
 void sub_219F6(char *title, char *msg, int a, int b, int c, int d);    /* seg008: message box */
 void sub_20099(int msg, int who, int a, int b);                     /* seg008: report */
 void sub_11DCC(int n);              /* seg001: sound effect */
@@ -593,7 +580,7 @@ int FindSide(Vec32 *v)
         else
             return 3;
     }
-    sub_267C7("this is in FindSide and is impossible.");
+    Fatal("this is in FindSide and is impossible.");
 }
 
 char *system_names[10] = {

@@ -31,7 +31,7 @@ typedef struct Point {
     int y;
 } Point;
 
-void sub_267C7(char *fmt, ...);     /* fatal error */
+void Fatal(char *fmt, ...);     /* fatal error */
 void sub_219F6(char *title, char *msg, int a, int b, int c, int d);    /* seg008: message box */
 void GameOverMenu(void);               /* seg019: game over */
 void SaveWrite(void *p, int n);     /* seg019: save game I/O */
@@ -220,7 +220,7 @@ void AddR3(Obj3D *o)
             *p = o;
             return;
         }
-    sub_267C7("AddR3: out of shapes.");
+    Fatal("AddR3: out of shapes.");
 }
 
 void DelR3(Obj3D *o)
@@ -233,7 +233,7 @@ void DelR3(Obj3D *o)
             o->visible = 0;
             return;
         }
-    sub_267C7("DelR3: shape not found.");
+    Fatal("DelR3: shape not found.");
 }
 
 void ClearView(void)
@@ -480,7 +480,7 @@ int SelectView(Obj3D *o)
         o->r3s_type = 0;
     } else {
         if (o->scale < star_near)
-            sub_267C7("object too close.");
+            Fatal("object too close.");
         MemSet(&rel, sizeof(rel), 0);
         Vec32Sub(&rel, &o->view);
         MatTranspose(&o->view_m, &m);
@@ -816,9 +816,9 @@ void DrawR3Shape(Obj3D *o)
             h = hdr->h;
             q = p;
             if (h > 245)
-                sub_267C7("Shape height too big in DrawR3Shape!");
+                Fatal("Shape height too big in DrawR3Shape!");
             if (w > 252)
-                sub_267C7("Shape width too big in DrawR3Shape!");
+                Fatal("Shape width too big in DrawR3Shape!");
             for (i = 0; i < 2; i++)
                 MemSet(q + (i << 8), w + 4, 0);
             for (i = 0; i < 2; i++)
@@ -1677,7 +1677,7 @@ void RestoreR3(Obj3D *o)
             o->free = FreePlanet;
             break;
         case R3_SHOT:
-            sub_267C7("illegal shot saved in restore r3.");
+            Fatal("illegal shot saved in restore r3.");
             break;
         }
     }
@@ -1691,7 +1691,7 @@ void RestoreR3Shot(Obj3D *o)
         switch (o->visible) {
         case R3_PLANET:
         case R3_SHIP:
-            sub_267C7("illegal non-shot saved in restore r3 shot.");
+            Fatal("illegal non-shot saved in restore r3 shot.");
             break;
         case R3_SHOT:
             o->draw = LoadShotShape;

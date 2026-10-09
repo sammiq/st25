@@ -13,7 +13,7 @@
 #include "cache.h"
 
 int tolower(int c);
-void sub_267C7(char *fmt, ...);             /* fatal error */
+void Fatal(char *fmt, ...);             /* fatal error */
 unsigned ReadVoc(void far *buf, long len); /* seg015: read stream data */
 void DigiShutdown(void);                       /* seg015 */
 
@@ -76,7 +76,7 @@ MemHandle CacheGet(char *name, char *ext, int ems, int load, int unpack)
             goto found;
         }
     }
-    sub_267C7("Cache overflow.");
+    Fatal("Cache overflow.");
 found:
     ListRemove(&cache_list, &e->node);
     ListAdd(&cache_list, &e->node);
@@ -123,7 +123,7 @@ void CacheStore(char *name, char *ext, MemHandle h)
             return;
         }
     }
-    sub_267C7("Cache overflow.");
+    Fatal("Cache overflow.");
 }
 
 void ReleaseCache(MemHandle h)
@@ -135,7 +135,7 @@ void ReleaseCache(MemHandle h)
     for (i = 0; i != CACHE_ENTRIES; ++i, e = (CacheEntry *)e->node.next) {
         if (e->data == h) {
             if (--e->lock < 0)
-                sub_267C7("ReleaseCache: too many releases. %s", e->name);
+                Fatal("ReleaseCache: too many releases. %s", e->name);
             return;
         }
     }
@@ -220,7 +220,7 @@ MemHandle getanyfile(char *name, char *ext)
     MemHandle h;
 
     if ((size = GetFileSize(name, ext)) > 65000L)
-        sub_267C7("getanyfile: excessively large object requested %s.", name);
+        Fatal("getanyfile: excessively large object requested %s.", name);
     h = AllocMemAbort(size, 0);
     LoadFilePacked(name, ext, LockMem(h));
     UnlockMem(h);

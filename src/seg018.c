@@ -10,7 +10,7 @@
 #include "fixmath.h"
 #include "obj3d.h"
 
-void sub_267C7(char *fmt, ...);     /* fatal error */
+void Fatal(char *fmt, ...);     /* fatal error */
 
 extern long proj_dist;
 extern float star_near;
@@ -116,15 +116,15 @@ int DrawPlanetLarge(Obj3D *o)
     work = LockMem(wh);
     if (o->small) {
         if (bmp->w != 32 || bmp->h != 32)
-            sub_267C7("Planet image not %d x %d", 32, 32);
+            Fatal("Planet image not %d x %d", 32, 32);
     } else if (bmp->w != 128 || bmp->h != 128)
-        sub_267C7("Planet image not %d x %d", 128, 128);
+        Fatal("Planet image not %d x %d", 128, 128);
     work0 = work;
     table = work + 0x7622;
     pix = bmp->data;
     dist = proj_dist * o->radius;
     if (o->view.z < star_near)
-        sub_267C7("object too close.");
+        Fatal("object too close.");
     if (o->view.z >= dist) {
         src = work + 0x4000;
         o->size = o->radius;
@@ -314,7 +314,7 @@ int DrawPlanetSmall(Obj3D *o)
                 len >>= 2;
             MakeFractal(len, o->seed, o->palette);
             if (fractal_handle == 0)
-                sub_267C7("Can't create small fractal planet!");
+                Fatal("Can't create small fractal planet!");
             bh = fractal_handle;
             CacheStore(o->name, "%sf", bh);
         }
@@ -323,7 +323,7 @@ int DrawPlanetSmall(Obj3D *o)
     if (wh == 0) {
         wh = AllocMem(0x143E, 0);
         if (wh == 0)
-            sub_267C7("Can't alloc small work segment!");
+            Fatal("Can't alloc small work segment!");
         work = LockMem(wh);
         LoadFilePacked("planet", "sdt", work);
         UnlockMem(wh);
@@ -334,13 +334,13 @@ int DrawPlanetSmall(Obj3D *o)
     bmp = LockMem(bh);
     work = LockMem(wh);
     if (bmp->w != 32 || bmp->h != 32)
-        sub_267C7("Planet image not %d x %d", 32, 32);
+        Fatal("Planet image not %d x %d", 32, 32);
     work0 = work;
     table = work + 0x107C;
     pix = bmp->data;
     dist = proj_dist * o->radius;
     if (o->view.z < star_near)
-        sub_267C7("object too close.");
+        Fatal("object too close.");
     if (o->view.z >= dist) {
         src = work + 0x800;
         o->size = o->radius;

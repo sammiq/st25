@@ -7,7 +7,7 @@
 #include "sound.h"
 #include "event.h"
 
-void sub_267C7(char *fmt, ...);     /* fatal error */
+void Fatal(char *fmt, ...);     /* fatal error */
 void sub_219F6(char *title, char *msg, int a, int b, int c, int d);    /* seg008: message box */
 void QuitMenu(int a, int b);       /* seg019: quit dialog */
 
@@ -131,7 +131,7 @@ Event *NextEvent(Event *p)
     if (++p == &ev_queue[EV_MAX])
         p = ev_queue;
     if (ev_read == p)
-        sub_267C7("event overflow");
+        Fatal("event overflow");
     return p;
 }
 
