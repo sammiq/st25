@@ -34,11 +34,11 @@ void DemonFight(void);
 void DemonHail(void);
 void DemonTravel(void);
 void DemonReturn(void);
-void sub_3CB26(void);
-void sub_3CD74(void);
-void sub_3D060(void);
-void sub_3D17D(void);
-void sub_3D474(void);
+void TugArrive(void);
+void TugPirates(void);
+void TugDisabled(void);
+void TugOrbit(void);
+void TugReturn(void);
 void sub_3DDDA(void);
 void sub_3DF4F(void);
 void sub_3E10E(void);
@@ -273,7 +273,7 @@ int view_dir = 0;                 /* view direction, -1 forward */
 int word_45ABA = 0;
 void (far *tick_fns[32])(void) = {
     DemonArrive, DemonFight, DemonHail, DemonTravel, DemonReturn,
-    sub_3CB26, sub_3CD74, sub_3D060, sub_3D17D, sub_3D474,
+    TugArrive, TugPirates, TugDisabled, TugOrbit, TugReturn,
     sub_3DDDA, sub_3DF4F, sub_3E10E, sub_3E34B, sub_3E462, sub_3E63B,
     sub_3E8D4, sub_3EBA4, sub_3F08B,
     sub_3F59A, sub_3FA2E, sub_3FEC1,

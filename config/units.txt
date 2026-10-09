@@ -232,7 +232,9 @@ seg027                     .data    46D26  46E42  complete
 seg028                     .text    3A832  3C136  complete
 seg029                     .text    3C136  3CB25  complete
 seg029                     .rodata  497FC  49898  complete
-seg030                     .text    3CB26  3DDDA
+seg030                     .text    3CB26  3DDDA  complete
+seg030                     .data    46E42  46E88  complete
+seg030                     .rodata  49898  498FD  complete
 seg031                     .text    3DDDA  3E8D3
 seg032                     .text    3E8D4  3F599
 seg033                     .text    3F59A  3FEDB
@@ -249,12 +251,12 @@ far/seg041                 .data    44CE0  45A50
 data/d45A50                .data    45A50  45A92
 data/d45D14                .data    45D14  45D2A
 data/d46794                .data    46794  46798
-data/d46E42                .data    46E42  46ED2
+data/d46E88                .data    46E88  46ED2
 data/d46F68                .data    46F68  470AC
 data/d47118                .data    47118  47238
 data/d473E6                .data    473E6  473F0
 data/d47490                .rodata  47490  474C8
-data/d49898                .rodata  49898  49C66
+data/d498FE                .rodata  498FE  49C66
 data/d49C6E                .rodata  49C6E  49E56
 data/d49E78                .bss     49E78  53920
 data/stack                 .bss     53920  54820

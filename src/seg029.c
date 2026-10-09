@@ -37,7 +37,7 @@ void SetPower(int shields, int weapons);
 /* seg017 */
 void DelR3(Obj3D *o);
 /* seg030 */
-void sub_3CB26(void);
+void TugArrive(void);
 
 void DemonArrive(void);
 void DemonFight(void);
@@ -56,7 +56,7 @@ extern int msg_head;
 extern int word_50CA6;
 extern Obj3D ships[4];
 extern unsigned long bridge_ticks;
-extern int word_519BC[6];
+extern int mission_vars[6];
 extern void (far *saved_tick)(void);
 extern int word_52C1E;
 extern Obj3D player_ship;
@@ -74,7 +74,7 @@ void DemonArrive(void)
             LoadMusic("bridgew");
             BoostEnd();
             strcpy(mission, "demon");
-            MemSet(word_519BC, 12, 0);
+            MemSet(mission_vars, 12, 0);
             SetTextFile(mission);
             saved_tick = DemonArrive;
             CutScene("demon", "DEM0\\FLYBY");
@@ -218,11 +218,11 @@ void DemonTravel(void)
                     MsgBox(crew_names[6], GetText(16), 0x12A, 0x96, 0xA1, 0);
                     msg_head = (msg_head + 1) % 16;
                     return;
-                } else if (word_519BC[0] == 0) {
+                } else if (mission_vars[0] == 0) {
                     BridgeSfx(0x22);
                     MsgBox(crew_names[6], GetText(17), 0x12A, 0x96, 0xA1, 0);
                     HailSay("prst", "Priest", GetText(18));
-                    word_519BC[0] = 1;
+                    mission_vars[0] = 1;
                     msg_head = (msg_head + 1) % 16;
                     return;
                 } else {
@@ -292,7 +292,7 @@ void DemonReturn(void)
             break;
         case 2:
             Orbit(0, 0);
-            bridge_tick = sub_3CB26;
+            bridge_tick = TugArrive;
             bridge_ticks = 0;
             StartAnim(1, "bstndsp", 0, 0, 256);
             EndAnim(2);

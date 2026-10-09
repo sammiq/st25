@@ -65,7 +65,7 @@ void SendScript(int n);
 int LeverPuzzle(void);              /* seg012 */
 int Turbolift(int unused, int deck);
 int ItemCase(int mask);
-void sub_3DD2A(char *name);         /* seg030 */
+void FlashBitmap(char *name);         /* seg030 */
 void StartCrew(void);
 
 typedef struct Msg {
@@ -117,7 +117,7 @@ extern int view_dir;
 extern int word_45ABA;
 extern char mission[16];
 extern int boost_active[6];
-extern int word_519BC[6];
+extern int mission_vars[6];
 extern int last_mission;
 extern int mission_ranks[7];
 extern char sfx_name[10];
@@ -357,7 +357,7 @@ void SaveGameState(void)
     SaveWrite(&view_dir, 2);
     SaveWrite(mission, 16);
     SaveWrite(boost_active, 12);
-    SaveWrite(word_519BC, 12);
+    SaveWrite(mission_vars, 12);
     SaveWrite(&last_mission, 2);
     SaveWrite(mission_ranks, 14);
     SaveWrite(sfx_name, 10);
@@ -452,7 +452,7 @@ void LoadGameState(void)
     SaveRead(&view_dir, 2);
     SaveRead(mission, 16);
     SaveRead(boost_active, 12);
-    SaveRead(word_519BC, 12);
+    SaveRead(mission_vars, 12);
     SaveRead(&last_mission, 2);
     SaveRead(mission_ranks, 14);
     SaveRead(sfx_name, 10);
@@ -1334,7 +1334,7 @@ long ScriptService(int cmd, int a1, int a2, int a3, int a4, unsigned a5)
         rdf = LockMem(rdf_handle);
         MemCpy(name, RdfPtr(a1), 10);
         UnlockMem(rdf_handle);
-        sub_3DD2A(name);
+        FlashBitmap(name);
         break;
     }
     case 9:

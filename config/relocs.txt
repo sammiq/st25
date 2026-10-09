@@ -292,3 +292,18 @@
 3C77E  aPriest
 3C781  aPrst
 3C3D6  _ships+0xD0
+
+# seg030: strings pushed as bare immediates
+3CB99  aBridge_10
+3CBBB  aTug
+3CBF3  aTug0Flyby
+3CBF6  aHijacked_0
+3CC6F  aWoman_1
+3CE2B  aPira_0
+3CEAF  aOrion_1
+3D291  aPira_1
+3D4B9  aXstndsp_0
+3D4CD  aXstndmc_1
+3D6E8  aBstndsp_1
+3DA22  aPira_2
+3D00B  _ships+0xD0
