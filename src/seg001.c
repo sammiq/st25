@@ -51,12 +51,12 @@ void MuddReturn(void);
 void FeatherArrive(void);
 void FeatherKenka(void);
 void FeatherAttack(void);
-void sub_3FEDC(void);
-void sub_400B5(void);
-void sub_401C1(void);
-void sub_402EA(void);
-void sub_403F1(void);
-void sub_4058A(void);
+void TrialArrive(void);
+void TrialKenka(void);
+void TrialSpock(void);
+void TrialSulu(void);
+void TrialKallarax(void);
+void TrialFight(void);
 void sub_40E66(void);
 void sub_41434(void);
 void sub_4074E(void);
@@ -277,7 +277,7 @@ void (far *tick_fns[32])(void) = {
     LoveArrive, LoveTravel, LoveRomulans, LoveOrbit, LoveAway, LoveReturn,
     MuddArrive, MuddHarlequin, MuddReturn,
     FeatherArrive, FeatherKenka, FeatherAttack,
-    sub_3FEDC, sub_400B5, sub_401C1, sub_402EA, sub_403F1, sub_4058A,
+    TrialArrive, TrialKenka, TrialSpock, TrialSulu, TrialKallarax, TrialFight,
     sub_40E66, sub_41434,
     sub_4074E, sub_40A47
 };

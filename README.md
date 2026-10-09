@@ -169,6 +169,7 @@ MASM 5.0 (`tools/MASM50`) assembles `src/<unit>.asm` (`/Ml`, case-sensitive name
 | a function that only copies its argument (`mov [m], ax / mov [m+2], dx`) and then `jmp` to its epilogue | an empty `switch (m) { }`, left over from debug code compiled out (`TraceMsg`) |
 | `jmp epilogue` then a second `jmp` to the end of the `switch` inside a case | `return;` followed by a `break;` that can't be reached (`TugDisabled` in `src/seg030.c`) |
 | a `switch` whose case bodies are single `jmp`s to code after the compare chain | each case is a `goto` to a label after the `switch` (`case 0: goto a;`), and the code falling out of the `switch` is the default (`ElasiTalk` in `src/seg030.c`) |
+| a call that pushes one argument more than the function takes (`add sp, 0Eh` for six words) | a bug in the original, e.g. a stray string in `MsgBox`'s `x` slot. Declare the function without a prototype (`void MsgBox();`) in that file so the call compiles (`TrialKallarax` in `src/seg034.c`) |
 | a `switch` whose compare chain is a single `jmp` | the `switch` has only a `default:` (`DemonHail` in `src/seg029.c`) |
 | an empty string literal pushed as a bare number | IDA didn't mark it as an offset. Add `aEmpty_N` symbols for each `""` in `symbols.txt`, shrink the string before it, and add `config/relocs.txt` entries for the pushes |
 

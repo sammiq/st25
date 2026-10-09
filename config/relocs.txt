@@ -375,3 +375,14 @@
 3FEC7  aKlingon_3
 3F693  _ships+0xA0
 3F6A2  _ships+0xA0
+
+# seg034: strings pushed as bare immediates
+3FF18  aTrial_0
+40122  aVlictKenka
+40125  aKlg2_1
+40453  aKlg1_2
+40473  aKallarax
+404C8  aKallarax_0
+40505  aSetCourseForDigifalM
+405CF  aKallarax_1
+40615  aKLrta_0

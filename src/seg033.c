@@ -50,7 +50,7 @@ void SetPlanet(int n);
 /* seg025 */
 void WarpOut(void);
 /* seg034 */
-void sub_3FEDC(void);
+void TrialArrive(void);
 
 void FeatherArrive(void);
 void FeatherKenka(void);
@@ -257,7 +257,7 @@ void FeatherKenka(void)
                 SetSteering(1);
                 ViewBridge();
                 bridge_ticks = 0;
-                bridge_tick = sub_3FEDC;
+                bridge_tick = TrialArrive;
                 ClearMsgs();
                 return;
             } else {
