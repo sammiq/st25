@@ -51,7 +51,7 @@ void InitShips(char *name);
 /* seg017 */
 void DelR3(Obj3D *o);
 /* seg031 */
-void sub_3DDDA(void);
+void LoveArrive(void);
 
 void TugArrive(void);
 void TugPirates(void);
@@ -384,7 +384,7 @@ void TugReturn(void)
             StartAnim(1, "bstndsp", 0, 0, 256);
             EndAnim(2);
             bridge_ticks = 0;
-            bridge_tick = sub_3DDDA;
+            bridge_tick = LoveArrive;
             word_45AA2 = 0;
             ClearMsgs();
             return;
@@ -476,7 +476,7 @@ void MissionCalledOff(void)
     MsgBox(admiral, GetText(64), 0xA0, 0xBE, 0x2C, -7);
     Orbit(0, 0);
     bridge_ticks = 0;
-    bridge_tick = sub_3DDDA;
+    bridge_tick = LoveArrive;
     return;
 }
 

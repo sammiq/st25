@@ -307,3 +307,21 @@
 3D6E8  aBstndsp_1
 3DA22  aPira_2
 3D00B  _ships+0xD0
+
+# seg031: strings pushed as bare immediates
+3DE0A  aBridge_11
+3DE1A  aLove
+3DE52  aLov0Flyby
+3DE55  aTlove
+3DF09  aAdmiral
+3DF0C  aWoman_2
+3E139  aRomulan_1
+3E153  aBridB160RomulanShipD
+3E2BA  aRomulanCaptain
+3E2BD  aRomula_0
+3E53D  aCenturionPreax
+3E540  aRomula_1
+3E578  aAutobeacon
+3E673  aXstndsp_1
+3E687  aXstndmc_2
+3E86B  aBstndsp_2
