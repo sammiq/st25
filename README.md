@@ -27,7 +27,7 @@ ninja progress                     # progress summary
 ```
 
 These inputs are not in git, so supply your own copies:
-- `orig/CD/TREKCD/STARTREK.EXE` (the original EXE, as shipped)
+- `orig/CD/TREKCD/STARTREK.EXE` (the original EXE, as shipped; `configure.py` checks it against `config/orig.sha1`, or run `sha1sum -c config/orig.sha1`)
 - `tools/C600/` (the Microsoft C 6.00A installation: `BIN`, `INCLUDE`, `LIB`)
 - `tools/MASM50/` (the Microsoft Assembler 5.0 installation: `BIN`, `INC`)
 
