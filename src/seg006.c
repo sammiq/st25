@@ -73,7 +73,7 @@ extern Matrix cam_orient;
 Matrix cam_matrix;           /* cam_orient transposed */
 extern Sprite view_sprite;           /* the view, as a sprite */
 extern Obj3D player_ship;
-extern Obj3D shot_obj;
+extern Shot shot_obj;
 extern Obj3D dummy_planet;
 extern Obj3D ships[4];
 extern unsigned long blink_count;
@@ -1707,7 +1707,7 @@ void SaveSpace(void)
     int i;
 
     SaveR3(&player_ship);
-    SaveR3Shot(&shot_obj);
+    SaveR3Shot((Obj3D *)&shot_obj);
     SaveR3(&dummy_planet);
     SaveWrite(&cam_pos, sizeof(cam_pos));
     SaveWrite(&cam_orient, sizeof(cam_orient));
@@ -1727,7 +1727,7 @@ void LoadSpace(void)
             DelR3(o);
     }
     RestoreR3(&player_ship);
-    RestoreR3Shot(&shot_obj);
+    RestoreR3Shot((Obj3D *)&shot_obj);
     RestoreR3(&dummy_planet);
     SaveRead(&cam_pos, sizeof(cam_pos));
     SaveRead(&cam_orient, sizeof(cam_orient));

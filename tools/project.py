@@ -1,5 +1,9 @@
 """Shared helpers: the original EXE, the IDA export and the config files.
 
+The original, orig/CD/TREKCD/STARTREK.EXE, is EXEPACK-compressed (it was
+linked with /EXEPACK). The tools work on its unpacked image, which
+load_exe() keeps in build/exe/STARTREK.EXE, made with `exepack -d`.
+
 Addresses everywhere are IDA linear addresses: the load module is based at
 paragraph 0x1000, so image offset = address - 0x10000 and an EXE segment
 value S maps to linear (S + 0x1000) * 16.
@@ -8,15 +12,19 @@ value S maps to linear (S + 0x1000) * 16.
 from __future__ import annotations
 
 import bisect
+import os
 import re
+import shutil
 import struct
+import subprocess
 import sys
 from dataclasses import dataclass, field
 from typing import Callable
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-EXE_PATH = ROOT / "orig/CD/TREKCD/STARTREK_U.EXE"
+ORIG_EXE = ROOT / "orig/CD/TREKCD/STARTREK.EXE"    # the shipped, packed EXE
+EXE_PATH = ROOT / "build/exe/STARTREK.EXE"          # its unpacked image
 IDA_EXPORT = ROOT / "config/ida_export.txt"
 SYMBOLS = ROOT / "config/symbols.txt"
 UNITS = ROOT / "config/units.txt"
@@ -54,8 +62,29 @@ class Exe:
         return self.image[start - LOAD_BASE:end - LOAD_BASE]
 
 
-def load_exe(path: Path = EXE_PATH) -> Exe:
-    d = path.read_bytes()
+def exepack_tool() -> str:
+    """$EXEPACK, else tools/bin/exepack (tools/exepack/build.sh), else exepack on PATH."""
+    if os.environ.get("EXEPACK"):
+        return os.environ["EXEPACK"]
+    local = ROOT / "tools/bin/exepack"
+    return str(local) if local.exists() else (shutil.which("exepack") or "exepack")
+
+
+def unpack_original() -> Path:
+    """Unpack the original EXE into EXE_PATH if it's missing or older."""
+    if not EXE_PATH.exists() or EXE_PATH.stat().st_mtime < ORIG_EXE.stat().st_mtime:
+        EXE_PATH.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            subprocess.run([exepack_tool(), "-d", str(ORIG_EXE), str(EXE_PATH)],
+                           check=True, capture_output=True)
+        except (OSError, subprocess.CalledProcessError) as e:
+            sys.exit(f"can't unpack {ORIG_EXE.relative_to(ROOT)} with exepack ({e}); "
+                     "build it with tools/exepack/build.sh or set $EXEPACK")
+    return EXE_PATH
+
+
+def load_exe(path: Path | None = None) -> Exe:
+    d = (path or unpack_original()).read_bytes()
     (_, cblp, cp, crlc, cparhdr, _, _, ss, sp, _, ip, cs, lfarlc, _) = struct.unpack_from("<14H", d)
     size = (cp - 1) * 512 + cblp if cblp else cp * 512
     image = d[cparhdr * 16:size]

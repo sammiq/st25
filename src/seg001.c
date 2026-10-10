@@ -237,7 +237,7 @@ extern int boost_time;
 int encounter_delay;
 int word_51156;
 extern Bitmap far *backbuf;
-Obj3D shot_obj;
+Shot shot_obj;                      /* the fly-by shuttle, drawn as a shot */
 extern int small_planets;
 char *word_531D8;
 Sprite cut_sprite;
@@ -1922,7 +1922,7 @@ void ShuttleFlyby(int kind)
     shot_obj.size = 2;
     shot_obj.draw = LoadShotShape;
     shot_obj.free = FreeShotShape;
-    AddR3(&shot_obj);
+    AddR3((Obj3D *)&shot_obj);
     MatIdentity(&cam_orient);
     MatIdentity(&player_ship.orient);
     player_ship.pos = shot_obj.pos;
@@ -1956,7 +1956,7 @@ void ShuttleFlyby(int kind)
 void ShuttleEnd(void)
 {
     if (shot_obj.visible)
-        DelR3(&shot_obj);
+        DelR3((Obj3D *)&shot_obj);
 }
 
 /* Play n lines of conversation. */

@@ -2396,6 +2396,7 @@
 5089C  data   000002  _dma_count
 5089E  data   000004  _rdf
 508A2  data   000012  _room_jmp
+508B4  data   000200  __bufin  lib
 50AB4  data   00009B  _timers
 50B50  data   000001  _pal_remap
 50C50  data   000002  _span_fill
