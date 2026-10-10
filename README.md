@@ -29,6 +29,7 @@ ninja progress                     # progress summary
 These inputs are not in git, so supply your own copies:
 - `orig/CD/TREKCD/STARTREK.EXE` (the original EXE, as shipped)
 - `tools/C600/` (the Microsoft C 6.00A installation: `BIN`, `INCLUDE`, `LIB`)
+- `tools/MASM50/` (the Microsoft Assembler 5.0 installation: `BIN`, `INC`)
 
 The original was linked with `/EXEPACK`, so it is compressed. The build unpacks it with David Fifield's [exepack](https://www.bamsoftware.com/software/exepack/) (`exepack -d`) into `build/exe/STARTREK.EXE`, which is the image every tool reads, and IDA too. Set `$EXEPACK` to use an exepack other than `tools/bin/exepack` or the one on `PATH`.
 
@@ -43,7 +44,7 @@ Open `objdiff.json` in `tools/bin/objdiff` (the GUI) for the interactive diff. I
 .venv/bin/python tools/dosbuild.py /A   # rebuild everything
 ```
 
-It also needs `tools/MASM50/` (MASM 5.0). emu2 can't run this build: NMAKE needs a command processor, and LINK 5.10 goes wrong under emu2 with this many objects.
+emu2 can't run this build: NMAKE needs a command processor, and LINK 5.10 goes wrong under emu2 with this many objects.
 
 The original was linked with `/EXEPACK`, and so is the rebuild. The two packed files are compared directly, then both are unpacked with exepack and compared again, where each difference stays at the address it affects.
 
