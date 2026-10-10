@@ -184,6 +184,10 @@ MSC 6 accepts anonymous structs and unions inside a struct. `Obj3D` (`include/ob
 
 A compiled object references its own string literals and statics as `_DATA+offset`. These only match once the target unit owns the same slice of DGROUP. To give a unit its data, add `.data` / `.rodata` / `.bss` ranges to the unit in `config/units.txt`, and shrink the `data/dXXXXX` unit that held them. Ranges must not overlap. Until then, either switch objdiff's *Function relocation diffs* option to *None* or accept those mismatches.
 
+`_far` initialized data (`char _far msg[] = "...";`) doesn't go into DGROUP. MSC puts it in a segment of its own, `<FILE>_DATA` (class `FAR_DATA`), which the build names `.data.<FILE>_DATA`. To match it, give the unit a section with that exact name over the `far/segNNN` unit's range and delete the `far/` unit. seg012's memory messages are an example: `seg012 .data.SEG012_DATA 44510 44720` replaced `far/seg038`. Each variable in the segment starts on an even address, as in DGROUP. The same works for library modules: the 8087 emulator's `EMULATOR_DATA` is `lib/emulator .data.EMULATOR_DATA`. Paragraph padding after a segment (the next one starts on a 16-byte boundary) stays outside the range.
+
+Uninitialized far arrays (`int far sin_table[0x101];`) are different: MSC emits them as communal definitions (`COMDEF`) with no data, and LINK lays them all out in one `FAR_BSS` segment, in an order no object controls. That segment (`far/seg041`: `sin_table`, `file_buf`, `tan_table`, `ems_files`, `cos_table`) is marked `.bss` in `units.txt`, and each array only needs a definition in the source that owns it (seg010, seg003, seg016).
+
 ## How it works
 
 | Tool | Purpose |

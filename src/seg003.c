@@ -12,6 +12,8 @@
 
 void Fatal(char *fmt, ...);     /* fatal error */
 
+char far file_buf[0x800];       /* ReadChunk reads through this (in FAR_BSS) */
+
 /* Locate the speech directory: ./voc if installed, else on the CD. */
 void FindCD(void)
 {

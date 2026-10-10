@@ -84,13 +84,16 @@ extern jmp_buf room_jmp;
 extern int game_mode;               /* 1 bridge, 2 away team; 3, 4 beaming */
 extern int prev_mode;
 
-extern char _far mem_msg1[];
-extern char _far mem_msg2[];
-extern char _far mem_msg3[];
-extern char _far mem_msg4[];
-extern char _far mem_msg5[];
-extern char _far mem_msg6[];
-extern char _far mem_msg7[];
+/* CheckMemory's message, kept out of DGROUP in a far data segment. */
+char _far mem_msg1[] = "Star Trek: 25th Anniversary Enhanced CD-ROM requires 560K of free\n";
+char _far mem_msg2[] = "low memory and 1024k of free EMS (expanded) memory to play. You currently\n";
+char _far mem_msg3[] = "have %ldK free low memory and %ldK free EMS memory.\n";
+char _far mem_msg4[] = "Try moving your TSRs and device drivers into high memory, or remove\n";
+char _far mem_msg5[] = "them completely. Be sure you are not running a DOS shell from Windows.\n\n";
+char _far mem_msg6[] = "If you have more memory in your computer, we recommend you free up\n";
+char _far mem_msg7[] = "even more EMS memory to speed up the game -- 2048K free EMS is recommended.\n";
+char _far size_msg1[] = "program size = %ld\n";    /* unused */
+char _far size_msg2[] = "heap size    = %ld\n";
 
 MemHandle space_bmp_handle = 0;
 Point old_item_pos[5] = { { 0x89, 0x7A }, { 0x78, 0x85 }, { 0x99, 0x91 }, { 0xF7, 0x9C }, { 0x75, 0xA9 } };
