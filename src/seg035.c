@@ -36,7 +36,7 @@ void RenderR3(int statics);
 /* seg020 */
 void BoostEnd(void);
 /* seg036 */
-void sub_40E66(void);
+void VengArrive(void);
 
 void SinsArrive(void);
 void SinsProxima(void);
@@ -164,7 +164,7 @@ void SinsProxima(void)
         Orbit(0, 0);
         StartAnim(1, "bstndsp", 0, 0, 256);
         EndAnim(2);
-        bridge_tick = sub_40E66;
+        bridge_tick = VengArrive;
         bridge_ticks = 0;
         word_45AA2 = 0;
         ClearMsgs();

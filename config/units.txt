@@ -247,7 +247,9 @@ seg034                     .data    46EA6  46EAE  complete
 seg034                     .rodata  49B24  49B96  complete
 seg035                     .text    4074E  40E66  complete
 seg035                     .rodata  49B96  49BDC  complete
-seg036                     .text    40E66  41E1E
+seg036                     .text    40E66  41E1E  complete
+seg036                     .data    46EAE  46ED2  complete
+seg036                     .rodata  49BDC  49C66  complete
 asm/t41E20                 .text    41E20  41E22  complete
 lib/emulator               .text    41E30  4448F  lib=EM.LIB:emulator.asm
 lib/emoem                  .text    44490  44510  lib=EM.LIB:emoem.asm
@@ -258,12 +260,10 @@ far/seg041                 .data    44CE0  45A50
 data/d45A50                .data    45A50  45A92
 data/d45D14                .data    45D14  45D2A
 data/d46794                .data    46794  46798
-data/d46EAE                .data    46EAE  46ED2
 data/d46F68                .data    46F68  470AC
 data/d47118                .data    47118  47238
 data/d473E6                .data    473E6  473F0
 data/d47490                .rodata  47490  474C8
-data/d49BDC                .rodata  49BDC  49C66
 data/d49C6E                .rodata  49C6E  49E56
 data/d49E78                .bss     49E78  53920
 data/stack                 .bss     53920  54820

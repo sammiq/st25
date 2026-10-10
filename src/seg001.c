@@ -57,8 +57,8 @@ void TrialSpock(void);
 void TrialSulu(void);
 void TrialKallarax(void);
 void TrialFight(void);
-void sub_40E66(void);
-void sub_41434(void);
+void VengArrive(void);
+void VengFinale(void);
 void SinsArrive(void);
 void SinsProxima(void);
 void FreeActors(void);              /* seg000 */
@@ -278,7 +278,7 @@ void (far *tick_fns[32])(void) = {
     MuddArrive, MuddHarlequin, MuddReturn,
     FeatherArrive, FeatherKenka, FeatherAttack,
     TrialArrive, TrialKenka, TrialSpock, TrialSulu, TrialKallarax, TrialFight,
-    sub_40E66, sub_41434,
+    VengArrive, VengFinale,
     SinsArrive, SinsProxima
 };
 char byte_45B3C = 1;
@@ -660,7 +660,7 @@ void StartCrew(void)
     StartAnim(5, "bstndch", 0, 0, 256);
     StartAnim(4, "bstndsu", 0, 0, 256);
     StartAnim(7, "bstndsc", 0, 0, 256);
-    if (bridge_tick == sub_41434)
+    if (bridge_tick == VengFinale)
         StartAnim(2, "xstndmc", 0, 0, 256);
 }
 
