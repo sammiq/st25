@@ -12,6 +12,9 @@
 #include "fixmath.h"
 #include "actor.h"
 
+/* Globals this file owns (declared in the headers). */
+Ban bans[16];
+
 #define ABS(x)  ((x) > 0 ? (x) : -(x))
 #define SGN(x)  ((x) > 0 ? 1 : ((x) < 0 ? -1 : 0))
 
@@ -51,7 +54,7 @@ typedef struct WalkGraph {
     unsigned char next[32][32];     /* next node from a towards b */
 } WalkGraph;
 
-extern WalkGraph walk;
+WalkGraph walk;
 
 void SaveActors(void);
 void LoadActors(void);

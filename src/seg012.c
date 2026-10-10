@@ -69,20 +69,20 @@ typedef struct Point {
     int y;
 } Point;
 
-extern Bitmap far *backbuf;
-extern Bitmap far *screen;
-extern unsigned char far *mask_buf;
+Bitmap far *backbuf;
+Bitmap far *screen;
+unsigned char far *mask_buf;
 extern unsigned long blink_count;
 extern Obj3D player_ship;
 extern Obj3D dummy_planet;
 extern char sfx_name[];
-extern int sb_port;
-extern int sb_irq;
+int sb_port;
+int sb_irq;
 extern char room_name[];
 extern jmp_buf game_jmp;            /* back to the main loop */
 extern jmp_buf room_jmp;
-extern int game_mode;               /* 1 bridge, 2 away team; 3, 4 beaming */
-extern int prev_mode;
+int game_mode;               /* 1 bridge, 2 away team; 3, 4 beaming */
+int prev_mode;
 
 /* CheckMemory's message, kept out of DGROUP in a far data segment. */
 char _far mem_msg1[] = "Star Trek: 25th Anniversary Enhanced CD-ROM requires 560K of free\n";

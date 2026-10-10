@@ -21,7 +21,7 @@ void WarpOut(void);               /* seg025 */
 void CreatePlanet(Obj3D *o, char *name, int radius, int small, unsigned seed, int pal);
 void RandomPlanet(Obj3D *o);
 
-extern Obj3D dummy_planet;
+Obj3D dummy_planet;
 extern Bitmap far *backbuf;
 extern Bitmap far *screen;
 extern long blink_count;

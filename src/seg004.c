@@ -3,11 +3,21 @@
 #include <dos.h>
 #include "ems.h"
 
+/* Globals this file owns (declared in the headers). */
+EMSBlock ems_blocks[EMS_MAX_BLOCKS];
+EMSBlock *ems_head;
+int ems_first_page;
+
 extern unsigned _aseghi;    /* C runtime: highest segment in use */
 
 /* No prototypes in this file in the original: the pointer is passed near. */
 int MemSet();
 void Fatal();           /* fatal error */
+
+int ems_other_page = -1;
+unsigned ems_page_seg = 0;
+unsigned ems_num_pages = 0;
+void far *ems_lock_ptr = 0;
 
 void EMSInit(void)
 {

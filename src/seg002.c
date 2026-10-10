@@ -22,13 +22,13 @@ typedef struct DBList {
 } DBList;
 
 extern int key_accel;
-extern unsigned char cursor_on;
-extern MemHandle input_bg;          /* the empty box */
-extern MemHandle input_bmp;         /* the box with the text */
-extern int input_size;
-extern Sprite input_sprite;
+unsigned char cursor_on;
+MemHandle input_bg;          /* the empty box */
+MemHandle input_bmp;         /* the box with the text */
+int input_size;
+Sprite input_sprite;
 extern long blink_count;
-extern char *dialog_title;
+char *dialog_title;
 
 char input_buf[134] = "some input";
 int cursor = 0;

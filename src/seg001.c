@@ -21,6 +21,9 @@
 #include "menu.h"
 #include "room.h"
 
+/* Globals this file owns (declared in the headers). */
+Sprite mouse_sprite;
+
 /* Called here with the rectangle passed whole. */
 void SpriteAddRect(Sprite *s, MemHandle h, Rect r);
 
@@ -175,13 +178,13 @@ typedef struct Point {
 
 extern Bitmap far *screen;
 extern unsigned char far *mask_buf;
-extern unsigned long blink_count;
-extern Obj3D player_ship;
-extern Obj3D ships[4];
-extern Matrix cam_orient;
+unsigned long blink_count;
+Obj3D player_ship;
+Obj3D ships[4];
+Matrix cam_orient;
 extern Vec32 cam_pos;
-extern Sprite view_sprite;
-extern BitmapHdr space_bmp;
+Sprite view_sprite;
+BitmapHdr space_bmp;
 extern MemHandle space_bmp_handle;
 extern Rect clip_rect;
 extern int view_cx;
@@ -192,22 +195,22 @@ extern int arrow_key;
 extern long proj_dist;
 extern float star_near;
 extern int fade_level;
-extern unsigned long bridge_ticks;
+unsigned long bridge_ticks;
 extern int msg_tail;
-extern int msg_head;
-extern int word_537AE;
-extern Sprite radar_sprite;
-extern Sprite bspr1;
-extern Sprite bspr2;
-extern Sprite bspr3;
-extern Sprite bspr4;
-extern Sprite bspr5;
-extern Sprite bspr6;
-extern BitmapHdr bhdr1;
-extern BitmapHdr bhdr2;
-extern BitmapHdr bhdr3;
-extern BitmapHdr bhdr4;
-extern BitmapHdr bhdr5;
+int msg_head;
+int word_537AE;
+Sprite radar_sprite;
+Sprite bspr1;
+Sprite bspr2;
+Sprite bspr3;
+Sprite bspr4;
+Sprite bspr5;
+Sprite bspr6;
+BitmapHdr bhdr1;
+BitmapHdr bhdr2;
+BitmapHdr bhdr3;
+BitmapHdr bhdr4;
+BitmapHdr bhdr5;
 extern Actor actors[];
 
 typedef struct Msg {
@@ -218,28 +221,28 @@ typedef struct Msg {
 
 extern Msg msg_queue[16];
 Msg *PeekMsg(void);
-extern Obj3D *last_target;
+Obj3D *last_target;
 extern char mission[];
-extern int cam_tab1[2][3];
-extern int cam_tab2[2][3];
+int cam_tab1[2][3];
+int cam_tab2[2][3];
 extern Obj3D dummy_planet;
-extern Sprite hail_sprite;
-extern char hail_name[];
-extern int hail_anim;
+Sprite hail_sprite;
+char hail_name[16];
+int hail_anim;
 extern jmp_buf game_jmp;
-extern int mission_ranks[7];
+int mission_ranks[7];
 extern int voc_wait;
 extern int boost_power;
 extern int boost_time;
-extern int encounter_delay;
-extern int word_51156;
+int encounter_delay;
+int word_51156;
 extern Bitmap far *backbuf;
-extern Obj3D shot_obj;
+Obj3D shot_obj;
 extern int small_planets;
-extern char *word_531D8;
-extern Sprite cut_sprite;
-extern void (far *saved_tick)(void);
-extern char text_name[];
+char *word_531D8;
+Sprite cut_sprite;
+void (far *saved_tick)(void);
+char text_name[10];
 extern long boost_count;
 extern int boost_amount;
 

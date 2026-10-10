@@ -6,10 +6,21 @@
 #include "ems.h"
 #include "mem.h"
 
+/* Globals this file owns (declared in the headers). */
+MemSlot mem__handle_tbl[MEM_MAX_HANDLES];
+PoolHdr far *lpPoolStart;
+unsigned pool_free_mem;
+PoolHdr far *lpPoolCurrent;
+PoolHdr far *lpPoolEnd;
+MemSlot *mem_handle_free_list;
+
 extern unsigned _aseghi;    /* C runtime: highest segment in use */
 
 void Fatal(char *msg);  /* fatal error */
-int sub_2B676(int ems);     /* release cached memory, 0 if nothing left */
+int CachePurge(int ems);    /* seg016: release cached memory, 0 if nothing left */
+
+int pool_stack_size = 0;
+int pool_lock_count = 0;
 
 void *AllocMemPtr(int size)
 {
@@ -86,7 +97,7 @@ void far *PushMem(unsigned size)
     char buf[80];
 
     for (paras = ((size + 15) >> 4) + 1; pool_free_mem <= paras; ) {
-        if (!sub_2B676(0)) {
+        if (!CachePurge(0)) {
             sprintf(buf, "Can't push %d bytes of FAR memory", size);
             Fatal(buf);
         }
@@ -147,7 +158,7 @@ MemHandle AllocMemHandle(void far *p)
     MemHandle h;
 
     for (; mem_handle_free_list == 0; ) {
-        if (!sub_2B676(1))
+        if (!CachePurge(1))
             Fatal("Out of memory handles!");
     }
     h = mem_handle_free_list;
@@ -238,7 +249,7 @@ MemHandle AllocMem(unsigned size, int ems)
         }
         if (failed)
             return 0;
-        failed = !sub_2B676(ems != 0);
+        failed = !CachePurge(ems != 0);
     }
 }
 

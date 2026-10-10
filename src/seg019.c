@@ -26,11 +26,11 @@ void LoadGameState(void);               /* seg008: read the game state */
 void Fatal(char *fmt, ...);     /* fatal error */
 char *InputDescription(void);       /* seg002 */
 
-extern SaveDir save_dir;
-extern char save_path[];
-extern char save_desc[25];
-extern FILE *save_fp;
-extern int save_version;
+SaveDir save_dir;
+char save_path[80];
+char save_desc[25];
+FILE *save_fp;
+int save_version;
 extern int voc_wait;
 
 /* The bitmap in a ship's .r3s for each yaw and pitch step (seg006

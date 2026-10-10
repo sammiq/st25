@@ -10,9 +10,23 @@
 #include "mem.h"
 #include "resource.h"
 
+/* Globals this file owns (declared in the headers). */
+char voc_path[32];
+MemHandle dir_handle;
+int data_fd;
+unsigned dir_size;
+MemHandle run_handle;
+struct find_t patch_find;
+unsigned dir_count;
+
 void Fatal(char *fmt, ...);     /* fatal error */
 
 char far file_buf[0x800];       /* ReadChunk reads through this (in FAR_BSS) */
+int voc_on_cd = 0;
+int word_45D18 = 0;             /* never used */
+char *exit_msg = 0;
+int data_not_open = -1;
+int dir_last = 0;
 
 /* Locate the speech directory: ./voc if installed, else on the CD. */
 void FindCD(void)

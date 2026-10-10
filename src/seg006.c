@@ -50,27 +50,27 @@ int Project(long a, long z);
 int DrawPlanet(Obj3D *o);
 void FreePlanet(Obj3D *o);
 
-extern int view_cx;
-extern int view_cy;
-extern int view_w;                  /* half the view width */
-extern int view_h;
-extern int view_x0;
-extern int view_x1;
-extern int view_y0;
-extern int view_y1;
-extern Rect clip_rect;
-extern char far *view_ptr;          /* first row of the view on the screen */
+int view_cx;
+int view_cy;
+int view_w;                  /* half the view width */
+int view_h;
+int view_x0;
+int view_x1;
+int view_y0;
+int view_y1;
+Rect clip_rect;
+char far *view_ptr;          /* first row of the view on the screen */
 extern Bitmap far *screen;
 extern Bitmap far *backbuf;
-extern long proj_dist;
-extern float star_near;
-extern Vec32 fr_left;               /* frustum edges */
-extern Vec32 fr_right;
-extern Vec32 fr_top;
-extern Vec32 fr_bottom;
+long proj_dist;
+float star_near;
+Vec32 fr_left;               /* frustum edges */
+Vec32 fr_right;
+Vec32 fr_top;
+Vec32 fr_bottom;
 extern Vec32 cam_pos;
 extern Matrix cam_orient;
-extern Matrix cam_matrix;           /* cam_orient transposed */
+Matrix cam_matrix;           /* cam_orient transposed */
 extern Sprite view_sprite;           /* the view, as a sprite */
 extern Obj3D player_ship;
 extern Obj3D shot_obj;
@@ -78,7 +78,7 @@ extern Obj3D dummy_planet;
 extern Obj3D ships[4];
 extern unsigned long blink_count;
 extern unsigned char byte_45B3C[];
-extern int span_fill;
+int span_fill;
 extern int view_tab[24][13];        /* bitmap for each yaw and pitch, 0x8000 mirrored */
 
 Obj3D *r3_list[MAX_R3] = { 0 };

@@ -417,3 +417,7 @@
 41C8A  aCredgene
 41CD5  aSfxGeneeulo
 41D46  aBridge_13
+
+# asm/t35052: [2Ch] is the PSP's environment segment (DS = CS-10h), not DGROUP
+35619  none
+3561D  none

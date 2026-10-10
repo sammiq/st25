@@ -42,17 +42,17 @@ void ReleaseShipShape(Obj3D *o);
 extern Obj3D *r3_list[48];
 extern Obj3D player_ship;
 extern Obj3D ships[4];
-extern Shot shots[MAX_SHOTS];
+Shot shots[MAX_SHOTS];
 extern unsigned long blink_count;
 extern int under_attack;
-extern char *off_45AA0;
+extern char *crew_names[8];
 extern int kbd_mouse;
 extern Obj3D *last_target;          /* last ship the player hit */
-extern int boost_active;            /* extra power from the engines */
-extern long boost_count;
-extern int boost_amount;
-extern int boost_power;
-extern int boost_time;
+int boost_active;            /* extra power from the engines */
+long boost_count;
+int boost_amount;
+int boost_power;
+int boost_time;
 
 int FireShot(Obj3D *o, Weapon *w, Vec32 *dir, ShipPart *p);
 void UpdateShots(void);
@@ -645,7 +645,7 @@ void SetRepair(int sys)
 {
     repair_sys = sys;
     if (sys != -1)
-        MsgBox(off_45AA0, "#BRID\\BRID_S22#Aye Sir.", 0x40, 0x64, 0xA1, 0);
+        MsgBox(crew_names[7], "#BRID\\BRID_S22#Aye Sir.", 0x40, 0x64, 0xA1, 0);
 }
 
 /* Every 32 frames: recharge the shields and repair the systems a little. */

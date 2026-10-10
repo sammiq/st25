@@ -10,9 +10,15 @@
 #include "sprite.h"
 #include "gfx.h"
 
+/* Globals this file owns (declared in the headers). */
+int video_mode;
+unsigned char cur_palette[768];
+unsigned char remap_table[256];
+int fade_level;
+
 void Fatal(char *fmt, ...);     /* fatal error */
 
-extern unsigned char far *cur_glyph;
+unsigned char far *cur_glyph;
 
 MemHandle font_handle = 0;
 unsigned char far *font_data = 0;

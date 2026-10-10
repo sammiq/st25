@@ -456,7 +456,11 @@ class Splitter:
                     sym = ".text"       # the unit's own code segment
                 else:
                     seg = self.ida.seg_at(base + 0x10) or self.ida.seg_at(base)
-                    sym = f"SEG_{seg.name}" if seg else f"SEG_{segv:04X}"
+                    own = self.owner(seg.start) if seg else None
+                    if own and own[1].startswith(".data."):
+                        sym = own[1][len(".data."):]   # a far segment: named like the compiler's SEGDEF
+                    else:
+                        sym = f"SEG_{seg.name}" if seg else f"SEG_{segv:04X}"
             self._add(w, sec, start, at, R_386_SEG16, sym, 0, set())
 
 

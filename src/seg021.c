@@ -9,16 +9,16 @@
 
 void Fatal(char *fmt, ...);     /* fatal error */
 
-extern Sprite *sprite_array[MAX_SPRITES];
-extern Rect dirty_rects[];
-extern int dirty_count;
+Sprite *sprite_array[MAX_SPRITES];
+Rect dirty_rects[64];
+int dirty_count;
 extern int video_mode;              /* 0 VGA, 1 EGA, 2 Tandy */
 extern Bitmap far *backbuf;         /* sprites are composed here */
 extern Bitmap far *screen;          /* the background without sprites */
 extern unsigned char far *mask_buf; /* EGA priority mask, 2 pixels a byte */
-extern unsigned char palette[256][3];
-extern unsigned char pal_remap[256];
-extern unsigned char shade_table[256];
+unsigned char palette[256][3];
+unsigned char pal_remap[256];
+unsigned char shade_table[256];
 
 int sprite_count0 = 0;
 Sprite **sprite_list = sprite_array;

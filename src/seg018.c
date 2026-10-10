@@ -16,14 +16,14 @@ extern long proj_dist;
 extern float star_near;
 extern long blink_count;
 extern Bitmap far *backbuf;
-extern MemHandle fractal_handle;        /* result of MakeFractal */
-extern unsigned long planet_start;
-extern int far *frac_pal;
-extern int frac_size2;
-extern int frac_bytes;
-extern int far *frac_map;               /* heights, in the back buffer */
-extern Bitmap far *frac_bmp;
-extern int frac_size;
+MemHandle fractal_handle;        /* result of MakeFractal */
+unsigned long planet_start;
+int far *frac_pal;
+int frac_size2;
+int frac_bytes;
+int far *frac_map;               /* heights, in the back buffer */
+Bitmap far *frac_bmp;
+int frac_size;
 extern Obj3D dummy_planet;
 
 /* Colours for the fractal heights of each planet palette (kept in a far

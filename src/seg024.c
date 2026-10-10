@@ -4,6 +4,10 @@
 #include "mem.h"
 #include "bitmap.h"
 
+/* Globals this file owns (declared in the headers). */
+char scale_code[0x502];
+char scale_row[0x140];
+
 void Fatal(char *fmt, ...);     /* fatal error */
 
 /* Scale a bitmap by scale/256, returning a new bitmap. */

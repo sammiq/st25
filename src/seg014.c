@@ -10,6 +10,12 @@
 #include "sound.h"
 #include "menu.h"
 
+/* Globals this file owns (declared in the headers). */
+int menu_sel;
+int menu_count;
+unsigned mouse_x;
+unsigned mouse_y;
+
 void UpdateActors(void);               /* seg000 */
 void DrawBans(void);
 void UpdateBans(void);
@@ -23,10 +29,10 @@ void TextModeMenu(int a);
 extern int kbd_mouse;
 extern int key_accel;
 extern long blink_count;
-extern int stream_done;
+int stream_done;
 extern int voc_wait;
-extern MemHandle menu_handle;
-extern int menu_saved_accel;
+MemHandle menu_handle;
+int menu_saved_accel;
 
 Sprite *menu_sprites = 0;
 int *menu_ids = 0;

@@ -7,6 +7,11 @@
 #include "sound.h"
 #include "event.h"
 
+/* Globals this file owns (declared in the headers). */
+int buttons;
+unsigned long ticks;
+int input_dev;
+
 void Fatal(char *fmt, ...);     /* fatal error */
 void MsgBox(char *title, char *msg, int a, int b, int c, int d);    /* seg008: message box */
 void QuitMenu(int a, int b);       /* seg019: quit dialog */
@@ -21,25 +26,25 @@ void JoyUpdate(void);
 
 extern Rect clip_rect;
 extern int sound_closed;
-extern Event *ev_write;
-extern Event *ev_read;
-extern Event ev_queue[EV_MAX];
-extern unsigned char move_pending;      /* an EV_MOVE is queued */
-extern unsigned char tick_pending;      /* an EV_TICK is queued */
-extern unsigned char mouse_present;
-extern unsigned long last_tick;
-extern int old_buttons;
-extern int key_code;
-extern int key_shift;
-extern int mouse_hires;                 /* the driver works in 640 wide coordinates */
-extern int key_b1;                      /* keypad + held: left button */
-extern int key_b2;                      /* keypad - held: right button */
+Event *ev_write;
+Event *ev_read;
+Event ev_queue[EV_MAX];
+unsigned char move_pending;      /* an EV_MOVE is queued */
+unsigned char tick_pending;      /* an EV_TICK is queued */
+unsigned char mouse_present;
+unsigned long last_tick;
+int old_buttons;
+int key_code;
+int key_shift;
+int mouse_hires;                 /* the driver works in 640 wide coordinates */
+int key_b1;                      /* keypad + held: left button */
+int key_b2;                      /* keypad - held: right button */
 extern int kbd_mouse;                   /* keypad arrows jump the pointer */
-extern int arrow_key;                   /* keypad arrow held */
-extern int arrow_changed;
-extern int btn_key;
-extern int btn_changed;
-extern int shift_key;
+int arrow_key;                   /* keypad arrow held */
+int arrow_changed;
+int btn_key;
+int btn_changed;
+int shift_key;
 
 int last_mx = 160;
 int last_my = 100;

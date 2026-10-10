@@ -34,7 +34,7 @@ void MenuMove(Sprite *s, int n, int cur, int dir);
 void DrawButtonFrame(MemHandle h, int c);
 
 extern Item items[NUM_ITEMS];
-extern InvEntry inv_ents[NUM_ITEMS];
+InvEntry inv_ents[NUM_ITEMS];
 extern int key_accel;
 
 /* What the captain starts with. */

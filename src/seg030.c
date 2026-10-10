@@ -89,7 +89,7 @@ extern int mission_vars[6];
 extern void (far *saved_tick)(void);
 extern int word_52C1E;
 extern char mission[16];
-extern Sprite flash_sprite;
+Sprite flash_sprite;
 
 char elasi_cereth[] = "Elasi Cereth";
 char elasi_captain[] = "Elasi Captain";

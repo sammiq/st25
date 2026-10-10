@@ -40,8 +40,8 @@
 	.DATA
 	EXTRN	_clip_rect:BYTE
 	EXTRN	_proj_dist:BYTE
-	EXTRN	_word_45AA6:BYTE
-	EXTRN	_word_50826:BYTE
+	EXTRN	_kbd_mouse:BYTE
+	EXTRN	_ticks:BYTE
 L_DATA	LABEL	BYTE
 _sqrt_table	LABEL	BYTE
 	DB	000h, 001h, 001h, 001h, 002h, 002h, 002h, 002h, 002h, 003h, 003h, 003h
@@ -695,7 +695,7 @@ L3A668:
 _JoyUpdate:
 	push si
 	push di
-	mov ax, word ptr [_word_50826]
+	mov ax, word ptr [_ticks]
 	cmp ax, word ptr [_joy_frame]
 	jne L3A679
 	jmp L3A793
@@ -706,7 +706,7 @@ L3A67C:
 	mov ax, cx
 	or ax, dx
 	js L3A67C
-	mov ax, word ptr [_word_45AA6]
+	mov ax, word ptr [_kbd_mouse]
 	or ax, ax
 	jne L3A68F
 	jmp L3A731

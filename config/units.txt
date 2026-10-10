@@ -8,11 +8,13 @@ seg001                     .text    11DCC  160EE  complete
 seg001                     .data    45A92  45C8E  complete
 seg001                     .rodata  47586  480C5  complete
 seg002                     .text    160EE  16E08  complete
-seg002                     .data    45C8E  45D14  complete
+seg002                     .data    45C8E  45D16  complete
 seg002                     .rodata  480C6  4816C  complete
 seg003                     .text    16E08  18430  complete
+seg003                     .data    45D16  45D20  complete
 seg003                     .rodata  4816C  484A2  complete
 seg004                     .text    18430  18A90  complete
+seg004                     .data    45D20  45D2A  complete
 seg004                     .rodata  484A2  48510  complete
 seg005                     .text    18A90  1971F  complete
 seg005                     .data    45D2A  45D42  complete
@@ -37,6 +39,7 @@ seg012                     .data    4676A  46794  complete
 seg012                     .rodata  48ABA  48C71  complete
 seg012                     .data.SEG012_DATA 44510  44720
 seg013                     .text    26DEC  277BD  complete
+seg013                     .data    46794  46798  complete
 seg013                     .rodata  48C72  48DA5  complete
 seg014                     .text    277BE  29480  complete
 seg014                     .data    46798  467A2  complete
@@ -258,8 +261,6 @@ lib/emulator               .data.EMULATOR_DATA 44B70  44CD9  lib=EM.LIB:emulator
 lib/emoem                  .text    44490  44510  lib=EM.LIB:emoem.asm
 far/seg041                 .bss     44CE0  45A50
 data/d45A50                .data    45A50  45A92
-data/d45D14                .data    45D14  45D2A
-data/d46794                .data    46794  46798
 data/d46F68                .data    46F68  470AC
 data/d47118                .data    47118  47238
 data/d473E6                .data    473E6  473F0

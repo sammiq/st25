@@ -33,7 +33,6 @@
 	PUBLIC	_word_35915
 
 	.DATA
-	EXTRN	aMsRunTimeLibra:BYTE
 
 	.CODE
 L_TEXT	LABEL	BYTE
@@ -878,8 +877,8 @@ _sub_355D2:
 	mov ax, cs
 	sub ax, 10h
 	mov ds, ax
-	mov es, word ptr [aMsRunTimeLibra+36]
-	mov ds, word ptr [aMsRunTimeLibra+36]
+	mov es, word ptr ds:[2Ch]	; PSP: environment segment
+	mov ds, word ptr ds:[2Ch]
 	xor di, di
 	mov cx, 0FFFFh
 	mov ax, 100h

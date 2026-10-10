@@ -28,7 +28,7 @@ void RenderR3(int statics);
 
 extern Bitmap far *screen;
 extern Bitmap far *backbuf;
-extern Vec32 cam_pos;
+Vec32 cam_pos;
 extern Matrix cam_orient;
 extern Obj3D player_ship;
 extern Obj3D dummy_planet;

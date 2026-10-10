@@ -188,6 +188,8 @@ A compiled object references its own string literals and statics as `_DATA+offse
 
 Uninitialized far arrays (`int far sin_table[0x101];`) are different: MSC emits them as communal definitions (`COMDEF`) with no data, and LINK lays them all out in one `FAR_BSS` segment, in an order no object controls. That segment (`far/seg041`: `sin_table`, `file_buf`, `tan_table`, `ems_files`, `cos_table`) is marked `.bss` in `units.txt`, and each array only needs a definition in the source that owns it (seg010, seg003, seg016).
 
+The near `.bss` (`data/d49E78`) works the same way. Every uninitialized global needs a definition (`int game_mode;`, `Obj3D ships[4];`) in the file that owns it, usually the one that uses it most. A plain `extern` everywhere still matches unit by unit, but leaves the program unlinkable. `tools/linkcheck.py` lists anything left undefined.
+
 ## How it works
 
 | Tool | Purpose |
@@ -201,6 +203,7 @@ Uninitialized far arrays (`int far sin_table[0x101];`) are different: MSC emits 
 | `tools/elf16.py` | ELF writer shared by both sides |
 | `tools/fdiff.py`, `tools/disasm.py`, `tools/progress.py` | command-line diff, disassembly, progress summary |
 | `tools/rename.py` | renames symbols in `symbols.txt`, `relocs.txt` and every source and header (`tools/rename.py _sub_3AEFF _AIL_startup …`) |
+| `tools/linkcheck.py` | lists externals that no object or C library defines, as LINK would report them; exits non-zero if any (run `ninja` first) |
 | `tools/strrel.py` | gives each string in a unit's `.rodata` a symbol and adds `relocs.txt` entries for `push` operands IDA left as numbers (`tools/strrel.py seg030 [--dry-run]`) |
 
 ### Object conventions
