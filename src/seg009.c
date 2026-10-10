@@ -1,5 +1,6 @@
 /* seg009: the inventory */
 
+#include "compat.h"
 #include <string.h>
 #include "mem.h"
 #include "cache.h"
@@ -11,48 +12,48 @@
 #define NUM_ITEMS   137
 
 typedef struct Item {
-    int have;                   /* 00 carried */
-    int code;                   /* 02 */
+    int16_t have;                   /* 00 carried */
+    int16_t code;                   /* 02 */
     char name[12];              /* 04 bitmap name */
 } Item;
 
 /* As menu.h's MenuEntry. */
 typedef struct InvEntry {
     char name[10];              /* 00 */
-    int x;                      /* 0A */
-    int y;                      /* 0C */
-    int code;                   /* 0E */
+    int16_t x;                      /* 0A */
+    int16_t y;                      /* 0C */
+    int16_t code;                   /* 0E */
 } InvEntry;
 
-void BridgeSfx(int a);              /* seg001 */
-void SaveWrite(void *p, int n);     /* seg019: save game I/O */
-void SaveRead(void *p, int n);
+void BridgeSfx(int16_t a);              /* seg001 */
+void SaveWrite(void *p, int16_t n);     /* seg019: save game I/O */
+void SaveRead(void *p, int16_t n);
 
 /* seg014 */
-int MenuHit(Sprite *s, int n, unsigned x, unsigned y);
-void MenuMove(Sprite *s, int n, int cur, int dir);
-void DrawButtonFrame(MemHandle h, int c);
+int16_t MenuHit(Sprite *s, int16_t n, uint16_t x, uint16_t y);
+void MenuMove(Sprite *s, int16_t n, int16_t cur, int16_t dir);
+void DrawButtonFrame(MemHandle h, int16_t c);
 
 extern Item items[NUM_ITEMS];
 InvEntry inv_ents[NUM_ITEMS];
-extern int key_accel;
+extern int16_t key_accel;
 
 /* What the captain starts with. */
-int start_items[6] = { 0x40, 0x41, 0x44, 0x45, 0x47, 0x7F };
+int16_t start_items[6] = { 0x40, 0x41, 0x44, 0x45, 0x47, 0x7F };
 
-void ItemGive(int id)
+void ItemGive(int16_t id)
 {
     items[id - ITEM_FIRST].have = 1;
 }
 
-void ItemTake(int id)
+void ItemTake(int16_t id)
 {
     items[id - ITEM_FIRST].have = 0;
 }
 
 void ItemsInit(void)
 {
-    int i;
+    int16_t i;
 
     for (i = 0x40; i != 0x89; i++)
         ItemTake(i);
@@ -60,14 +61,14 @@ void ItemsInit(void)
         ItemGive(start_items[i - 1]);
 }
 
-int ItemHave(int id)
+int16_t ItemHave(int16_t id)
 {
     return items[id - ITEM_FIRST].have;
 }
 
 void ItemsSave(void)
 {
-    int i;
+    int16_t i;
     unsigned char c;
 
     for (i = 0; i < NUM_ITEMS; i++) {
@@ -78,7 +79,7 @@ void ItemsSave(void)
 
 void ItemsLoad(void)
 {
-    int i;
+    int16_t i;
     unsigned char c;
 
     for (i = 0; i < NUM_ITEMS; i++) {
@@ -89,20 +90,20 @@ void ItemsLoad(void)
 
 /* Show the items carried in rows of five at (x, y) and let the player
  * pick one. Returns its code, or -1. restore: put the pointer back. */
-int PickItem(int x, int y, int restore)
+int16_t PickItem(int16_t x, int16_t y, int16_t restore)
 {
     Sprite *sprites;
     char name[10];
-    int i;
-    int n;
-    int sel;
-    int running;
-    int count;
+    int16_t i;
+    int16_t n;
+    int16_t sel;
+    int16_t running;
+    int16_t count;
     Event *e;
     InvEntry *ents;
-    unsigned old_x;
-    unsigned old_y;
-    int old_accel;
+    uint16_t old_x;
+    uint16_t old_y;
+    int16_t old_accel;
     MemHandle h;
 
     sel = -1;
@@ -139,7 +140,7 @@ int PickItem(int x, int y, int restore)
         if ((e = PeekEvent()) != 0) {
             switch (e->type) {
             case EV_KEY:
-                switch (((unsigned)e->key >> 8) & 0xFF) {
+                switch (((uint16_t)e->key >> 8) & 0xFF) {
                 case 0x1C:
                 case 0x3B:
                     goto pick;

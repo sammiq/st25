@@ -1,6 +1,8 @@
 /* seg001: the bridge - main loop, view panels, crew, radar, damage
  * display and the bridge menus */
 
+#include "compat.h"
+#include <ctype.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -11,9 +13,7 @@
 #include "event.h"
 #include "gfx.h"
 #include "sound.h"
-#define SpriteAddRect SpriteAddRect_
 #include "sprite.h"
-#undef SpriteAddRect
 #include "resource.h"
 #include "fixmath.h"
 #include "obj3d.h"
@@ -24,13 +24,11 @@
 /* Globals this file owns (declared in the headers). */
 Sprite mouse_sprite;
 
-/* Called here with the rectangle passed whole. */
-void SpriteAddRect(Sprite *s, MemHandle h, Rect r);
 
-int getch(void);
-void Fatal();
-void PostRoomMsg(int msg, int who, int a, int b);     /* seg008: report */
-void MsgBox(char *title, char *msg, int a, int b, int c, int d);    /* seg008: message box */
+void PostRoomMsg(unsigned char msg, unsigned char who, unsigned char a, unsigned char b);     /* seg008: report */
+void InitActors(void);                      /* seg000 */
+void AddR3(Obj3D *o);                       /* seg006 */
+void MsgBox(char *title, char *msg, int16_t a, int16_t b, int16_t c, int16_t d);    /* seg008: message box */
 /* mission bridge handlers, seg029 - seg036 */
 void DemonArrive(void);
 void DemonFight(void);
@@ -69,34 +67,33 @@ void UpdateActors(void);
 
 /* seg006 */
 void CamReset(void);
-void SetView(int x0, int y0, int x1, int y1, int fov);
-void RenderR3(int statics);
+void SetView(int16_t x0, int16_t y0, int16_t x1, int16_t y1, int16_t fov);
+void RenderR3(int16_t statics);
 /* seg020 */
-int FireShot(Obj3D *o, Weapon *w, Vec32 *dir, ShipPart *p);
-void Bearing(Obj3D *o, Vec32 *to, int *pitch, int *yaw);
-int WeaponsReady(Obj3D *o);
+int16_t FireShot(Obj3D *o, Weapon *w, Vec32 *dir, ShipPart *p);
+void Bearing(Obj3D *o, Vec32 *to, int16_t *pitch, int16_t *yaw);
+int16_t WeaponsReady(Obj3D *o);
 void UpdatePower(Obj3D *o);
 void MoveShip(Obj3D *o);
 void Repair(Obj3D *o);
 void UpdateShips(void);
 void UpdateShots(void);
-int BoostStart(void);
-void SetPower(int shields, int weapons);
-void SetRepair(int sys);
+int16_t BoostStart(void);
+void SetPower(int16_t shields, int16_t weapons);
+void SetRepair(int16_t sys);
 /* seg027 */
 void Vec32Add(Vec32 *a, Vec32 *b);
 /* others */
-int StarMap(void);                  /* seg023 */
-void CrewAnim(char *buf, int n, char *name);   /* seg008 */
+int16_t StarMap(void);                  /* seg023 */
+void CrewAnim(char *buf, int16_t n, char *name);   /* seg008 */
 void InitShips(char *name);         /* seg020 */
 void ClearShots(void);
-int tolower(int c);
-int LoadShotShape(Obj3D *o);        /* seg006 */
+int16_t LoadShotShape(Obj3D *o);        /* seg006 */
 void FreeShotShape(Obj3D *o);
 void DelR3(Obj3D *o);
 void StopShip(Obj3D *o);            /* seg025 */
 void RandomPlanet(Obj3D *o);
-void ChoiceTitle(int x, char far *name, int n);   /* seg008 */
+void ChoiceTitle(char *x, char *name, int16_t n);   /* seg008 */
 void StarsReset(void);
 void OrbitArrive(void);             /* seg025 */
 void OrbitDepart(void);
@@ -104,17 +101,17 @@ void OrthoR3(void);                 /* seg006 */
 void ClearView(void);
 void Computer(void);                /* seg005 */
 
-void BridgeSfx(int n);
+void BridgeSfx(int16_t n);
 void ClearScreen(void);
-void KeyStation(int dx, int dy);
-void SetSteering(int on);
+void KeyStation(int16_t dx, int16_t dy);
+void SetSteering(int16_t on);
 void BridgeLoop(void);
 void WaitButtonUp(void);
 void FullView(void);
 void FullViewEnd(void);
 void BridgeScreen(void);
 void BridgeScreenEnd(void);
-void BridgeEnter(int reset);
+void BridgeEnter(int16_t reset);
 void BridgeLeave(void);
 void StartCrew(void);
 void UpdateCrew(void);
@@ -122,63 +119,63 @@ void DrawRadar(void);
 void FreeRadar(void);
 void DrawShipStatus(Obj3D *o);
 void DrawBmp(char *name);
-void TintBmp(Bitmap far *bmp, int color);
+void TintBmp(Bitmap *bmp, int16_t color);
 void CyclePalette(void);
-void CycleRange(int first, int count);
+void CycleRange(int16_t first, int16_t count);
 void InitBlip(void);
 void MoveBlip(void);
 void FaceEnemy(void);
-void FireWeapons(int torps, int phasers);
-void ClickCrew(int x, int y);
+void FireWeapons(int16_t torps, int16_t phasers);
+void ClickCrew(int16_t x, int16_t y);
 void BridgeKey(Event e);
 void ClampPointer(void);
 void ViewFull(void);
 void ViewBridge(void);
 void EncounterTick(void);
 void DrawGauges(void);
-void CrewMenu(char *name, int x, int y);
+void CrewMenu(char *name, int16_t x, int16_t y);
 void BridgeMsg(void);
 void SetViewDir(void);
-void CrewOrder(int cmd);
-int StarMapGo(void);
-void Orbit(int arrive, int say);
-void CamFollow(int n);
-void CamPath(long *out, int which, int n);
-void SendScript(int n);
+void CrewOrder(int16_t cmd);
+int16_t StarMapGo(void);
+void Orbit(int16_t arrive, int16_t say);
+void CamFollow(int16_t n);
+void CamPath(int32_t *out, int16_t which, int16_t n);
+void SendScript(int16_t n);
 void HailShow(char *name);
 void HailRestart(void);
 void HailEnd(void);
 void HailSay(char *name, char *title, char *text);
 void Transport(char *name);
 void RepairAll(Obj3D *o);
-void Debrief(int n, int msg, int score, int max);
-void SayNumber(char *out, int n);
+void Debrief(int16_t n, int16_t msg, int16_t score, int16_t max);
+void SayNumber(char *out, int16_t n);
 void CaptainsLog(void);
 void StartEncounter(void);
 void FreeText(char *p);
 void SetTextFile(char *name);
-char *GetText(int n);
-void ShuttleFlyby(int kind);
+char *GetText(int16_t n);
+void ShuttleFlyby(int16_t kind);
 void ShuttleEnd(void);
 void CutScene(char *name, char *voc);
 void CutSceneTick(void);
-char *GetChoice(int n, int *list, int x);
+char *GetChoice(int16_t n, int16_t *list, char *x);
 void ResetMsgs(void);
-void DrawWeaponGauge(ShipPart *p, Weapon *w, int x, int y, Bitmap far *bmp, int flip);
-void DrawEngineGauge(ShipPart *p, int x, int y);
+void DrawWeaponGauge(ShipPart *p, Weapon *w, int16_t x, int16_t y, Bitmap *bmp, int16_t flip);
+void DrawEngineGauge(ShipPart *p, int16_t x, int16_t y);
 void DrawSpeedGauges(void);
-void HLine(int x, int y, int len, int color);
+void HLine(int16_t x, int16_t y, int16_t len, int16_t color);
 void ClearMsgs(void);
 
 typedef struct Point {
-    int x;
-    int y;
+    int16_t x;
+    int16_t y;
 } Point;
 
 
-extern Bitmap far *screen;
-extern unsigned char far *mask_buf;
-unsigned long blink_count;
+extern Bitmap *screen;
+extern unsigned char *mask_buf;
+uint32_t blink_count;
 Obj3D player_ship;
 Obj3D ships[4];
 Matrix cam_orient;
@@ -187,18 +184,18 @@ Sprite view_sprite;
 BitmapHdr space_bmp;
 extern MemHandle space_bmp_handle;
 extern Rect clip_rect;
-extern int view_cx;
-extern int view_cy;
-extern int key_accel;
-extern int btn_key;
-extern int arrow_key;
-extern long proj_dist;
+extern int16_t view_cx;
+extern int16_t view_cy;
+extern int16_t key_accel;
+extern int16_t btn_key;
+extern int16_t arrow_key;
+extern int32_t proj_dist;
 extern float star_near;
-extern int fade_level;
-unsigned long bridge_ticks;
-extern int msg_tail;
-int msg_head;
-int word_537AE;
+extern int16_t fade_level;
+uint32_t bridge_ticks;
+extern int16_t msg_tail;
+int16_t msg_head;
+int16_t word_537AE;
 Sprite radar_sprite;
 Sprite bspr1;
 Sprite bspr2;
@@ -216,44 +213,40 @@ extern Actor actors[];
 typedef struct Msg {
     unsigned char type;
     unsigned char arg;
-    int unk;
+    int16_t unk;
 } Msg;
 
 extern Msg msg_queue[16];
 Msg *PeekMsg(void);
 Obj3D *last_target;
 extern char mission[];
-int cam_tab1[2][3];
-int cam_tab2[2][3];
+int16_t cam_tab1[2][3];
+int16_t cam_tab2[2][3];
 extern Obj3D dummy_planet;
 Sprite hail_sprite;
 char hail_name[16];
-int hail_anim;
+int16_t hail_anim;
 extern jmp_buf game_jmp;
-int mission_ranks[7];
-extern int voc_wait;
-extern int boost_power;
-extern int boost_time;
-int encounter_delay;
-int word_51156;
-extern Bitmap far *backbuf;
+int16_t mission_ranks[7];
+extern int16_t voc_wait;
+int16_t encounter_delay;
+int16_t word_51156;
+extern Bitmap *backbuf;
 Shot shot_obj;                      /* the fly-by shuttle, drawn as a shot */
-extern int small_planets;
+extern int16_t small_planets;
 char *word_531D8;
 Sprite cut_sprite;
-void (far *saved_tick)(void);
+void (*saved_tick)(void);
 char text_name[10];
-extern long boost_count;
-extern int boost_amount;
 
 /* A line of a scripted conversation. */
 typedef struct Line {
-    int who;
+    int16_t who;
     char *text;
-    int x;
-    int y;
-    int c;
-    int d;
+    int16_t x;
+    int16_t y;
+    int16_t c;
+    int16_t d;
 } Line;
 
 #define ROW(m, i)   (*(Vec *)(m).e[i])
@@ -262,19 +255,19 @@ char *crew_names[8] = {
     "Captain Kirk", "Mr. Spock", "Dr. McCoy", "Security Officer",
     "Mr. Sulu", "Mr. Chekov", "Lieutenant Uhura", "Mr. Scott"
 };
-int word_45AA2 = 0;
-int full_view = 0;                 /* the view fills the screen */
-int kbd_mouse = 0;                  /* the pointer steers the ship */
-int in_orbit = 0;                 /* in orbit */
-int under_attack = 0;
-int encounter_kind = 0;                 /* encounter: 1 Klingon, 2 Romulan, 3 Elasi */
-void (far *bridge_tick)(void) = DemonArrive;    /* the bridge tick */
-int word_45AB2 = -1;
-int word_45AB4 = 18;
-int magnify = 6;                 /* magnification */
-int view_dir = 0;                 /* view direction, -1 forward */
-int word_45ABA = 0;
-void (far *tick_fns[32])(void) = {
+int16_t word_45AA2 = 0;
+int16_t full_view = 0;                 /* the view fills the screen */
+int16_t kbd_mouse = 0;                  /* the pointer steers the ship */
+int16_t in_orbit = 0;                 /* in orbit */
+int16_t under_attack = 0;
+int16_t encounter_kind = 0;                 /* encounter: 1 Klingon, 2 Romulan, 3 Elasi */
+void (*bridge_tick)(void) = DemonArrive;    /* the bridge tick */
+int16_t word_45AB2 = -1;
+int16_t word_45AB4 = 18;
+int16_t magnify = 6;                 /* magnification */
+int16_t view_dir = 0;                 /* view direction, -1 forward */
+int16_t word_45ABA = 0;
+void (*tick_fns[32])(void) = {
     DemonArrive, DemonFight, DemonHail, DemonTravel, DemonReturn,
     TugArrive, TugPirates, TugDisabled, TugOrbit, TugReturn,
     LoveArrive, LoveTravel, LoveRomulans, LoveOrbit, LoveAway, LoveReturn,
@@ -294,16 +287,16 @@ MemHandle word_45B5A = 0;
 Rect side_rects[2] = { { 0, 0x42, 0x3D, 0x6B }, { 0x101, 0x44, 0x13F, 0x6C } };
 MemHandle word_45B6C = 0;
 MemHandle word_45B6E = 0;
-int word_45B70 = 0;
-int target_analysis = 0;                 /* target analysis */
-int word_45B74 = 0;
+int16_t word_45B70 = 0;
+int16_t target_analysis = 0;                 /* target analysis */
+int16_t word_45B74 = 0;
 Point stations[6] = {
     { 0x3E, 0x79 }, { 0x7D, 0x84 }, { 0xA0, 0xA6 }, { 0xC7, 0x83 }, { 0x11B, 0x7F }, { 0x123, 0xB0 }
 };
 Vec32 cam_ofs = { -150, 50, -500 };
 char radar_colors[4] = { 0x2E, 0x78, 0x64, 0x56 };
 
-void BridgeSfx(int n)
+void BridgeSfx(int16_t n)
 {
     switch (n) {
     case 34:
@@ -319,10 +312,10 @@ void BridgeSfx(int n)
         PlaySfx("HITSHIEL");
         break;
     case 39:
-        PlaySfxSeq((unsigned)n);
+        PlaySfxSeq((uint16_t)n);
         break;
     case 16:
-        PlaySfxSeq((unsigned)n);
+        PlaySfxSeq((uint16_t)n);
         break;
     case 40:
         PlaySfx("REDALERT");
@@ -340,7 +333,7 @@ void BridgeSfx(int n)
         PlaySfx("PHASSHOT");
         break;
     case 7:
-        PlaySfxSeq((unsigned)n);
+        PlaySfxSeq((uint16_t)n);
         break;
     case 8:
         PlaySfx("TRANSDEM");
@@ -369,12 +362,12 @@ void ClearScreen(void)
 }
 
 /* Keyboard pointer: jump to the nearest station in direction (dx, dy). */
-void KeyStation(int dx, int dy)
+void KeyStation(int16_t dx, int16_t dy)
 {
-    int i;
-    int best;
-    int besti;
-    int d;
+    int16_t i;
+    int16_t best;
+    int16_t besti;
+    int16_t d;
 
     best = 0x7FFF;
     if (dx == 0 && dy == 0)
@@ -408,7 +401,7 @@ void KeyStation(int dx, int dy)
     SetPointer(mouse_x, mouse_y);
 }
 
-void SetSteering(int on)
+void SetSteering(int16_t on)
 {
     if (kbd_mouse || full_view)
         word_45B74 = full_view;
@@ -432,9 +425,9 @@ void SetSteering(int on)
 /* The bridge main loop. */
 void BridgeLoop(void)
 {
-    int unused[3];
+    int16_t unused[3];
     Event ev;
-    int full;
+    int16_t full;
 
     for (;;) {
         if (encounter_kind == 0) {
@@ -472,7 +465,7 @@ void BridgeLoop(void)
         }
         switch (ev.type) {
         case EV_TICK:
-            PostRoomMsg(0, (int)bridge_ticks & 0xFF, (int)(bridge_ticks >> 8) & 0xFF, (int)(bridge_ticks >> 16) & 0xFF);
+            PostRoomMsg(0, (int16_t)bridge_ticks & 0xFF, (int16_t)(bridge_ticks >> 8) & 0xFF, (int16_t)(bridge_ticks >> 16) & 0xFF);
             blink_count++;
             bridge_ticks++;
             if (in_orbit == 0) {
@@ -487,8 +480,8 @@ void BridgeLoop(void)
         case EV_MOVE:
             ClampPointer();
             if (in_orbit == 0 && kbd_mouse && word_45AA2 == 0) {
-                player_ship.mo.turn_target[1] = (long)(ev.x - view_cx) << 16;
-                player_ship.mo.turn_target[0] = (long)(ev.y - view_cy) << 16;
+                player_ship.mo.turn_target[1] = (int32_t)(ev.x - view_cx) << 16;
+                player_ship.mo.turn_target[0] = (int32_t)(ev.y - view_cy) << 16;
             }
             break;
         case EV_DOWN2:
@@ -504,14 +497,14 @@ void BridgeLoop(void)
             }
             break;
         case EV_KEY:
-            if ((((unsigned)ev.key >> 8) & 0xFF) == 0x19) {
+            if ((((uint16_t)ev.key >> 8) & 0xFF) == 0x19) {
                 getch();
                 break;
             }
             if (word_45AA2)
                 break;
             if (kbd_mouse == 0) {
-                switch (((unsigned)ev.key >> 8) & 0xFF) {
+                switch (((uint16_t)ev.key >> 8) & 0xFF) {
                 case 0x48:
                     KeyStation(0, -1);
                     break;
@@ -554,7 +547,7 @@ void BridgeLoop(void)
 /* Wait for the left button to be released. */
 void WaitButtonUp(void)
 {
-    int going;
+    int16_t going;
     Event *e;
 
     going = 1;
@@ -617,7 +610,7 @@ void BridgeScreen(void)
 
 void BridgeScreenEnd(void)
 {
-    int unused;
+    int16_t unused;
 
     FreeActors();
     DelSprite(&bspr5);
@@ -631,7 +624,7 @@ void BridgeScreenEnd(void)
     ClearScreen();
 }
 
-void BridgeEnter(int reset)
+void BridgeEnter(int16_t reset)
 {
     LoadPalette("bridge");
     LoadMusic("bridge");
@@ -675,13 +668,13 @@ struct {
 MemHandle word_45BBC = 0;
 struct {
     char name[10];
-    int x;
-    int y;
+    int16_t x;
+    int16_t y;
 } station_menus[8] = {
     { "command", 60, 100 }, { "comp", 200, 30 }, { "", 0, 0 }, { "", 0, 0 },
     { "helm", 60, 70 }, { "nav", 60, 70 }, { "comm", 30, 30 }, { "eng", 30, 30 }
 };
-int view_key = 0;
+int16_t view_key = 0;
 
 void UpdateCrew(void)
 {
@@ -692,13 +685,13 @@ void UpdateCrew(void)
 /* The radar: a dot for each distant ship. */
 void DrawRadar(void)
 {
-    int i;
-    char far *p;
-    Bitmap far *bmp;
-    int angle;
-    int r;
-    int x;
-    int y;
+    int16_t i;
+    char *p;
+    Bitmap *bmp;
+    int16_t angle;
+    int16_t r;
+    int16_t x;
+    int16_t y;
     Obj3D *o;
 
     if (full_view)
@@ -731,21 +724,21 @@ void DrawRadar(void)
         if (o->shields_on && o->shield_glow >= 20)
             continue;
         {
-            long vx;
-            long vy;
-            long vz;
-            int t;
+            int32_t vx;
+            int32_t vy;
+            int32_t vz;
+            int16_t t;
 
             vx = o->view.x;
             vy = o->view.y;
             vz = o->view.z;
             angle = FixAtan2(vy, vx);
-            t = 256 - FixAtan2(vz, (unsigned)FixLength(vx, vy, 0));
+            t = 256 - FixAtan2(vz, (uint16_t)FixLength(vx, vy, 0));
             r = FixMul(16, FixSin(t >> 1));
             x = (FixMul(r, FixCos(angle)) + 1) / 2 + 8;
             y = (FixMul(r, -FixSin(angle)) + 1) / 2 + 8;
         }
-        p[y * 17 + x] = radar_colors[(unsigned)i % 4];
+        p[y * 17 + x] = radar_colors[(uint16_t)i % 4];
     }
     UnlockMem(radar_sprite.handle);
     radar_sprite.dirty = 1;
@@ -765,9 +758,9 @@ void DrawShipStatus(Obj3D *o)
 {
     char name[16];
     MemHandle h;
-    Bitmap far *bmp;
-    int i;
-    int j;
+    Bitmap *bmp;
+    int16_t i;
+    int16_t j;
     ShipPart *p;
 
     if (full_view)
@@ -808,7 +801,7 @@ void DrawShipStatus(Obj3D *o)
 void DrawBmp(char *name)
 {
     MemHandle h;
-    Bitmap far *bmp;
+    Bitmap *bmp;
 
     h = CacheLoad(name, "bmp");
     bmp = LockMem(h);
@@ -818,10 +811,10 @@ void DrawBmp(char *name)
 }
 
 /* Set every non-zero pixel of bmp to color. */
-void TintBmp(Bitmap far *bmp, int color)
+void TintBmp(Bitmap *bmp, int16_t color)
 {
-    char far *p;
-    int n;
+    char *p;
+    int16_t n;
 
     n = bmp->w * bmp->h;
     p = bmp->data;
@@ -847,11 +840,11 @@ void CyclePalette(void)
     CycleRange(0xF2, 11);
 }
 
-void CycleRange(int first, int count)
+void CycleRange(int16_t first, int16_t count)
 {
     unsigned char buf[34];
-    int shift;
-    int n;
+    int16_t shift;
+    int16_t n;
 
     if (count > 11)
         Fatal("Increase the color cycle const.");
@@ -877,7 +870,7 @@ void InitBlip(void)
 
 void MoveBlip(void)
 {
-    int x;
+    int16_t x;
 
     if (full_view)
         return;
@@ -891,8 +884,8 @@ void MoveBlip(void)
 /* Turn the ship towards the first enemy. */
 void FaceEnemy(void)
 {
-    int yaw;
-    int pitch;
+    int16_t yaw;
+    int16_t pitch;
 
     if (ships[0].visible) {
         Bearing(&player_ship, &ships[0].pos, &pitch, &yaw);
@@ -901,13 +894,13 @@ void FaceEnemy(void)
 }
 
 /* Fire torpedoes and/or phasers at the pointer. */
-void FireWeapons(int torps, int phasers)
+void FireWeapons(int16_t torps, int16_t phasers)
 {
     Vec32 v;
     Vec32 dir;
     Matrix m;
     ShipPart *p;
-    int fired;
+    int16_t fired;
 
     p = &player_ship.systems[SYS_TORP_PORT];
     if (!WeaponsReady(&player_ship) || player_ship.weapons_pwr == 0)
@@ -934,12 +927,12 @@ void FireWeapons(int torps, int phasers)
 }
 
 /* A crew member's menu. */
-void CrewMenu(char *name, int x, int y)
+void CrewMenu(char *name, int16_t x, int16_t y)
 {
-    int r;
-    int kbd;
-    int x0;
-    int y0;
+    int16_t r;
+    int16_t kbd;
+    int16_t x0;
+    int16_t y0;
     MemHandle bmp;
     Event ev;
 
@@ -973,11 +966,11 @@ void CrewMenu(char *name, int x, int y)
 }
 
 /* Click on the bridge: open the menu of the crew member there. */
-void ClickCrew(int x, int y)
+void ClickCrew(int16_t x, int16_t y)
 {
     Sprite *s;
     Actor *a;
-    int i;
+    int16_t i;
 
     if ((s = SpriteAt(x, y)) != 0) {
         for (i = 0, a = actors; i <= 7; ++i, ++a) {
@@ -993,7 +986,7 @@ void ClickCrew(int x, int y)
 /* Bridge keys. */
 void BridgeKey(Event e)
 {
-    int k;
+    int16_t k;
     char buf[40];
 
     if (view_key) {
@@ -1002,7 +995,7 @@ void BridgeKey(Event e)
             view_dir = k - '1';
         return;
     }
-    k = (unsigned)e.key >> 8;
+    k = (uint16_t)e.key >> 8;
     switch (k) {
     case 68:
     case 88:
@@ -1127,7 +1120,7 @@ void ClampPointer(void)
 void BridgeMsg(void)
 {
     Msg m;
-    int i;
+    int16_t i;
     char buf[80];
 
     if (msg_head == msg_tail)
@@ -1155,7 +1148,7 @@ void BridgeMsg(void)
         break;
     case 7: {
         static struct {
-            int sys;
+            int16_t sys;
             char *name;
         } repair_names[7] = {
             { 0xFF, "#BRID\\SCOTSHIE#Shields" }, { 0, "#BRID\\SCOTHULL#Hull" },
@@ -1267,7 +1260,7 @@ void SetViewDir(void)
 }
 
 /* A crew order. */
-void CrewOrder(int cmd)
+void CrewOrder(int16_t cmd)
 {
     Obj3D *o;
 
@@ -1405,10 +1398,10 @@ void CrewOrder(int cmd)
 }
 
 /* The star map. Returns the chosen destination. */
-int StarMapGo(void)
+int16_t StarMapGo(void)
 {
-    int full;
-    int r;
+    int16_t full;
+    int16_t r;
 
     full = full_view;
     FadeOut();
@@ -1443,10 +1436,10 @@ void ViewBridge(void)
     }
 }
 
-void Orbit(int arrive, int say)
+void Orbit(int16_t arrive, int16_t say)
 {
-    int full;
-    int mag;
+    int16_t full;
+    int16_t mag;
     char *msg;
 
     full = full_view;
@@ -1470,7 +1463,7 @@ void Orbit(int arrive, int say)
     magnify = mag;
 }
 
-void CamFollow(int n)
+void CamFollow(int16_t n)
 {
     Vec32 v;
     Matrix m;
@@ -1485,15 +1478,15 @@ void CamFollow(int n)
         cam_orient = m;
 }
 
-void CamPath(long *out, int which, int n)
+void CamPath(int32_t *out, int16_t which, int16_t n)
 {
-    int i;
+    int16_t i;
 
     for (i = 0; i != 3; i++)
         out[i] = cam_tab1[which][i] * n + cam_tab2[which][i];
 }
 
-void SendScript(int n)
+void SendScript(int16_t n)
 {
     if (n)
         PostRoomMsg(5, n & 0xFF, 0, 0);
@@ -1535,7 +1528,7 @@ void HailEnd(void)
 }
 
 Point beam_pos[4] = { { 0x8E, 0x7C }, { 0xBE, 0x7C }, { 0x7E, 0x72 }, { 0xAA, 0x72 } };
-int last_mission = -1;                /* last mission completed */
+int16_t last_mission = -1;                /* last mission completed */
 
 void HailSay(char *name, char *title, char *text)
 {
@@ -1548,8 +1541,8 @@ void HailSay(char *name, char *title, char *text)
 void Transport(char *name)
 {
     char buf[10];
-    int i;
-    int n;
+    int16_t i;
+    int16_t n;
     Event ev;
 
     DigiShutdown();
@@ -1606,7 +1599,7 @@ void Transport(char *name)
 void RepairAll(Obj3D *o)
 {
     ShipPart *p;
-    int i;
+    int16_t i;
 
     for (i = 0, p = o->shields; i != 6; ++i, ++p)
         p->cur = p->max;
@@ -1615,15 +1608,15 @@ void RepairAll(Obj3D *o)
 }
 
 /* Starfleet's verdict on mission n. */
-void Debrief(int n, int msg, int score, int max)
+void Debrief(int16_t n, int16_t msg, int16_t score, int16_t max)
 {
-    int pct;
-    int rank;
+    int16_t pct;
+    int16_t rank;
     char *verdict;
     char *text;
-    int len;
-    unsigned music;
-    int i;
+    int16_t len;
+    uint16_t music;
+    int16_t i;
     char voice1[128];
     char voice2[128];
 
@@ -1680,11 +1673,11 @@ void Debrief(int n, int msg, int score, int max)
 }
 
 /* Append the voice clips saying n (0 to 100) to out. */
-void SayNumber(char *out, int n)
+void SayNumber(char *out, int16_t n)
 {
     char buf[64];
-    int a;
-    int b;
+    int16_t a;
+    int16_t b;
 
     a = 0;
     b = 0;
@@ -1739,16 +1732,16 @@ char *mission_names[7] = {
 char *text_buf = 0;               /* text from GetText */
 Point weapon_pos[4] = { { 0xC4, 0x10 }, { 0xC2, 0x14 }, { 0x5A, 0x10 }, { 0x5C, 0x14 } };
 Point engine_pos[2] = { { 0x8C, 0x0D }, { 0x8C, 0x10 } };
-int word_45C86[4] = { 0 };
+int16_t word_45C86[4] = { 0 };
 
 /* The captain's log: points for the recent missions. */
 void CaptainsLog(void)
 {
-    int wait;
+    int16_t wait;
     char log[300];
     char buf[20];
-    int total;
-    int i;
+    int16_t total;
+    int16_t i;
 
     wait = voc_wait;
     voc_wait = 0;
@@ -1781,8 +1774,8 @@ void CaptainsLog(void)
 /* Start a random encounter on the way. */
 void StartEncounter(void)
 {
-    unsigned n;
-    int count;
+    uint16_t n;
+    int16_t count;
 
     n = blink_count & 0x7FFF;
     srand(n);
@@ -1898,13 +1891,13 @@ void EncounterTick(void)
 }
 
 /* Approach the planet: the shuttle flies past. */
-void ShuttleFlyby(int kind)
+void ShuttleFlyby(int16_t kind)
 {
-    int saved;
-    int i;
-    long t;
-    long unused;
-    long dz;
+    int16_t saved;
+    int16_t i;
+    int32_t t;
+    int32_t unused;
+    int32_t dz;
 
     saved = small_planets;
     ClearShots();
@@ -1939,7 +1932,7 @@ void ShuttleFlyby(int kind)
         UpdateSprites();
         MatRotYPre(4, &dummy_planet.orient);
         blink_count++;
-        while ((unsigned long)t == GetTicks())
+        while ((uint32_t)t == GetTicks())
             ;
         player_ship.pos.z += dz;
         dz -= 2;
@@ -1960,7 +1953,7 @@ void ShuttleEnd(void)
 }
 
 /* Play n lines of conversation. */
-void SayLines(Line *p, int n)
+void SayLines(Line *p, int16_t n)
 {
     while (n--) {
         MsgBox(crew_names[p->who], p->text, p->x, p->y, p->c, p->d);
@@ -1971,7 +1964,7 @@ void SayLines(Line *p, int n)
 /* Show the planet cut-scene picture name.bmp (and say voc). */
 void CutScene(char *name, char *voc)
 {
-    Bitmap far *bmp;
+    Bitmap *bmp;
 
     if (voc)
         word_531D8 = voc;
@@ -2074,9 +2067,9 @@ void SetTextFile(char *name)
 }
 
 /* String n of the current .txt file. */
-char *GetText(int n)
+char *GetText(int16_t n)
 {
-    char far *p;
+    char *p;
     MemHandle h;
 
     FreeText(0);
@@ -2096,9 +2089,9 @@ char *GetText(int n)
 }
 
 /* Choice n of list: a copy of its text. */
-char *GetChoice(int n, int *list, int x)
+char *GetChoice(int16_t n, int16_t *list, char *x)
 {
-    int len;
+    int16_t len;
     char *buf;
 
     if (list[n] == -1)
@@ -2125,8 +2118,8 @@ void ResetMsgs(void)
 void DrawGauges(void)
 {
     MemHandle h;
-    Bitmap far *bmp;
-    int i;
+    Bitmap *bmp;
+    int16_t i;
 
     h = CacheLoad("phasind", "bmp");
     bmp = LockMem(h);
@@ -2140,12 +2133,12 @@ void DrawGauges(void)
 }
 
 /* A weapon's charge bar and status light. */
-void DrawWeaponGauge(ShipPart *p, Weapon *w, int x, int y, Bitmap far *bmp, int flip)
+void DrawWeaponGauge(ShipPart *p, Weapon *w, int16_t x, int16_t y, Bitmap *bmp, int16_t flip)
 {
-    int sx;
-    int sy;
-    int len;
-    int color;
+    int16_t sx;
+    int16_t sy;
+    int16_t len;
+    int16_t color;
 
     sy = 0;
     len = 24;
@@ -2171,18 +2164,18 @@ void DrawWeaponGauge(ShipPart *p, Weapon *w, int x, int y, Bitmap far *bmp, int 
 }
 
 /* An engine's power bar. */
-void DrawEngineGauge(ShipPart *p, int x, int y)
+void DrawEngineGauge(ShipPart *p, int16_t x, int16_t y)
 {
-    int max;
-    int color;
-    int len;
+    int16_t max;
+    int16_t color;
+    int16_t len;
 
     max = p->cur;
     if (boost_count)
         max += boost_amount / 2;
     color = boost_count ? 0x69 : 0x81;
     max = min(p->max, max);
-    len = (long)max * 34 / p->max;
+    len = (int32_t)max * 34 / p->max;
     HLine(x, y, len, 0xB1);
     HLine(x, y + 1, len, 0xB1);
     HLine(x + len, y, 34 - len, 0x81);
@@ -2194,7 +2187,7 @@ void DrawEngineGauge(ShipPart *p, int x, int y)
 /* The target and actual speed bars. */
 void DrawSpeedGauges(void)
 {
-    int n;
+    int16_t n;
 
     n = player_ship.mo.target_speed * 25 / player_ship.mo.max_speed;
     n = max(n, 0);
@@ -2207,24 +2200,10 @@ void DrawSpeedGauges(void)
 }
 
 /* A horizontal line on the background. */
-void HLine(int x, int y, int len, int color)
+void HLine(int16_t x, int16_t y, int16_t len, int16_t color)
 {
-    _asm {
-        mov cx, len
-        or cx, cx
-        je done
-        push di
-        les di, screen
-        mov ax, 320
-        mul y
-        add di, ax
-        add di, x
-        add di, 8
-        mov al, byte ptr color
-        rep stosb
-        pop di
-    done:
-    }
+    if (len > 0)
+        memset(screen->data + y * 320 + x, color, len);
 }
 
 void ClearMsgs(void)

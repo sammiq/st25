@@ -1,35 +1,32 @@
-/* seg016: resource cache, EMS sound files and the streaming buffer */
+/* seg016: resource cache, sound files and the streaming buffer */
 
+#include "compat.h"
 #include <stdio.h>
 #include <string.h>
 #include <fcntl.h>
-#include <io.h>
-#include <dos.h>
+#include <unistd.h>
 #include "list.h"
 #include "mem.h"
-#include "ems.h"
 #include "bitmap.h"
 #include "resource.h"
 #include "cache.h"
+#include "sound.h"
+#include "obj3d.h"
 
-int tolower(int c);
-void Fatal(char *fmt, ...);             /* fatal error */
-unsigned ReadVoc(void far *buf, long len); /* seg015: read stream data */
+#include <ctype.h>
 void DigiShutdown(void);                       /* seg015 */
 
 CacheEntry cache_entries[CACHE_ENTRIES];
 List cache_list;
-long stream_fill_pos;
-long stream_play_pos;
-int stream_active;
+int32_t stream_fill_pos;
+int32_t stream_play_pos;
+int16_t stream_active;
 MemHandle stream_handle;
-long map_tmp;
-long stream_tmp;
-EMSFile far ems_files[8];
+SfxFile sfx_files[8];
 
 void CacheInit(void)
 {
-    int i;
+    int16_t i;
     CacheEntry *e;
 
     ListInit(&cache_list);
@@ -42,10 +39,10 @@ void CacheInit(void)
 /* Find a file in the cache, loading it into the least recently used free
  * entry if needed (and if load is set). With unpack the unpacked data is
  * returned and the entry stays locked until ReleaseCache. */
-MemHandle CacheGet(char *name, char *ext, int ems, int load, int unpack)
+MemHandle CacheGet(char *name, char *ext, int16_t ems, int16_t load, int16_t unpack)
 {
-    int i;
-    int hash;
+    int16_t i;
+    int16_t hash;
     CacheEntry *e;
 
     hash = NameHash(name) + NameHash(ext);
@@ -87,7 +84,7 @@ found:
             UnpackAll(LockMem(e->packed), LockMem(e->data), e->packed_size);
             UnlockMem(e->packed);
             UnlockMem(e->data);
-            if (e->size < (e->packed_size >> 2) + e->packed_size) {
+            if ((int16_t)e->size < (int16_t)((e->packed_size >> 2) + e->packed_size)) {
                 FreeMem(e->packed);
                 e->packed = 0;
             }
@@ -100,8 +97,8 @@ found:
 /* Put an existing block into the cache under name.ext (locked). */
 void CacheStore(char *name, char *ext, MemHandle h)
 {
-    int i;
-    int hash;
+    int16_t i;
+    int16_t hash;
     CacheEntry *e;
 
     hash = NameHash(name) + NameHash(ext);
@@ -128,7 +125,7 @@ void CacheStore(char *name, char *ext, MemHandle h)
 
 void ReleaseCache(MemHandle h)
 {
-    int i;
+    int16_t i;
     CacheEntry *e;
 
     e = (CacheEntry *)cache_list.tail.next;
@@ -141,12 +138,11 @@ void ReleaseCache(MemHandle h)
     }
 }
 
-/* Free some cached memory; returns 0 if nothing could be freed. Unless
- * ems is set, memory in EMS is left alone. */
-int CachePurge(int ems)
+/* Free some cached memory; returns 0 if nothing could be freed. */
+int16_t CachePurge(int16_t ems)
 {
     CacheEntry *e;
-    int i;
+    int16_t i;
     MemHandle h;
 
     /* unlocked entries: drop the packed or unpacked copy */
@@ -154,19 +150,10 @@ int CachePurge(int ems)
     for (i = 0; i != CACHE_ENTRIES; ++i, e = (CacheEntry *)e->node.prev) {
         if (e->lock == 0 && e->data != 0) {
             if (e->packed != 0) {
-                if (!ems && IsMemEMS(e->data)) {
-                    if (IsMemEMS(e->packed))
-                        continue;
-                    FreeMem(e->packed);
-                    e->packed = 0;
-                } else {
-                    FreeMem(e->data);
-                    e->data = 0;
-                }
+                FreeMem(e->data);
+                e->data = 0;
                 return 1;
             } else if (e->ext[0] == '$') {
-                if (!ems && IsMemEMS(e->data))
-                    continue;
                 FreeMem(e->data);
                 ListRemove(&cache_list, &e->node);
                 MemSet(e, sizeof(CacheEntry), 0);
@@ -180,8 +167,6 @@ int CachePurge(int ems)
     for (i = 0; i != CACHE_ENTRIES; ++i, e = (CacheEntry *)e->node.prev) {
         if (e->lock == 0 && (e->data != 0 || e->packed != 0)) {
             h = e->data ? e->data : e->packed;
-            if (!ems && IsMemEMS(h))
-                continue;
             FreeMem(h);
             ListRemove(&cache_list, &e->node);
             MemSet(e, sizeof(CacheEntry), 0);
@@ -193,8 +178,6 @@ int CachePurge(int ems)
     e = (CacheEntry *)cache_list.head.prev;
     for (i = 0; i != CACHE_ENTRIES; ++i, e = (CacheEntry *)e->node.prev) {
         if (e->lock != 0 && e->packed != 0 && e->data != 0) {
-            if (!ems && IsMemEMS(e->packed))
-                continue;
             FreeMem(e->packed);
             e->packed = 0;
             return 1;
@@ -216,7 +199,7 @@ void ReleaseBitmap(MemHandle h)
 /* Load and unpack a file into its own block (not cached). */
 MemHandle getanyfile(char *name, char *ext)
 {
-    long size;
+    int32_t size;
     MemHandle h;
 
     if ((size = GetFileSize(name, ext)) > 65000L)
@@ -247,12 +230,12 @@ void CacheRelease(MemHandle h)
     ReleaseCache(h);
 }
 
-void LoadR3S(R3SOwner *o, char *name, int n)
+void LoadR3S(Obj3D *o, char *name, int16_t n)
 {
     MemHandle h;
-    void far *p;
+    void *p;
     char buf[16];
-    int unused;
+    int16_t unused;
 
     unused = 0;
     sprintf(buf, "%s%02x", name, (n >> 1) & 0x77);
@@ -260,7 +243,7 @@ void LoadR3S(R3SOwner *o, char *name, int n)
     o->r3s = h;
     o->r3s_type = 0x24;
     p = LockMem(h);
-    MemCpy(o->r3s_hdr, p, 18);
+    MemCpy(&o->rot, p, 18);
     UnlockMem(h);
 }
 
@@ -272,25 +255,26 @@ void ReleaseR3S(MemHandle h)
 /* Load a bitmap, scaled by scale/256. Crew "stnd"/"tele" bitmaps other
  * than the 'm' ones are built from the 'm' bitmap plus a .xor delta, with
  * the uniform colours shifted for 'k' and 'r', and cached as .$bm. */
-MemHandle LoadSpriteBitmap(char *name, int scale)
+MemHandle LoadSpriteBitmap(char *name, int16_t scale)
 {
     MemHandle h;
     MemHandle scaled;
-    int unused;
-    Bitmap far *src;
-    Bitmap far *xr;
-    Bitmap far *dst;
+    int16_t unused;
+    Bitmap *src;
+    Bitmap *xr;
+    Bitmap *dst;
     MemHandle hbase;
     MemHandle hxor;
-    int shift;
-    unsigned npix;
+    int16_t shift;
+    uint16_t npix;
     char c;
-    char far *s;
-    char far *d;
-    int rows;
-    unsigned w;
-    int skip;
-    int unused2;
+    char *s;
+    char *d;
+    int16_t i;
+    int16_t rows;
+    uint16_t w;
+    int16_t skip;
+    int16_t unused2;
 
     if ((strncmp(name + 1, "stnd", 4) == 0 || strncmp(name + 1, "tele", 4) == 0)
             && (name[0] == 'm' || name[0] == 's' || name[0] == 'k' || name[0] == 'r')) {
@@ -311,7 +295,7 @@ MemHandle LoadSpriteBitmap(char *name, int scale)
             dst = LockMem(h);
             src = LockMem(hbase);
             xr = LockMem(hxor);
-            *(BitmapHdr far *)dst = *(BitmapHdr far *)src;
+            *(BitmapHdr *)dst = *(BitmapHdr *)src;
             if (c == 'k')
                 shift = 8;
             else if (c == 'r')
@@ -323,41 +307,11 @@ MemHandle LoadSpriteBitmap(char *name, int scale)
             else {
                 s = src->data;
                 d = dst->data;
-                _asm {
-                    push si
-                    push di
-                    lds si, s
-                    les di, d
-                    mov cx, npix
-                    mov bl, 0A8h
-                    mov dl, byte ptr shift
-                    add dl, 0A8h
-                    mov dh, 7
-                l_plain:
-                    lodsb
-                    sub al, bl
-                    cmp al, dh
-                    jbe l_shift
-                l_store:
-                    add al, bl
-                    stosb
-                    loop l_plain
-                    jmp l_done
-                l_next:
-                    lodsb
-                    sub al, bl
-                    cmp al, dh
-                    ja l_store
-                l_shift:
-                    add al, dl
-                    stosb
-                    loop l_next
-                    jmp l_done
-                l_done:
-                    mov ax, ss
-                    mov ds, ax
-                    pop di
-                    pop si
+                /* shift the colours 0xA8-0xAF (the uniform's) by shift */
+                for (; npix != 0; npix--, s++, d++) {
+                    unsigned char t = (unsigned char)*s - 0xA8;
+
+                    *d = t <= 7 ? (unsigned char)(t + 0xA8 + shift) : (unsigned char)*s;
                 }
             }
             s = xr->data;
@@ -365,41 +319,10 @@ MemHandle LoadSpriteBitmap(char *name, int scale)
             w = xr->w;
             rows = xr->h;
             skip = dst->w - w;
-            _asm {
-                push si
-                push di
-                lds si, s
-                les di, d
-            l_row:
-                mov cx, w
-                test si, 1
-                je l_even
-                lodsb
-                xor es:[di], al
-                inc di
-                dec cx
-            l_even:
-                shr cx, 1
-                pushf
-            l_words:
-                lodsw
-                xor es:[di], ax
-                add di, 2
-                loop l_words
-                popf
-                jae l_rowend
-                lodsb
-                xor es:[di], al
-                inc di
-            l_rowend:
-                add di, skip
-                dec rows
-                jne l_row
-                mov ax, ss
-                mov ds, ax
-                pop di
-                pop si
-            }
+            /* xor the difference bitmap onto the copy */
+            for (; rows != 0; rows--, d += skip)
+                for (i = w; i != 0; i--)
+                    *d++ ^= *s++;
             UnlockMem(hxor);
             ReleaseCache(hxor);
             UnlockMem(hbase);
@@ -418,7 +341,7 @@ MemHandle LoadSpriteBitmap(char *name, int scale)
     }
 }
 
-void FreeSpriteBitmap(MemHandle h, int scale)
+void FreeSpriteBitmap(MemHandle h, int16_t scale)
 {
     if (scale == 0x100)
         ReleaseCache(h);
@@ -426,36 +349,29 @@ void FreeSpriteBitmap(MemHandle h, int scale)
         FreeMem(h);
 }
 
-int NameHash(char *s)
+int16_t NameHash(char *s)
 {
-    int sum;
+    int16_t sum;
 
     for (sum = 0; *s != 0; s++)
         sum += tolower(*s);
     return sum;
 }
 
-/* A 64K EMS ring buffer for streamed sound. */
+/* A 64K ring buffer for streamed sound. */
 void StreamInit(void)
 {
-    void far *p;
-    int unused;
-
-    if ((p = EMSAlloc(0x10000L)) != 0)
-        stream_handle = AllocMemHandle(p);
+    stream_handle = AllocMem(0x10000L, 1);
 }
 
 /* Refill the ring buffer up to the play position, 8K at a time. */
 void StreamFill(void)
 {
-    long left;
-    int unused1;
-    long addr;
-    long unused2;
-    long pos;
-    long chunk;
-    unsigned n;
-    void far *p;
+    int32_t left;
+    int32_t pos;
+    int32_t chunk;
+    uint16_t n;
+    char *p;
 
     if (!stream_active)
         return;
@@ -466,159 +382,111 @@ void StreamFill(void)
     left &= 0xFFFFE000L;
     pos = stream_fill_pos;
     while (left != 0) {
-        addr = (long)stream_handle->ptr;
-        addr = addr + pos;
-        p = LockMem((MemHandle)&addr);
+        p = (char *)LockMem(stream_handle) + pos;
         chunk = left > 0x2000 ? 0x2000L : left;
         n = ReadVoc(p, chunk);
         if (n == 0) {
             stream_active = 0;
-            UnlockMem((MemHandle)&addr);
+            UnlockMem(stream_handle);
             break;
         } else if (n < chunk) {
             stream_active = 0;
-            _fmemset((char far *)p + n, 0x80, 0x2000 - n);
+            memset(p + n, 0x80, 0x2000 - n);
         }
         left -= chunk;
         pos += chunk;
         if (pos >= 0x10000L)
             pos = 0;
-        UnlockMem((MemHandle)&addr);
+        UnlockMem(stream_handle);
     }
     stream_fill_pos = pos;
 }
 
-/* Load voc_path/sfx/name.ext whole into EMS, remembering up to 8 files. */
-MemHandle LoadEMSFile(char *name, char *ext)
+/* Load voc_path/sfx/name.ext whole into memory, remembering up to 8 files. */
+MemHandle LoadSfxFile(char *name, char *ext)
 {
-    long size;
+    int32_t size;
     MemHandle h;
-    long addr;
-    void far *e;
     char path[40];
-    int fd;
-    long pos;
-    long chunk;
-    void far *p;
-    void far *saved;
-    unsigned got;
-    int i;
+    int16_t fd;
+    uint16_t got;
+    int16_t i;
 
     for (i = 0; i < 8; i++)
-        if (ems_files[i].handle != 0 && _fstrnicmp(ems_files[i].name, name, 10) == 0)
-            return ems_files[i].handle;
+        if (sfx_files[i].handle != 0 && strncasecmp(sfx_files[i].name, name, 10) == 0)
+            return sfx_files[i].handle;
     sprintf(path, "%ssfx/%s.%s", voc_path, name, ext);
     if ((fd = open(path, O_RDONLY | O_BINARY)) == -1)
         return 0;
     size = filelength(fd);
-    close(fd);
-    if ((e = EMSAlloc(size)) != 0)
-        h = AllocMemHandle(e);
-    if (_dos_open(path, O_RDONLY | O_BINARY, &fd) != 0)
-        return;
-    pos = 0;
-    saved = EMSUnlock();
-    while (size != 0) {
-        addr = (long)h->ptr;
-        addr = addr + pos;
-        p = LockMem((MemHandle)&addr);
-        chunk = size > 0x4000 ? 0x4000L : size;
-        ReadChunk(fd, p, chunk, &got);
-        size -= chunk;
-        pos += chunk;
-        UnlockMem((MemHandle)&addr);
+    if ((h = AllocMem(size, 1)) == 0) {
+        close(fd);
+        return 0;
     }
-    EMSRestore(saved);
-    _dos_close(fd);
+    ReadChunk(fd, LockMem(h), size, &got);
+    UnlockMem(h);
+    close(fd);
     for (i = 0; i < 8; i++)
-        if (ems_files[i].handle == 0)
+        if (sfx_files[i].handle == 0)
             break;
     if (i == 8)
-        FreeEMSFiles();
+        FreeSfxFiles();
     for (i = 0; i < 8; i++)
-        if (ems_files[i].handle == 0) {
-            ems_files[i].handle = h;
-            _fstrncpy(ems_files[i].name, name, 10);
+        if (sfx_files[i].handle == 0) {
+            sfx_files[i].handle = h;
+            strncpy(sfx_files[i].name, name, 10);
             break;
         }
     return h;
 }
 
-/* Like EMSAccess, without the lock bookkeeping. */
-void far *EMSMapAddr(void far *handle)
+/* The address of a handle's block. */
+void *MapHandle(MemHandle h)
 {
-    int page;
-    int i;
-    long addr = (long)handle;
-
-    if (ems_other_page == -1)
-        return handle;
-    if (!IsEMSMemory(handle))
-        return handle;
-    page = (addr >> 14) & 0xFF;
-    for (i = 0; i != 4; ++i, ++page)
-        EMSMapPage(page, i);
-    return EMSHandleToPtr(handle);
+    return h->ptr;
 }
 
-void far *MapHandle(MemHandle h)
+void *MapMemRef(MemRef *r)
 {
-    return EMSMapAddr(h->ptr);
+    return (char *)r->handle->ptr + r->offset;
 }
 
-void far *MapMemRef(MemRef *r)
+void *MapStream(void)
 {
-    int unused;
-    void far *p;
-
-    map_tmp = (long)r->handle->ptr;
-    map_tmp = map_tmp + r->offset;
-    p = MapHandle((MemHandle)&map_tmp);
-    return p;
-}
-
-void far *MapStream(void)
-{
-    int unused;
-    void far *p;
-
-    stream_tmp = (long)stream_handle->ptr;
-    stream_tmp = stream_tmp + stream_play_pos;
-    p = MapHandle((MemHandle)&stream_tmp);
-    return p;
+    return (char *)stream_handle->ptr + stream_play_pos;
 }
 
 void CacheNop(void)
 {
 }
 
-void FreeAllEMSFiles(void)
+void FreeAllSfxFiles(void)
 {
-    int i;
+    int16_t i;
 
     DigiShutdown();
     for (i = 0; i < 8; i++)
-        if (ems_files[i].handle != 0) {
-            FreeAnyFile(ems_files[i].handle);
-            ems_files[i].handle = 0;
-            ems_files[i].name[0] = 0;
+        if (sfx_files[i].handle != 0) {
+            FreeAnyFile(sfx_files[i].handle);
+            sfx_files[i].handle = 0;
+            sfx_files[i].name[0] = 0;
         }
 }
 
-/* Free the EMS sound files that no channel is playing. */
-void FreeEMSFiles(void)
+/* Free the sound files that no channel is playing. */
+void FreeSfxFiles(void)
 {
-    int i;
+    int16_t i;
 
     for (i = 0; i < 8; i++) {
-        if (ems_files[i].handle != 0
-                && !(snd_chan[0].handle == ems_files[i].handle && snd_chan[0].busy)
-                && !(snd_chan[1].handle == ems_files[i].handle && snd_chan[1].busy)
-                && !(snd_chan[2].handle == ems_files[i].handle && snd_chan[2].busy)
-                && !(snd_chan[3].handle == ems_files[i].handle && snd_chan[3].busy)) {
-            FreeAnyFile(ems_files[i].handle);
-            ems_files[i].handle = 0;
-            ems_files[i].name[0] = 0;
+        if (sfx_files[i].handle != 0
+                && !(snd_chan[0].handle == sfx_files[i].handle && snd_chan[0].busy)
+                && !(snd_chan[1].handle == sfx_files[i].handle && snd_chan[1].busy)
+                && !(snd_chan[2].handle == sfx_files[i].handle && snd_chan[2].busy)
+                && !(snd_chan[3].handle == sfx_files[i].handle && snd_chan[3].busy)) {
+            FreeAnyFile(sfx_files[i].handle);
+            sfx_files[i].handle = 0;
+            sfx_files[i].name[0] = 0;
         }
     }
 }
@@ -631,6 +499,6 @@ void LoadSfx(char *name)
 {
     MemHandle h;
 
-    h = LoadEMSFile(name, "voc");
+    h = LoadSfxFile(name, "voc");
     SfxNop(h);
 }

@@ -1,6 +1,7 @@
 /* seg000: actors in the away-team rooms - animations, walking, the walk
  * graph and .ban screen animations */
 
+#include "compat.h"
 #include <stdio.h>
 #include <string.h>
 #include "mem.h"
@@ -19,37 +20,32 @@ Ban bans[16];
 #define SGN(x)  ((x) > 0 ? 1 : ((x) < 0 ? -1 : 0))
 
 typedef struct WalkNode {
-    int x;
-    int y;
+    int16_t x;
+    int16_t y;
 } WalkNode;
 
 /* NearestNode's list: node and distance. */
 typedef struct NodeDist {
-    int idx;
-    int dist;
+    int16_t idx;
+    int16_t dist;
 } NodeDist;
 
-int rand(void);
-void qsort();
-void Fatal(char *fmt, ...);     /* fatal error */
-void SaveWrite(void *p, unsigned n);    /* seg019 */
-void SaveRead(void *p, unsigned n);
-int WalkBlocked(int x, int y);        /* seg008: is (x, y) blocked */
-void CheckRegions(int x, int y);       /* seg008 */
-void PostRoomMsg(int msg, int who, int a, int b);     /* seg008: report */
-int DepthPri(int y);               /* seg008: depth for y */
-int DepthScale(int y);               /* seg008: scale for y */
-void StandUp(Actor *a, int n);    /* seg008 */
+void SaveWrite(void *p, uint16_t n);    /* seg019 */
+void SaveRead(void *p, uint16_t n);
+int16_t WalkBlocked(int16_t x, int16_t y);        /* seg008: is (x, y) blocked */
+void CheckRegions(int16_t x, int16_t y);       /* seg008 */
+void PostRoomMsg(unsigned char msg, unsigned char who, unsigned char a, unsigned char b);     /* seg008: report */
+int16_t DepthPri(int16_t y);               /* seg008: depth for y */
+int16_t DepthScale(int16_t y);               /* seg008: scale for y */
+void StandUp(Actor *a, int16_t n);    /* seg008 */
 
-extern Bitmap far *screen;
-extern Bitmap far *backbuf;
-extern unsigned long blink_count;
-extern int video_mode;
-extern int ems_other_page;
-extern unsigned char pal_remap[];
+extern Bitmap *screen;
+extern Bitmap *backbuf;
+extern uint32_t blink_count;
+extern int16_t video_mode;
 /* The room's walk graph (.iw file). */
 typedef struct WalkGraph {
-    int count;
+    int16_t count;
     WalkNode nodes[32];
     unsigned char next[32][32];     /* next node from a towards b */
 } WalkGraph;
@@ -59,33 +55,30 @@ WalkGraph walk;
 void SaveActors(void);
 void LoadActors(void);
 void InitActors(void);
-int StartAnim(int n, char *name, int x, int y, int scale);
+int16_t StartAnim(int16_t n, char *name, int16_t x, int16_t y, int16_t scale);
 void LoadBan(char *name);
-int StartWalk(int n, char *name, int x, int y, int dx, int dy);
+int16_t StartWalk(int16_t n, char *name, int16_t x, int16_t y, int16_t dx, int16_t dy);
 void UpdateActors(void);
-void AnimStep(int n);
-void WalkStep(int n);
+void AnimStep(int16_t n);
+void WalkStep(int16_t n);
 void DrawBans(void);
 void UpdateBans(void);
-void BanDraw(char far *dst, char far *src);
-void BanCopyEGA(char far *dst, char far *src, char far *from);
-char far *BanEGA(char far *dst, char far *src, char far *from);
-char far *BanTandy(char far *dst, char far *src, char far *from);
-char far *BanCopy(char far *dst, char far *src, char far *from);
-void EndOrStand(int n);
-void EndAnim(int n);
+void BanDraw(char *dst, char *src);
+char *BanCopy(char *dst, char *src, char *from);
+void EndOrStand(int16_t n);
+void EndAnim(int16_t n);
 void FreeActors(void);
-void InitAnim(Actor *a, char *name, int x, int y, int scale, int add);
+void InitAnim(Actor *a, char *name, int16_t x, int16_t y, int16_t scale, int16_t add);
 void release_anim(Actor *a);
 void FreeAnim(Actor *a);
 void FreeWalk(Actor *a);
-void init_stand_anim(int n);
-void SetWalkFrame(Actor *a, int x, int y);
-void SetWalk(Actor *a, int x0, int y0, int x1, int y1);
-int CanWalk(int x0, int y0, int x1, int y1);
+void init_stand_anim(int16_t n);
+void SetWalkFrame(Actor *a, int16_t x, int16_t y);
+void SetWalk(Actor *a, int16_t x0, int16_t y0, int16_t x1, int16_t y1);
+int16_t CanWalk(int16_t x0, int16_t y0, int16_t x1, int16_t y1);
 void LoadWalkGraph(char *name);
-int NearestNode(int x, int y);
-int CompareDist(NodeDist *a, NodeDist *b);
+int16_t NearestNode(int16_t x, int16_t y);
+int CompareDist(const void *a, const void *b);
 
 void SaveActors(void)
 {
@@ -94,7 +87,7 @@ void SaveActors(void)
 
 void LoadActors(void)
 {
-    int i;
+    int16_t i;
     Actor *a;
     Sprite *s;
 
@@ -122,7 +115,7 @@ void InitActors(void)
 
 /* Play name.anm as actor n, or the first free one from 8 for -1.
  * Returns the actor. */
-int StartAnim(int n, char *name, int x, int y, int scale)
+int16_t StartAnim(int16_t n, char *name, int16_t x, int16_t y, int16_t scale)
 {
     Actor *a;
 
@@ -146,7 +139,7 @@ int StartAnim(int n, char *name, int x, int y, int scale)
 
 void LoadBan(char *name)
 {
-    int i;
+    int16_t i;
 
     for (i = 0; i != 16; i++)
         if (bans[i].h == 0) {
@@ -158,10 +151,10 @@ void LoadBan(char *name)
 
 /* Walk actor n from (x, y) to (dx, dy), straight or by the walk graph.
  * Returns 0 if it can't. */
-int StartWalk(int n, char *name, int x, int y, int dx, int dy)
+int16_t StartWalk(int16_t n, char *name, int16_t x, int16_t y, int16_t dx, int16_t dy)
 {
     Actor *a;
-    int unused[2];
+    int16_t unused[2];
 
     a = &actors[n];
     a->notify = 0;
@@ -201,7 +194,7 @@ int StartWalk(int n, char *name, int x, int y, int dx, int dy)
 
 void UpdateActors(void)
 {
-    int i;
+    int16_t i;
     Actor *a;
 
     for (a = actors, i = 0; i != MAX_ACTORS; ++i, ++a) {
@@ -222,12 +215,12 @@ void UpdateActors(void)
 }
 
 /* Show the next frame of actor n's animation when it is due. */
-void AnimStep(int n)
+void AnimStep(int16_t n)
 {
     Actor *a;
-    AnimFrame far *data;
-    AnimFrame far *f;
-    int next;
+    AnimFrame *data;
+    AnimFrame *f;
+    int16_t next;
 
     a = &actors[n];
     if (blink_count >= a->next_time) {
@@ -250,7 +243,7 @@ void AnimStep(int n)
         }
         {
             char name[16];
-            int z;
+            int16_t z;
             Sprite *s;
 
             s = &a->sprite;
@@ -274,13 +267,13 @@ void AnimStep(int n)
 
 /* Move a walking actor one or two steps (further away is slower), and
  * on to the next walk graph node at the end of each leg. */
-void WalkStep(int n)
+void WalkStep(int16_t n)
 {
     Actor *a;
     Sprite *s;
     char unused1[16];
-    long nx;
-    long ny;
+    int32_t nx;
+    int32_t ny;
     char unused2[10];
 
     a = &actors[n];
@@ -289,8 +282,8 @@ void WalkStep(int n)
         if (n == 0)
             CheckRegions(actors[0].x, actors[0].y);
         if (a->steps) {
-            int i;
-            int k;
+            int16_t i;
+            int16_t k;
 
             if (DepthScale((a->fy + 0x8000) >> 16) < 160)
                 k = 1;
@@ -332,10 +325,10 @@ void WalkStep(int n)
 /* Draw the next frame of each .ban into the screen and back buffer. */
 void DrawBans(void)
 {
-    int n;
+    int16_t n;
     Ban *b;
-    char far *base;
-    char far *p;
+    char *base;
+    char *p;
 
     b = bans;
     if ((blink_count & 3) != 0)
@@ -344,19 +337,11 @@ void DrawBans(void)
         if (b->h) {
             base = LockMem(b->h);
             p = base + b->pos;
-            if (*(int far *)p == -1)
+            if (*(int16_t *)p == -1)
                 p = base;
-            if (((int far *)p)[1] != 0) {
+            if (((int16_t *)p)[1] != 0) {
                 BanDraw(screen->data, p);
-                switch (video_mode) {
-                case VIDEO_VGA:
-                case VIDEO_TANDY:
-                    BanDraw(backbuf->data, p);
-                    break;
-                case VIDEO_EGA:
-                    BanCopyEGA(backbuf->data, p, screen->data);
-                    break;
-                }
+                BanDraw(backbuf->data, p);
             }
             b->pos = p - base;
             UnlockMem(b->h);
@@ -367,11 +352,11 @@ void DrawBans(void)
 /* Update the screen where each .ban changed the back buffer. */
 void UpdateBans(void)
 {
-    int n;
+    int16_t n;
     Ban *b;
     Rect r;
-    char far *base;
-    char far *p;
+    char *base;
+    char *p;
 
     b = bans;
     if ((blink_count & 3) != 0)
@@ -380,37 +365,18 @@ void UpdateBans(void)
         if (b->h) {
             base = LockMem(b->h);
             p = base + b->pos;
-            if (*(int far *)p == -1)
+            if (*(int16_t *)p == -1)
                 p = base, b->pos = 0;
-            if (((int far *)p)[1] != 0) {
-                r.x0 = ((int far *)p)[2];
-                r.y0 = ((int far *)p)[3];
-                r.x1 = ((int far *)p)[4];
-                r.y1 = ((int far *)p)[5];
-                switch (video_mode) {
-                case VIDEO_VGA:
-                    UnlockMem(b->h);
-                    RedrawSpritesIn(&r);
-                    base = LockMem(b->h);
-                    p = base + b->pos;
-                    p = BanCopy((char far *)0xA0000000L, p, backbuf->data);
-                    break;
-                case VIDEO_TANDY:
-                    UnlockMem(b->h);
-                    RedrawSpritesIn(&r);
-                    base = LockMem(b->h);
-                    p = base + b->pos;
-                    p = BanTandy((char far *)0xA0000000L, p, backbuf->data);
-                    break;
-                case VIDEO_EGA:
-                    r.x0 &= 0xFFFC;
-                    r.x1 |= 3;
-                    UnlockMem(b->h);
-                    RedrawSpritesIn(&r);
-                    base = LockMem(b->h);
-                    p = base + b->pos;
-                    p = BanEGA((char far *)0xA0000000L, p, backbuf->data);
-                }
+            if (((int16_t *)p)[1] != 0) {
+                r.x0 = ((int16_t *)p)[2];
+                r.y0 = ((int16_t *)p)[3];
+                r.x1 = ((int16_t *)p)[4];
+                r.y1 = ((int16_t *)p)[5];
+                UnlockMem(b->h);
+                RedrawSpritesIn(&r);
+                base = LockMem(b->h);
+                p = base + b->pos;
+                p = BanCopy((char *)plat_vram(), p, backbuf->data);
             } else
                 p += 4;
             b->pos = p - base;
@@ -420,397 +386,78 @@ void UpdateBans(void)
 }
 
 /* Draw a .ban frame: a start offset and run count, an 8 byte rectangle,
- * then runs (n+1 literal bytes, 0 transparent; -n: n+1 copies; 80h: skip). */
-void BanDraw(char far *dst, char far *src)
+ * then runs (n+1 literal bytes, 0 transparent; -n: n+1 copies; 80h: skip).
+ * Offsets are 16 bit sums, like the original's. */
+void BanDraw(char *dst, char *src)
 {
-    _asm {
-        push ds
-        push si
-        push di
-        lds si, src
-        les di, dst
-        lodsw
-        add di, ax
-        lodsw
-        mov dx, ax
-        add si, 8
-        sub cx, cx
-    d_next:
-        dec dx
-        js d_done
-        lodsb
-        or al, al
-        js d_neg
-        mov cl, al
-        inc cx
-    d_lit:
-        lodsb
-        or al, al
-        je d_skip
-        stosb
-        loop d_lit
-        jmp d_next
-    d_skip:
-        inc di
-        loop d_lit
-        jmp d_next
-    d_neg:
-        cmp al, 80h
-        je d_jump
-        mov cl, al
-        neg cl
-        inc cx
-        lodsb
-        or al, al
-        jne d_fill
-        add di, cx
-        jmp d_next
-    d_fill:
-        rep stosb
-        jmp d_next
-    d_jump:
-        lodsw
-        add di, ax
-        jmp d_next
-    d_done:
-        pop di
-        pop si
-        pop ds
+    unsigned char *p = (unsigned char *)src;
+    uint16_t off;
+    int16_t runs;
+    unsigned n, i;
+
+    off = *(uint16_t *)p;
+    runs = ((int16_t *)p)[1];
+    p += 12;
+    while (--runs >= 0) {
+        signed char c = *p++;
+
+        if (c >= 0) {
+            for (n = c + 1; n != 0; n--, off++) {
+                unsigned char b = *p++;
+
+                if (b)
+                    dst[off] = b;
+            }
+        } else if (c == -128) {
+            off += *(uint16_t *)p;
+            p += 2;
+        } else {
+            n = (unsigned char)-c + 1;
+            if (*p)
+                for (i = 0; i < n; i++)
+                    dst[(uint16_t)(off + i)] = *p;
+            p++;
+            off += n;
+        }
     }
 }
 
-/* EGA: copy the changed runs of from (whole words) into dst. */
-void BanCopyEGA(char far *dst, char far *src, char far *from)
+/* Copy the changed runs of a .ban frame from the same place in from into
+ * dst; returns where the next frame starts. */
+char *BanCopy(char *dst, char *src, char *from)
 {
-    _asm {
-        push ds
-        push si
-        push di
-        push bp
-        lds si, src
-        les di, dst
-        mov bp, word ptr from+2
-        lodsw
-        add di, ax
-        lodsw
-        mov dx, ax
-        add si, 8
-        sub cx, cx
-        mov bx, si
-    e_next:
-        dec dx
-        js e_done
-        mov al, [bx]
-        inc bx
-        or al, al
-        js e_neg
-        mov cl, al
-        inc cx
-        add bx, cx
-    e_copy:
-        mov si, di
-        and si, 0FFFCh
-        add di, cx
-        push ds
-        mov ds, bp
-        push di
-        add di, 3
-        and di, 0FFFCh
-        sub di, si
-        shr di, 1
-        mov cx, di
-        mov di, si
-        rep movsw
-        pop di
-        pop ds
-        jmp e_next
-    e_neg:
-        cmp al, 80h
-        je e_jump
-        mov cl, al
-        neg cl
-        inc cx
-        mov al, [bx]
-        inc bx
-        or al, al
-        jne e_copy
-        add di, cx
-        jmp e_next
-    e_jump:
-        add di, [bx]
-        add bx, 2
-        jmp e_next
-    e_done:
-        pop bp
-        pop di
-        pop si
-        pop ds
+    unsigned char *p = (unsigned char *)src;
+    uint16_t off;
+    int16_t runs;
+    unsigned n;
+
+    off = *(uint16_t *)p;
+    runs = ((int16_t *)p)[1];
+    p += 12;
+    while (--runs >= 0) {
+        signed char c = *p++;
+
+        if (c >= 0) {
+            n = c + 1;
+            p += n;
+        } else if (c == -128) {
+            off += *(uint16_t *)p;
+            p += 2;
+            continue;
+        } else {
+            n = (unsigned char)-c + 1;
+            if (*p++ == 0) {
+                off += n;
+                continue;
+            }
+        }
+        memcpy(dst + off, from + off, n);
+        off += n;
     }
+    return (char *)p;
 }
 
-/* EGA: copy the changed runs of from (packed pixels) to the planes. */
-char far *BanEGA(char far *dst, char far *src, char far *from)
-{
-    _asm {
-        push ds
-        push si
-        push di
-        push bp
-        mov dx, 3CEh
-        mov ax, 0FF08h
-        out dx, ax
-        mov dx, 3C4h
-        mov al, 2
-        out dx, al
-        lds si, src
-        les di, dst
-        mov bp, word ptr from+2
-        lodsw
-        add di, ax
-        lodsw
-        mov dx, ax
-        add si, 8
-        sub cx, cx
-        mov bx, si
-    g_next:
-        dec dx
-        js g_end
-        mov al, [bx]
-        inc bx
-        or al, al
-        jns g_lit
-        cmp al, 80h
-        je g_jump
-        mov cl, al
-        neg cl
-        inc cx
-        mov al, [bx]
-        inc bx
-        or al, al
-        jne g_copy
-        add di, cx
-        jmp g_next
-    g_end:
-        jmp g_done
-    g_jump:
-        add di, [bx]
-        add bx, 2
-        jmp g_next
-    g_lit:
-        mov cl, al
-        inc cx
-        add bx, cx
-    g_copy:
-        mov si, di
-        and si, 0FFFCh
-        add di, cx
-        push ds
-        mov ds, bp
-        push di
-        add di, 3
-        and di, 0FFFCh
-        sub di, si
-        shr di, 2
-        mov cx, di
-        mov di, si
-        add si, 8
-        shr di, 2
-        push bx
-        lea bx, pal_remap
-        push dx
-        mov dx, 3C5h
-    g_loop:
-        push cx
-        lodsw
-        _emit 36h
-        xlat [bx]
-        xchg al, ah
-        _emit 36h
-        xlat [bx]
-        mov cx, ax
-        mov al, 1
-        out dx, al
-        lodsw
-        _emit 36h
-        xlat [bx]
-        xchg al, ah
-        _emit 36h
-        xlat [bx]
-        xchg cl, ah
-        ror cx, 4
-        rol cl, 4
-        rol cx, 4
-        ror ax, 4
-        rol al, 4
-        rol ax, 2
-        mov dx, cx
-        xor dx, ax
-        and dx, 3333h
-        xor cx, dx
-        xor ax, dx
-        rol ax, 2
-        mov dx, 3C5h
-        mov es:[di], al
-        mov al, 2
-        out dx, al
-        mov es:[di], cl
-        mov al, 4
-        out dx, al
-        mov es:[di], ah
-        mov al, 8
-        out dx, al
-        mov es:[di], ch
-        inc di
-        pop cx
-        loop g_loop
-        pop dx
-        pop bx
-        pop di
-        pop ds
-        jmp g_next
-    g_done:
-        pop bp
-        mov word ptr src, bx
-        pop di
-        pop si
-        pop ds
-    }
-    return src;
-}
-
-/* Tandy: copy the changed runs of from through pal_remap. */
-char far *BanTandy(char far *dst, char far *src, char far *from)
-{
-    _asm {
-        push ds
-        push si
-        push di
-        push bp
-        lds si, src
-        les di, dst
-        mov bp, word ptr from+2
-        lodsw
-        add di, ax
-        lodsw
-        mov dx, ax
-        add si, 8
-        sub cx, cx
-        mov bx, si
-    t_next:
-        dec dx
-        js t_done
-        mov al, [bx]
-        inc bx
-        or al, al
-        js t_neg
-        mov cl, al
-        inc cx
-        add bx, cx
-    t_copy:
-        push ds
-        mov ds, bp
-        mov si, di
-        add si, 8
-        push bx
-        lea bx, pal_remap
-    t_loop:
-        lodsb
-        _emit 36h
-        xlat [bx]
-        stosb
-        loop t_loop
-        pop bx
-        pop ds
-        jmp t_next
-    t_neg:
-        cmp al, 80h
-        je t_jump
-        mov cl, al
-        neg cl
-        inc cx
-        mov al, [bx]
-        inc bx
-        or al, al
-        jne t_copy
-        add di, cx
-        jmp t_next
-    t_jump:
-        add di, [bx]
-        add bx, 2
-        jmp t_next
-    t_done:
-        pop bp
-        mov word ptr src, bx
-        pop di
-        pop si
-        pop ds
-    }
-    return src;
-}
-
-/* VGA: copy the changed runs of from into dst. */
-char far *BanCopy(char far *dst, char far *src, char far *from)
-{
-    _asm {
-        push ds
-        push si
-        push di
-        push bp
-        lds si, src
-        les di, dst
-        mov bp, word ptr from+2
-        lodsw
-        add di, ax
-        lodsw
-        mov dx, ax
-        add si, 8
-        sub cx, cx
-        mov bx, si
-    b_next:
-        dec dx
-        js b_done
-        mov al, [bx]
-        inc bx
-        or al, al
-        js b_neg
-        mov cl, al
-        inc cx
-        add bx, cx
-    b_copy:
-        push ds
-        mov ds, bp
-        mov si, di
-        add si, 8
-        rep movsb
-        pop ds
-        jmp b_next
-    b_neg:
-        cmp al, 80h
-        je b_jump
-        mov cl, al
-        neg cl
-        inc cx
-        mov al, [bx]
-        inc bx
-        or al, al
-        jne b_copy
-        add di, cx
-        jmp b_next
-    b_jump:
-        add di, [bx]
-        add bx, 2
-        jmp b_next
-    b_done:
-        pop bp
-        mov word ptr src, bx
-        pop di
-        pop si
-        pop ds
-    }
-    return src;
-}
-
-void EndOrStand(int n)
+void EndOrStand(int16_t n)
 {
     Actor *a;
 
@@ -821,7 +468,7 @@ void EndOrStand(int n)
         init_stand_anim(n);
 }
 
-void EndAnim(int n)
+void EndAnim(int16_t n)
 {
     Actor *a;
 
@@ -836,7 +483,7 @@ void EndAnim(int n)
 
 void FreeActors(void)
 {
-    int i;
+    int16_t i;
 
     for (i = 0; i != MAX_ACTORS; i++)
         if (actors[i].state == 1)
@@ -850,21 +497,15 @@ void FreeActors(void)
 
 /* Start name.anm on actor a. Standing animations come from the "j" set
  * when there is no second EMS page. */
-void InitAnim(Actor *a, char *name, int x, int y, int scale, int add)
+void InitAnim(Actor *a, char *name, int16_t x, int16_t y, int16_t scale, int16_t add)
 {
-    char fname[10];
-    AnimFrame far *data;
-    AnimFrame far *f;
+    char fname[16] = { 0 };
+    AnimFrame *data;
+    AnimFrame *f;
     Sprite *s;
-    int z;
+    int16_t z;
 
-    if (strnicmp(name + 1, "stnd", 4) == 0) {
-        if (ems_other_page == -1)
-            sprintf(fname, "%sj", name);
-        else
-            strcpy(fname, name);
-    } else
-        strcpy(fname, name);
+    strcpy(fname, name);
     MemCpy(a->name, fname, 16);
     a->type = ANIM_PLAY;
     a->anim = CacheLoad(fname, "anm");
@@ -923,7 +564,7 @@ void FreeWalk(Actor *a)
 }
 
 /* Make actor n stand, facing the way it last walked. */
-void init_stand_anim(int n)
+void init_stand_anim(int16_t n)
 {
     Actor *a;
     char name[16];
@@ -941,7 +582,7 @@ void init_stand_anim(int n)
 }
 
 /* Show the walking actor's next frame at (x, y). */
-void SetWalkFrame(Actor *a, int x, int y)
+void SetWalkFrame(Actor *a, int16_t x, int16_t y)
 {
     char name[16];
 
@@ -957,13 +598,13 @@ void SetWalkFrame(Actor *a, int x, int y)
 }
 
 /* Set up a straight walk, along the longer axis one pixel per step. */
-void SetWalk(Actor *a, int x0, int y0, int x1, int y1)
+void SetWalk(Actor *a, int16_t x0, int16_t y0, int16_t x1, int16_t y1)
 {
-    int dx;
-    int dy;
+    int16_t dx;
+    int16_t dy;
 
-    a->fx = (long)x0 << 16;
-    a->fy = (long)y0 << 16;
+    a->fx = (int32_t)x0 << 16;
+    a->fy = (int32_t)y0 << 16;
     dx = x1 - x0;
     dy = y1 - y0;
     if (ABS(dx) > ABS(dy)) {
@@ -973,8 +614,8 @@ void SetWalk(Actor *a, int x0, int y0, int x1, int y1)
             strcat(a->walk_name, "W"), a->dir = 'W';
         if ((a->steps = ABS(dx)) == 0)
             return;
-        a->dx = (long)SGN(dx) << 16;
-        a->dy = ((long)dy << 16) / ABS(dx);
+        a->dx = (int32_t)SGN(dx) << 16;
+        a->dy = ((int32_t)dy << 16) / ABS(dx);
     } else {
         if (dy > 0)
             strcat(a->walk_name, "S"), a->dir = 'S';
@@ -982,19 +623,19 @@ void SetWalk(Actor *a, int x0, int y0, int x1, int y1)
             strcat(a->walk_name, "N"), a->dir = 'N';
         if ((a->steps = ABS(dy)) == 0)
             return;
-        a->dx = ((long)dx << 16) / ABS(dy);
-        a->dy = (long)SGN(dy) << 16;
+        a->dx = ((int32_t)dx << 16) / ABS(dy);
+        a->dy = (int32_t)SGN(dy) << 16;
     }
 }
 
 /* Is the straight line from (x0, y0) to (x1, y1) clear? */
-int CanWalk(int x0, int y0, int x1, int y1)
+int16_t CanWalk(int16_t x0, int16_t y0, int16_t x1, int16_t y1)
 {
-    long dx;
-    long dy;
-    long x;
-    long y;
-    int n;
+    int32_t dx;
+    int32_t dy;
+    int32_t x;
+    int32_t y;
+    int16_t n;
 
     dx = x1 - x0;
     dy = y1 - y0;
@@ -1002,15 +643,15 @@ int CanWalk(int x0, int y0, int x1, int y1)
         if ((n = ABS(dx)) == 0)
             return 1;
         dy = (dy << 16) / ABS(dx);
-        dx = (long)SGN(dx) << 16;
+        dx = (int32_t)SGN(dx) << 16;
     } else {
         if ((n = ABS(dy)) == 0)
             return 1;
         dx = (dx << 16) / ABS(dy);
-        dy = (long)SGN(dy) << 16;
+        dy = (int32_t)SGN(dy) << 16;
     }
-    x = (long)x0 << 16;
-    y = (long)y0 << 16;
+    x = (int32_t)x0 << 16;
+    y = (int32_t)y0 << 16;
     if (WalkBlocked((x + 0x8000) >> 16, (y + 0x8000) >> 16))
         return 0;
     while (n--) {
@@ -1028,24 +669,24 @@ int CanWalk(int x0, int y0, int x1, int y1)
 
 void LoadWalkGraph(char *name)
 {
-    int i;
+    int16_t i;
     char buf[0x482];
     char *p;
 
     MemSet(&walk, sizeof(walk), 0xFF);
-    LoadFilePacked(name, "iw", (unsigned char far *)buf);
+    LoadFilePacked(name, "iw", (unsigned char *)buf);
     p = buf;
     READ(&walk.count, 2);
     READ(walk.nodes, sizeof(walk.nodes));
-    for (i = 0; i != (int)walk.count; i++) {
+    for (i = 0; i != (int16_t)walk.count; i++) {
         READ(walk.next[i], walk.count);
     }
 }
 
 /* The nearest walk graph node that (x, y) can walk straight to, or -1. */
-int NearestNode(int x, int y)
+int16_t NearestNode(int16_t x, int16_t y)
 {
-    int i;
+    int16_t i;
     NodeDist *list;
     NodeDist *p;
     WalkNode *n;
@@ -1068,7 +709,7 @@ int NearestNode(int x, int y)
     Fatal("impossible walk");
 }
 
-int CompareDist(NodeDist *a, NodeDist *b)
+int CompareDist(const void *a, const void *b)
 {
-    return a->dist - b->dist;
+    return (int16_t)(((const NodeDist *)a)->dist - ((const NodeDist *)b)->dist);
 }

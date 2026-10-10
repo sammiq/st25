@@ -4,13 +4,15 @@
 #ifndef ROOM_H
 #define ROOM_H
 
+#include "compat.h"
+
 /* The state of the current room, saved with the game and seen by the
  * room's scripts (SI points at it while they run). */
 typedef struct RoomState {
-    int timers[8];              /* 00 count down; message 8 at zero */
-    int saved_x;                /* 10 pointer when the game was saved */
-    int saved_y;                /* 12 */
-    int stun[4];                /* 14 crew stunned for this many ticks */
+    int16_t timers[8];              /* 00 count down; message 8 at zero */
+    int16_t saved_x;                /* 10 pointer when the game was saved */
+    int16_t saved_y;                /* 12 */
+    int16_t stun[4];                /* 14 crew stunned for this many ticks */
     char no_walk;               /* 1C */
     char busy;                  /* 1D the player can't act */
     char redshirt_dead;         /* 1E */
@@ -26,30 +28,30 @@ typedef struct RoomState {
 
 /* A room's .rdf file, locked at rdf. Offsets are from its start. */
 typedef struct Rdf {
-    long (far *service)();      /* 00 callback for the scripts */
-    unsigned state;             /* 04 the RoomState */
-    int y_max;                  /* 06 depth scaling */
-    int y_min;                  /* 08 */
-    unsigned scale_min;         /* 0A */
-    unsigned scale_max;         /* 0C */
-    unsigned scripts;           /* 0E */
-    unsigned scripts_end;       /* 10 */
-    unsigned objects;           /* 12 clickable polygons */
-    unsigned objects_end;       /* 14 */
-    unsigned exits;             /* 16 polygons */
-    unsigned exits_end;         /* 18 */
-    unsigned regions;           /* 1A */
-    unsigned regions_end;       /* 1C */
-    unsigned bans;              /* 1E names of the .ban animations */
-    unsigned bans_end;          /* 20 */
-    int exit_room[4];           /* 22 */
-    int walk_in[4][8][2];       /* 2A per entrance: from, to for each crew */
-    int beam_pos[4][2];         /* AA */
-    int stand_pos[4][2];        /* BA */
+    uint32_t service;           /* 00 the scripts' far pointer to the game call (unused) */
+    uint16_t state;             /* 04 the RoomState */
+    int16_t y_max;                  /* 06 depth scaling */
+    int16_t y_min;                  /* 08 */
+    uint16_t scale_min;         /* 0A */
+    uint16_t scale_max;         /* 0C */
+    uint16_t scripts;           /* 0E */
+    uint16_t scripts_end;       /* 10 */
+    uint16_t objects;           /* 12 clickable polygons */
+    uint16_t objects_end;       /* 14 */
+    uint16_t exits;             /* 16 polygons */
+    uint16_t exits_end;         /* 18 */
+    uint16_t regions;           /* 1A */
+    uint16_t regions_end;       /* 1C */
+    uint16_t bans;              /* 1E names of the .ban animations */
+    uint16_t bans_end;          /* 20 */
+    int16_t exit_room[4];           /* 22 */
+    int16_t walk_in[4][8][2];       /* 2A per entrance: from, to for each crew */
+    int16_t beam_pos[4][2];         /* AA */
+    int16_t stand_pos[4][2];        /* BA */
 } Rdf;
 
 extern RoomState room;
-extern Rdf far *rdf;
+extern Rdf *rdf;
 extern MemHandle rdf_handle;
 extern char room_mission[16];
 

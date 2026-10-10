@@ -1,16 +1,15 @@
 /* seg012: main, start-up checks and the bridge's full-screen puzzles
  * (the engineering levers, the turbolift and the item case) */
 
+#include "compat.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <setjmp.h>
-#include <dos.h>
-#define FindCD FindCD_
+#include <stdarg.h>
 #include "mem.h"
 #include "bitmap.h"
 #include "cache.h"
-#include "ems.h"
 #include "event.h"
 #include "gfx.h"
 #include "sound.h"
@@ -19,24 +18,21 @@
 #include "fixmath.h"
 #include "obj3d.h"
 #include "room.h"
-#undef FindCD
 
-int getch(void);
-void FindCD(char *argv0);
 
 void Intro(void);                   /* seg017 */
 void InitDummyPlanet(void);         /* seg006 */
 void AddR3(Obj3D *o);
-int SelectView(Obj3D *o);
+int16_t SelectView(Obj3D *o);
 void ReleaseShipShape(Obj3D *o);
 void StopShip(Obj3D *o);            /* seg025 */
 void BoostInit(void);               /* seg020 */
 void SaveNew(void);                 /* seg019 */
-void TextModeMenu(int ask);
+void TextModeMenu(int16_t ask);
 void FreeActors(void);              /* seg000 */
 void ClearScreen(void);               /* seg001 */
 void BridgeLoop(void);
-void BridgeEnter(int a);
+void BridgeEnter(int16_t a);
 void BridgeLeave(void);
 void CyclePalette(void);
 void Transport(char *name);
@@ -44,56 +40,42 @@ void ResetMsgs(void);
 void StartAway(void);               /* seg008 */
 void AwayLoop(void);
 void EndAway(void);
-void LoadRoom(char *mission, int n);
-void EnterRoom(int a);
+void LoadRoom(char *mission, int16_t n);
+void EnterRoom(int16_t a);
 void FreeRoom(void);
-void MsgBox(char *title, char *msg, int a, int b, int c, int d);    /* seg008: message box */
+void MsgBox(char *title, char *msg, int16_t a, int16_t b, int16_t c, int16_t d);    /* seg008: message box */
 
-void main(int argc, char **argv);
+void GameMain(int argc, char **argv);
 void InitScreens(void);
 void InitPlayerShip(void);
-int LeverPuzzle(void);
-void Turbolift(int unused, int deck);
-int ItemCase(int mask);
-void Fatal();
+int16_t LeverPuzzle(void);
+void Turbolift(int16_t unused, int16_t deck);
+int16_t ItemCase(int16_t mask);
 void TrackMouse(Event *e);
-void ReadConfig(int argc, char **argv);
+void ReadConfig(int16_t argc, char **argv);
 void ResetPointer(void);
-int TurboHover(void);
-int TurboPick(int deck);
-void CheckMemory(void);
-void FarPrintf();
+int16_t TurboHover(void);
+int16_t TurboPick(int16_t deck);
 
 typedef struct Point {
-    int x;
-    int y;
+    int16_t x;
+    int16_t y;
 } Point;
 
-Bitmap far *backbuf;
-Bitmap far *screen;
-unsigned char far *mask_buf;
-extern unsigned long blink_count;
+Bitmap *backbuf;
+Bitmap *screen;
+unsigned char *mask_buf;
+extern uint32_t blink_count;
 extern Obj3D player_ship;
 extern Obj3D dummy_planet;
 extern char sfx_name[];
-int sb_port;
-int sb_irq;
+int16_t sb_port;
+int16_t sb_irq;
 extern char room_name[];
 extern jmp_buf game_jmp;            /* back to the main loop */
 extern jmp_buf room_jmp;
-int game_mode;               /* 1 bridge, 2 away team; 3, 4 beaming */
-int prev_mode;
-
-/* CheckMemory's message, kept out of DGROUP in a far data segment. */
-char _far mem_msg1[] = "Star Trek: 25th Anniversary Enhanced CD-ROM requires 560K of free\n";
-char _far mem_msg2[] = "low memory and 1024k of free EMS (expanded) memory to play. You currently\n";
-char _far mem_msg3[] = "have %ldK free low memory and %ldK free EMS memory.\n";
-char _far mem_msg4[] = "Try moving your TSRs and device drivers into high memory, or remove\n";
-char _far mem_msg5[] = "them completely. Be sure you are not running a DOS shell from Windows.\n\n";
-char _far mem_msg6[] = "If you have more memory in your computer, we recommend you free up\n";
-char _far mem_msg7[] = "even more EMS memory to speed up the game -- 2048K free EMS is recommended.\n";
-char _far size_msg1[] = "program size = %ld\n";    /* unused */
-char _far size_msg2[] = "heap size    = %ld\n";
+int16_t game_mode;               /* 1 bridge, 2 away team; 3, 4 beaming */
+int16_t prev_mode;
 
 MemHandle space_bmp_handle = 0;
 Point old_item_pos[5] = { { 0x89, 0x7A }, { 0x78, 0x85 }, { 0x99, 0x91 }, { 0xF7, 0x9C }, { 0x75, 0xA9 } };
@@ -104,14 +86,11 @@ Point item_pos[5] = { { 0x29, 0x80 }, { 0x58, 0x7D }, { 0x82, 0x7D }, { 0xAE, 0x
 #define MOUSE_IN(x0, x1, y0, y1) \
     (mouse_x >= (x0) && mouse_x <= (x1) && mouse_y >= (y0) && mouse_y <= (y1))
 
-void main(int argc, char **argv)
+void GameMain(int argc, char **argv)
 {
-    int play_intro;
+    int16_t play_intro = 1;
 
     atexit(PrintExitMsg);
-    EMSInit();
-    atexit(EMSRelease);
-    CheckMemory();
     ReadConfig(argc, argv);
     InitMem();
     HookKbd();
@@ -124,7 +103,7 @@ void main(int argc, char **argv)
     ClearSprites();
     InitScreens();
     OpenDataFiles();
-    FindCD(argv[0]);
+    FindCD();
     SoundInit();
     atexit(SoundStop);
     InitPlayerShip();
@@ -151,7 +130,7 @@ void main(int argc, char **argv)
     TextModeMenu(0);
     FadeOut();
     game_mode = setjmp(game_jmp);
-    FreeAllEMSFiles();
+    FreeAllSfxFiles();
     if (sfx_name[0])
         PlaySfx(sfx_name);
     if (game_mode == 0)
@@ -227,7 +206,7 @@ void InitPlayerShip(void)
 {
     ShipDesc desc;
 
-    LoadFilePacked("enterpri", "dsc", (unsigned char far *)&desc);
+    LoadFilePacked("enterpri", "dsc", (unsigned char *)&desc);
     MemSet(&player_ship, sizeof(player_ship), 0);
     MatIdentity(&player_ship.orient);
     player_ship.visible = R3_SHIP;
@@ -256,26 +235,26 @@ void InitPlayerShip(void)
 
 /* The three levers in engineering. Each lights up to six lamps; solved
  * when all three are near the middle. */
-int LeverPuzzle(void)
+int16_t LeverPuzzle(void)
 {
-    int l1;
-    int l2;
-    int l3;
+    int16_t l1;
+    int16_t l2;
+    int16_t l3;
     Sprite *spr;
     Sprite done;
-    int i;
-    int n;
-    int running;
+    int16_t i;
+    int16_t n;
+    int16_t running;
     Event ev;
-    int unused[2];
-    int y;
-    int x;
-    int base;
-    int redraw;
+    int16_t unused[2];
+    int16_t y;
+    int16_t x;
+    int16_t base;
+    int16_t redraw;
     MemHandle h;
     Sprite *list[32];
-    int count;
-    int result;
+    int16_t count;
+    int16_t result;
 
     l1 = 0x11;
     l2 = -0x11;
@@ -283,7 +262,7 @@ int LeverPuzzle(void)
     count = 0;
     result = 0;
     FadeOut();
-    FreeAllEMSFiles();
+    FreeAllSfxFiles();
     SetSpriteList(list, &count);
     LoadFilePacked("machineb", "bmp", screen);
     MemCpy(backbuf->data, screen->data, 0xFA00);
@@ -360,7 +339,7 @@ int LeverPuzzle(void)
             TrackMouse(&ev);
             switch (ev.type) {
             case EV_KEY:
-                switch (((unsigned)ev.key >> 8) & 0xFF) {
+                switch (((uint16_t)ev.key >> 8) & 0xFF) {
                 case 0x1C:
                 case 0x3B:
                     goto click;
@@ -407,31 +386,31 @@ int LeverPuzzle(void)
 }
 
 /* Pick a deck on the turbolift panel and go there. */
-void Turbolift(int unused, int deck)
+void Turbolift(int16_t unused, int16_t deck)
 {
     Sprite *list[32];
     Sprite *s;
-    int count;
-    int unk46;
-    int hit;
-    int unk4a;
-    int done;
-    int shown;
-    int num;
-    int dir;
-    int timeout;
+    int16_t count;
+    int16_t unk46;
+    int16_t hit;
+    int16_t unk4a;
+    int16_t done;
+    int16_t shown;
+    int16_t num;
+    int16_t dir;
+    int16_t timeout;
     char *p;
     char name[16];
     char msg[76];
     char unkb2[40];
-    int unkdc;
+    int16_t unkdc;
     Event ev;
-    int unkec;
+    int16_t unkec;
 
     count = 0;
     unkdc = 1;
     FadeOut();
-    FreeAllEMSFiles();
+    FreeAllSfxFiles();
     shown = 0;
     FreeActors();
     SetSpriteList(list, &count);
@@ -450,7 +429,7 @@ void Turbolift(int unused, int deck)
                 case EV_DOWN2:
                     goto stop;
                 case EV_KEY:
-                    switch (((unsigned)ev.key >> 8) & 0xFF) {
+                    switch (((uint16_t)ev.key >> 8) & 0xFF) {
                     case 1:
                     case 0x1C:
                     case 0x39:
@@ -488,7 +467,7 @@ void Turbolift(int unused, int deck)
             TrackMouse(&ev);
             switch (ev.type) {
             case EV_KEY:
-                switch (((unsigned)ev.key >> 8) & 0xFF) {
+                switch (((uint16_t)ev.key >> 8) & 0xFF) {
                 case 0x1C:
                 case 0x3B:
                     goto click;
@@ -572,18 +551,18 @@ void Turbolift(int unused, int deck)
 
 /* The case of items: bit 0x10 >> n of mask is item n. Clicking an item
  * drops it out of the case. Returns the items left. */
-int ItemCase(int mask)
+int16_t ItemCase(int16_t mask)
 {
     Sprite *list[32];
-    int count;
+    int16_t count;
     Sprite *items;
     Sprite close;
-    int i;
-    int bit;
-    int done;
+    int16_t i;
+    int16_t bit;
+    int16_t done;
     Event ev;
     Sprite *hit;
-    long t;
+    int32_t t;
     char name[10];
 
     count = 0;
@@ -618,7 +597,7 @@ int ItemCase(int mask)
             TrackMouse(&ev);
             switch (ev.type) {
             case EV_KEY:
-                switch (((unsigned)ev.key >> 8) & 0xFF) {
+                switch (((uint16_t)ev.key >> 8) & 0xFF) {
                 case 0x1C:
                 case 0x3B:
                     goto click;
@@ -646,7 +625,7 @@ int ItemCase(int mask)
                     while (hit->y < 200) {
                         SpriteSetPos(hit, hit->x, hit->y, 8);
                         UpdateSprites();
-                        while (GetTicks() == (unsigned long)t)
+                        while (GetTicks() == (uint32_t)t)
                             ;
                         ++hit->y;
                     }
@@ -674,16 +653,17 @@ int ItemCase(int mask)
 }
 
 /* Fatal error: print the message and quit. */
-void Fatal(fmt, a, b, c, d)
-char *fmt;
-int a, b, c, d;
+void Fatal(const char *fmt, ...)
 {
+    va_list args;
+
     SetFade(cur_palette, 100);
-    printf("Internal error:\n");
-    printf(fmt, a, b, c, d);
-    printf("\n");
-    printf("Game aborted...\n");
-    getch();
+    fprintf(stderr, "Internal error:\n");
+    va_start(args, fmt);
+    vfprintf(stderr, fmt, args);
+    va_end(args);
+    fprintf(stderr, "\nGame aborted...\n");
+    plat_quit();
     exit(1);
 }
 
@@ -697,40 +677,17 @@ void TrackMouse(Event *e)
     }
 }
 
-/* Hardware settings: from the command line (as passed by the installer's
- * play program), else intrplay.cfg, else defaults. */
-void ReadConfig(int argc, char **argv)
+/* The hardware the original was configured for by its installer (video,
+ * input, music and digital sound drivers, Sound Blaster port and IRQ) is
+ * the emulated one here: VGA, mouse, AdLib music and Sound Blaster. */
+void ReadConfig(int16_t argc, char **argv)
 {
-    int cfg[16];
-    FILE *f;
-    int i;
-
-    if (argc == 9 || argc == 10) {
-        for (i = 0; i < 7; i++)
-            cfg[i] = atoi(argv[i + argc - 8]);
-        video_mode = cfg[0];
-        input_dev = cfg[1];
-        midi_driver = cfg[2];
-        digi_driver = cfg[3];
-        sb_port = cfg[4];
-        sb_irq = cfg[5];
-    } else if ((f = fopen("intrplay.cfg", "rb")) != 0) {
-        fread(cfg, 1, sizeof(cfg), f);
-        fclose(f);
-        video_mode = cfg[0];
-        input_dev = cfg[1];
-        midi_driver = cfg[2];
-        digi_driver = cfg[3];
-        sb_port = cfg[4];
-        sb_irq = cfg[5];
-    } else {
-        video_mode = -1;
-        input_dev = 0;
-        midi_driver = 1;
-        digi_driver = 0;
-        sb_port = 0;
-        sb_irq = 0;
-    }
+    video_mode = VIDEO_VGA;
+    input_dev = INPUT_MOUSE;
+    midi_driver = 2;
+    digi_driver = 4;
+    sb_port = 0x220;
+    sb_irq = 5;
 }
 
 void ResetPointer(void)
@@ -742,7 +699,7 @@ void ResetPointer(void)
 }
 
 /* The turbolift panel button under the pointer, 1 to 6, or 0. */
-int TurboHover(void)
+int16_t TurboHover(void)
 {
     if (MOUSE_IN(0x7F, 0x91, 0x78, 0x7B))
         return 1;
@@ -761,7 +718,7 @@ int TurboHover(void)
 }
 
 /* As TurboHover, but 7 for a deck the lift can't reach from deck. */
-int TurboPick(int deck)
+int16_t TurboPick(int16_t deck)
 {
     if (MOUSE_IN(0x7F, 0x91, 0x78, 0x7B)) {
         if (deck == 0)
@@ -791,39 +748,3 @@ int TurboPick(int deck)
         return 0;
 }
 
-/* Quit with a message unless there is 560K of low memory and 1M of EMS. */
-void CheckMemory(void)
-{
-    unsigned far *psp;
-    unsigned seg;
-    long size;
-    long avail;
-    char unused[100];
-
-    psp = (unsigned far *)((unsigned long)_psp << 16);
-    size = (unsigned long)(psp[1] - _psp) << 4;
-    _dos_allocmem(0xFFFF, &seg);
-    avail = (unsigned long)seg << 4;
-    if (size + avail < 0x8C000L || ems_num_pages << 4 < 1024) {
-        FarPrintf(mem_msg1);
-        FarPrintf(mem_msg2);
-        FarPrintf(mem_msg3, (size + avail) / 1024, (unsigned long)ems_num_pages << 4);
-        FarPrintf(mem_msg4);
-        FarPrintf(mem_msg5);
-        FarPrintf(mem_msg6);
-        FarPrintf(mem_msg7);
-        exit(0);
-    }
-}
-
-/* printf with a far format string. */
-void FarPrintf(fmt, a, b, c, d, e, f, g, h)
-char far *fmt;
-int a, b, c, d, e, f, g, h;
-{
-    char buf[100];
-
-    _fstrncpy(buf, fmt, 100);
-    buf[99] = 0;
-    printf(buf, a, b, c, d, e, f, g, h);
-}

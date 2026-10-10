@@ -1,5 +1,6 @@
 /* seg018: planets */
 
+#include "compat.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -10,25 +11,24 @@
 #include "fixmath.h"
 #include "obj3d.h"
 
-void Fatal(char *fmt, ...);     /* fatal error */
 
-extern long proj_dist;
+extern int32_t proj_dist;
 extern float star_near;
-extern long blink_count;
-extern Bitmap far *backbuf;
+extern int32_t blink_count;
+extern Bitmap *backbuf;
 MemHandle fractal_handle;        /* result of MakeFractal */
-unsigned long planet_start;
-int far *frac_pal;
-int frac_size2;
-int frac_bytes;
-int far *frac_map;               /* heights, in the back buffer */
-Bitmap far *frac_bmp;
-int frac_size;
+uint32_t planet_start;
+int16_t *frac_pal;
+int16_t frac_size2;
+int16_t frac_bytes;
+int16_t *frac_map;               /* heights, in the back buffer */
+Bitmap *frac_bmp;
+int16_t frac_size;
 extern Obj3D dummy_planet;
 
 /* Colours for the fractal heights of each planet palette (kept in a far
  * data segment). */
-int far planet_pals[22][25] = {
+int16_t planet_pals[22][25] = {
     { 0x73, 0x6E, 0x69, 0x64, 0xA2, 0xA3, 0xA4, 0xA5, 0x98, 0x99, 0x9A, 0x9B, 0x9C, 0x9D, 0x9E,
       0x9F, 0xCB, 0xCA, 0xC9, 0xC8, 0xC7, 0xC6, 0xC5, 0xC4, 0xC3 },
     { 0x63, 0xC0, 0xC1, 0xC2, 0xC3, 0xC4, 0xC5, 0xC6, 0xC7, 0xC8, 0xC9, 0xCA, 0xC8, 0x96, 0x97,
@@ -75,47 +75,90 @@ int far planet_pals[22][25] = {
       0xEF, 0xE8, 0xE9, 0xEA, 0xEB, 0xEC, 0xED, 0xEE, 0xEF, 0xE8 }
 };
 
-int small_planets = 0;                  /* generating textures is too slow */
-int planet_unused[6] = { 0, 1, 0, 0, 0, -1 };
-unsigned long planet_frame = 0;
-int planet_n = 0;
+int16_t small_planets = 0;                  /* generating textures is too slow */
+int16_t planet_unused[6] = { 0, 1, 0, 0, 0, -1 };
+uint32_t planet_frame = 0;
+int16_t planet_n = 0;
 
-int DrawPlanetLarge(Obj3D *o);
-int DrawPlanetSmall(Obj3D *o);
-void CreatePlanet(Obj3D *o, char *name, int radius, int small, unsigned seed, int pal);
-void InitPlanet(Obj3D *o, char *name, int radius, int small, int gen, unsigned seed, int pal);
-int DrawPlanet(Obj3D *o);
+int16_t DrawPlanetLarge(Obj3D *o);
+int16_t DrawPlanetSmall(Obj3D *o);
+void CreatePlanet(Obj3D *o, char *name, int16_t radius, int16_t small, uint16_t seed, int16_t pal);
+void InitPlanet(Obj3D *o, char *name, int16_t radius, int16_t small, int16_t gen, uint16_t seed, int16_t pal);
+int16_t DrawPlanet(Obj3D *o);
 void FreePlanet(Obj3D *o);
-void MakeFractal(int size, unsigned seed, unsigned pal);
-void FracSquare(int x0, int y0, int x1, int y1);
-void FracEdge(int x0, int y0, int x1, int y1);
+void MakeFractal(int16_t size, uint16_t seed, uint16_t pal);
+void FracSquare(int16_t x0, int16_t y0, int16_t x1, int16_t y1);
+void FracEdge(int16_t x0, int16_t y0, int16_t x1, int16_t y1);
 void FracColour(void);
+
+/* Look each pixel of the sphere up in the texture: src has nn words, each
+ * the table offset of a pixel (bit 15 set outside the sphere); tu and tv
+ * rotate it.  work is the planet.dat image holding the table, pix the
+ * texture.  The masks clear address bits (hi1 after adding tu, hi2 after
+ * the table lookup and tv); shrink maps the 128 wide address onto the
+ * 32 wide small texture.  The original patched the texture's address into
+ * a loop for this. */
+void PlanetPixels(const unsigned char *work, uint32_t work_size, const unsigned char *src,
+                         unsigned char *out, int16_t nn, uint16_t tu, uint16_t tv,
+                         const unsigned char *pix, unsigned char hi1, unsigned char hi2, int shrink)
+{
+    int blank_run = 0;
+
+    for (; nn != 0; nn--, src += 2, out++) {
+        uint16_t e = src[0] | (src[1] << 8);
+        uint16_t b, w;
+
+        /* after a blank pixel the original skips ahead on the entries' own
+         * bit 15; any other entry is tested with tu added */
+        if (blank_run && (e & 0x8000)) {
+            *out = 0;
+            continue;
+        }
+        blank_run = 0;
+        b = e + tu;
+        if (b & 0x8000) {
+            *out = 0;
+            blank_run = 1;
+            continue;
+        }
+        b &= (hi1 << 8) | 0xFF;
+        w = b + 2 <= work_size ? work[b] | (work[b + 1] << 8) : 0;
+        b = w + tv;
+        b &= (hi2 << 8) | 0xFF;
+        if (shrink) {
+            b <<= 1;
+            b = (((b >> 8) >> 2) << 8) | (b & 0xFF);
+            b >>= 3;
+        }
+        *out = pix[b];
+    }
+}
 
 /* Draw the planet's texture wrapped round a sphere into its bitmap, at one
  * of five sizes by distance. planet.dat holds the sphere's texture
  * coordinates for each size. */
-int DrawPlanetLarge(Obj3D *o)
+int16_t DrawPlanetLarge(Obj3D *o)
 {
     Vec32 rel;
     Vec32 v;
     Matrix m;
-    int pitch;
-    int yaw;
-    int tu;
-    int tv;
-    char far *src;
-    int n;
-    int nn;
-    char far *work0;
-    char far *table;
-    char far *pix;
-    long dist;
+    int16_t pitch;
+    int16_t yaw;
+    int16_t tu;
+    int16_t tv;
+    char *src;
+    int16_t n;
+    int16_t nn;
+    char *work0;
+    char *table;
+    char *pix;
+    int32_t dist;
     MemHandle wh;
     MemHandle bh;
-    Bitmap far *bmp;
-    char far *work;
-    int created;
-    int len;
+    Bitmap *bmp;
+    char *work;
+    int16_t created;
+    int16_t len;
 
     created = 0;
     if (o->generated == 0)
@@ -194,10 +237,10 @@ int DrawPlanetLarge(Obj3D *o)
         o->size = o->radius / 6;
         n = 61;
     }
-    ((BitmapHdr far *)(work + 0x761A))->x = (n - 1) / 2;
-    ((BitmapHdr far *)(work + 0x761A))->y = (n - 1) / 2;
-    ((BitmapHdr far *)(work + 0x761A))->w = n;
-    ((BitmapHdr far *)(work + 0x761A))->h = n;
+    ((BitmapHdr *)(work + 0x761A))->x = (n - 1) / 2;
+    ((BitmapHdr *)(work + 0x761A))->y = (n - 1) / 2;
+    ((BitmapHdr *)(work + 0x761A))->w = n;
+    ((BitmapHdr *)(work + 0x761A))->h = n;
     nn = n * n;
     MemSet(&rel, 12, 0);
     Vec32Sub(&rel, &o->view);
@@ -208,121 +251,21 @@ int DrawPlanetLarge(Obj3D *o)
     pitch = FixASin(FixDiv(rel.y, o->scale));
     if (pitch < -128 || pitch > 128) {
         len = FixLength(rel.x, rel.z, 0);
-        pitch = FixACos(FixDiv((unsigned)len, o->scale));
+        pitch = FixACos(FixDiv((uint16_t)len, o->scale));
         if (rel.y < 0)
             pitch = -pitch;
     }
     MatIdentity(&o->rot);
     MatRotY(-yaw, &o->rot);
     MatRotX(pitch, &o->rot);
-    tu = (((long)pitch << 7) + 0x200) / 0x400;
-    tv = (((long)-yaw << 7) + 0x200) / 0x400;
+    tu = (((int32_t)pitch << 7) + 0x200) / 0x400;
+    tv = (((int32_t)-yaw << 7) + 0x200) / 0x400;
     tu &= 0x7F;
     tv &= 0x7F;
     tu = tu << 7;
     tv = tv << 7;
-    /* Look each pixel of the sphere up in the texture. The texture's
-     * address is patched into the loop. */
-    if (o->small) {
-        _asm {
-            push si
-            push di
-            push bp
-            lds si, src
-            mov ax, word ptr pix
-            mov word ptr cs:l_spatch+3, ax
-            mov es, word ptr pix+2
-            mov di, word ptr table
-            mov dx, tv
-            mov cx, nn
-            mov al, 0BFh
-            mov ah, 0BFh
-            mov bp, tu
-            jmp l_snext
-        l_sblank:
-            mov bx, 8000h
-            jmp l_sclear
-        l_sskip:
-            add si, 2
-        l_sclear:
-            mov byte ptr [di], 0
-            inc di
-            and bx, [si]
-            loopne l_sskip
-            jcxz l_sdone
-        l_snext:
-            mov bx, [si]
-            add si, 2
-            add bx, bp
-            js l_sblank
-            and bh, al
-            mov bx, [bx]
-            add bx, dx
-            and bh, ah
-            shl bx, 1
-            shr bh, 2
-            shr bx, 3
-        l_spatch:
-            mov bl, es:[bx+1234h]
-            mov [di], bl
-            inc di
-            loop l_snext
-        l_sdone:
-            mov ax, ss
-            mov ds, ax
-            pop bp
-            pop di
-            pop si
-        }
-    } else {
-        _asm {
-            push si
-            push di
-            push bp
-            lds si, src
-            mov ax, word ptr pix
-            mov word ptr cs:l_lpatch+3, ax
-            mov es, word ptr pix+2
-            mov di, word ptr table
-            mov dx, tv
-            mov cx, nn
-            mov al, 0BFh
-            mov ah, 0BFh
-            mov bp, tu
-            jmp l_lnext
-        l_lblank:
-            mov bx, 8000h
-            jmp l_lclear
-        l_lskip:
-            add si, 2
-        l_lclear:
-            mov byte ptr [di], 0
-            inc di
-            and bx, [si]
-            loopne l_lskip
-            jcxz l_ldone
-        l_lnext:
-            mov bx, [si]
-            add si, 2
-            add bx, bp
-            js l_lblank
-            and bh, al
-            mov bx, [bx]
-            add bx, dx
-            and bh, ah
-        l_lpatch:
-            mov bl, es:[bx+1234h]
-            mov [di], bl
-            inc di
-            loop l_lnext
-        l_ldone:
-            mov ax, ss
-            mov ds, ax
-            pop bp
-            pop di
-            pop si
-        }
-    }
+    PlanetPixels((unsigned char *)work, 0x84AC, (unsigned char *)src, (unsigned char *)table, nn,
+                 tu, tv, (unsigned char *)pix, 0xBF, 0xBF, o->small);
     UnlockMem(wh);
     UnlockMem(bh);
     ReleaseCache(bh);
@@ -330,27 +273,27 @@ int DrawPlanetLarge(Obj3D *o)
 }
 
 /* DrawPlanetLarge for slow machines: a 32x32 texture and two sizes. */
-int DrawPlanetSmall(Obj3D *o)
+int16_t DrawPlanetSmall(Obj3D *o)
 {
     Vec32 rel;
     Vec32 v;
     Matrix m;
-    int pitch;
-    int yaw;
-    int tu;
-    int tv;
-    char far *src;
-    int n;
-    int nn;
-    char far *work0;
-    char far *table;
-    char far *pix;
-    long dist;
+    int16_t pitch;
+    int16_t yaw;
+    int16_t tu;
+    int16_t tv;
+    char *src;
+    int16_t n;
+    int16_t nn;
+    char *work0;
+    char *table;
+    char *pix;
+    int32_t dist;
     MemHandle wh;
     MemHandle bh;
-    Bitmap far *bmp;
-    char far *work;
-    int len;
+    Bitmap *bmp;
+    char *work;
+    int16_t len;
 
     if (o->generated == 0)
         bh = CacheGet(o->name, "spl", 1, 1, 1);
@@ -398,10 +341,10 @@ int DrawPlanetSmall(Obj3D *o)
         o->size = o->radius / 3;
         n = 31;
     }
-    ((BitmapHdr far *)(work + 0x1074))->x = (n - 1) / 2;
-    ((BitmapHdr far *)(work + 0x1074))->y = (n - 1) / 2;
-    ((BitmapHdr far *)(work + 0x1074))->w = n;
-    ((BitmapHdr far *)(work + 0x1074))->h = n;
+    ((BitmapHdr *)(work + 0x1074))->x = (n - 1) / 2;
+    ((BitmapHdr *)(work + 0x1074))->y = (n - 1) / 2;
+    ((BitmapHdr *)(work + 0x1074))->w = n;
+    ((BitmapHdr *)(work + 0x1074))->h = n;
     nn = n * n;
     MemSet(&rel, 12, 0);
     Vec32Sub(&rel, &o->view);
@@ -412,66 +355,21 @@ int DrawPlanetSmall(Obj3D *o)
     pitch = FixASin(FixDiv(rel.y, o->scale));
     if (pitch < -128 || pitch > 128) {
         len = FixLength(rel.x, rel.z, 0);
-        pitch = FixACos(FixDiv((unsigned)len, o->scale));
+        pitch = FixACos(FixDiv((uint16_t)len, o->scale));
         if (rel.y < 0)
             pitch = -pitch;
     }
     MatIdentity(&o->rot);
     MatRotY(-yaw, &o->rot);
     MatRotX(pitch, &o->rot);
-    tu = (((long)pitch << 5) + 0x200) / 0x400;
-    tv = (((long)-yaw << 5) + 0x200) / 0x400;
+    tu = (((int32_t)pitch << 5) + 0x200) / 0x400;
+    tv = (((int32_t)-yaw << 5) + 0x200) / 0x400;
     tu &= 0x1F;
     tv &= 0x1F;
     tu = tu << 6;
     tv = tv << 5;
-    _asm {
-        push si
-        push di
-        push bp
-        lds si, src
-        mov ax, word ptr pix
-        mov word ptr cs:l_patch+3, ax
-        mov es, word ptr pix+2
-        mov di, word ptr table
-        mov dx, tv
-        mov cx, nn
-        mov al, 0F7h
-        mov ah, 0FBh
-        mov bp, tu
-        jmp l_next
-    l_blank:
-        mov bx, 8000h
-        jmp l_clear
-    l_skip:
-        add si, 2
-    l_clear:
-        mov byte ptr [di], 0
-        inc di
-        and bx, [si]
-        loopne l_skip
-        jcxz l_done
-    l_next:
-        mov bx, [si]
-        add si, 2
-        add bx, bp
-        js l_blank
-        and bh, al
-        mov bx, [bx]
-        add bx, dx
-        and bh, ah
-    l_patch:
-        mov bl, es:[bx+1234h]
-        mov [di], bl
-        inc di
-        loop l_next
-    l_done:
-        mov ax, ss
-        mov ds, ax
-        pop bp
-        pop di
-        pop si
-    }
+    PlanetPixels((unsigned char *)work, 0x143E, (unsigned char *)src, (unsigned char *)table, nn,
+                 tu, tv, (unsigned char *)pix, 0xF7, 0xFB, 0);
     UnlockMem(wh);
     UnlockMem(bh);
     ReleaseCache(bh);
@@ -480,9 +378,9 @@ int DrawPlanetSmall(Obj3D *o)
 
 void InitDummyPlanet(void)
 {
-    int unused[6];
+    int16_t unused[6];
 
-    MemSet(&dummy_planet, 0x1CE, 0);
+    MemSet(&dummy_planet, sizeof(dummy_planet), 0);
     MatIdentity(&dummy_planet.orient);
     dummy_planet.pos.x = 0;
     dummy_planet.pos.y = 0;
@@ -491,13 +389,13 @@ void InitDummyPlanet(void)
 }
 
 /* A planet with a fractal texture. */
-void CreatePlanet(Obj3D *o, char *name, int radius, int small, unsigned seed, int pal)
+void CreatePlanet(Obj3D *o, char *name, int16_t radius, int16_t small, uint16_t seed, int16_t pal)
 {
     InitPlanet(o, name, radius, small, 1, seed, pal);
 }
 
 /* A planet textured with name.spl / name.lpl. */
-void CreatePlanetBmp(Obj3D *o, char *name, int radius, int small)
+void CreatePlanetBmp(Obj3D *o, char *name, int16_t radius, int16_t small)
 {
     InitPlanet(o, name, radius, small, 0, 0, 0);
 }
@@ -505,8 +403,8 @@ void CreatePlanetBmp(Obj3D *o, char *name, int radius, int small)
 void RandomPlanet(Obj3D *o)
 {
     char name[10];
-    unsigned seed;
-    int pal;
+    uint16_t seed;
+    int16_t pal;
 
     srand(blink_count);
     seed = rand() % 1000;
@@ -515,7 +413,7 @@ void RandomPlanet(Obj3D *o)
     CreatePlanet(o, name, 500, 0, seed, pal);
 }
 
-void InitPlanet(Obj3D *o, char *name, int radius, int small, int gen, unsigned seed, int pal)
+void InitPlanet(Obj3D *o, char *name, int16_t radius, int16_t small, int16_t gen, uint16_t seed, int16_t pal)
 {
     o->visible = 1;
     o->draw = DrawPlanet;
@@ -532,7 +430,7 @@ void InitPlanet(Obj3D *o, char *name, int radius, int small, int gen, unsigned s
     o->reach = o->radius * 11;
 }
 
-int DrawPlanet(Obj3D *o)
+int16_t DrawPlanet(Obj3D *o)
 {
     if (small_planets)
         DrawPlanetSmall(o);
@@ -540,6 +438,7 @@ int DrawPlanet(Obj3D *o)
         small_planets = 1;
         DrawPlanetSmall(o);
     }
+    return 1;
 }
 
 void FreePlanet(Obj3D *o)
@@ -549,7 +448,7 @@ void FreePlanet(Obj3D *o)
 
 /* Make a size x size texture: a diamond-square fractal heightmap coloured
  * with palette pal. */
-void MakeFractal(int size, unsigned seed, unsigned pal)
+void MakeFractal(int16_t size, uint16_t seed, uint16_t pal)
 {
     srand(seed);
     if (pal >= 22)
@@ -557,7 +456,7 @@ void MakeFractal(int size, unsigned seed, unsigned pal)
     frac_pal = planet_pals[pal];
     frac_size2 = size * size;
     frac_bytes = frac_size2 * 2;
-    frac_map = (int far *)backbuf->data;
+    frac_map = (int16_t *)backbuf->data;
     fractal_handle = AllocMem(frac_size2 + 8, 1);
     if (fractal_handle == 0)
         return;
@@ -573,10 +472,10 @@ void MakeFractal(int size, unsigned seed, unsigned pal)
     UnlockMem(fractal_handle);
 }
 
-void FracSquare(int x0, int y0, int x1, int y1)
+void FracSquare(int16_t x0, int16_t y0, int16_t x1, int16_t y1)
 {
-    register int hx;
-    register int hy;
+    register int16_t hx;
+    register int16_t hy;
 
     hx = (x1 - x0) >> 1;
     hy = (y1 - y0) >> 1;
@@ -595,13 +494,13 @@ void FracSquare(int x0, int y0, int x1, int y1)
 
 /* Set the midpoint of (x0, y0)-(x1, y1) to the average of its ends plus a
  * random offset, and recurse on the halves. */
-void FracEdge(int x0, int y0, int x1, int y1)
+void FracEdge(int16_t x0, int16_t y0, int16_t x1, int16_t y1)
 {
-    register int hx;
-    register int hy;
-    int h;
-    int wx;
-    int wy;
+    register int16_t hx;
+    register int16_t hy;
+    int16_t h;
+    int16_t wx;
+    int16_t wy;
 
     hx = (x1 - x0) >> 1;
     hy = (y1 - y0) >> 1;
@@ -620,13 +519,13 @@ void FracEdge(int x0, int y0, int x1, int y1)
 /* Scale the heights to the 25 colours of the palette. */
 void FracColour(void)
 {
-    int n;
-    int v;
-    int far *p;
-    int max;
-    int min;
-    int range;
-    unsigned char far *out;
+    int16_t n;
+    int16_t v;
+    int16_t *p;
+    int16_t max;
+    int16_t min;
+    int16_t range;
+    unsigned char *out;
 
     max = -32768;
     min = 32767;

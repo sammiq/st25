@@ -1,59 +1,55 @@
 /* seg005: input events */
 
-#include <dos.h>
-#include <conio.h>
+#include "compat.h"
 #include "mem.h"
 #include "sprite.h"
 #include "sound.h"
 #include "event.h"
 
 /* Globals this file owns (declared in the headers). */
-int buttons;
-unsigned long ticks;
-int input_dev;
+int16_t buttons;
+uint32_t ticks;
+int16_t input_dev;
 
-void Fatal(char *fmt, ...);     /* fatal error */
-void MsgBox(char *title, char *msg, int a, int b, int c, int d);    /* seg008: message box */
-void QuitMenu(int a, int b);       /* seg019: quit dialog */
+void MsgBox(char *title, char *msg, int16_t a, int16_t b, int16_t c, int16_t d);    /* seg008: message box */
+void QuitMenu(int16_t a, int16_t b);       /* seg019: quit dialog */
 
 /* seg027: joystick */
-extern int joy_x;
-extern int joy_y;
-extern int joy_buttons;
-extern int joy_present;
+extern int16_t joy_x;
+extern int16_t joy_y;
+extern int16_t joy_buttons;
+extern int16_t joy_present;
 void JoyCalibrate(void);
 void JoyUpdate(void);
 
 extern Rect clip_rect;
-extern int sound_closed;
+extern int16_t sound_closed;
 Event *ev_write;
 Event *ev_read;
 Event ev_queue[EV_MAX];
 unsigned char move_pending;      /* an EV_MOVE is queued */
 unsigned char tick_pending;      /* an EV_TICK is queued */
 unsigned char mouse_present;
-unsigned long last_tick;
-int old_buttons;
-int key_code;
-int key_shift;
-int mouse_hires;                 /* the driver works in 640 wide coordinates */
-int key_b1;                      /* keypad + held: left button */
-int key_b2;                      /* keypad - held: right button */
-extern int kbd_mouse;                   /* keypad arrows jump the pointer */
-int arrow_key;                   /* keypad arrow held */
-int arrow_changed;
-int btn_key;
-int btn_changed;
-int shift_key;
+uint32_t last_tick;
+int16_t old_buttons;
+int16_t key_code;
+int16_t key_shift;
+int16_t key_b1;                      /* keypad + held: left button */
+int16_t key_b2;                      /* keypad - held: right button */
+extern int16_t kbd_mouse;                   /* keypad arrows jump the pointer */
+int16_t arrow_key;                   /* keypad arrow held */
+int16_t arrow_changed;
+int16_t btn_key;
+int16_t btn_changed;
+int16_t shift_key;
 
-int last_mx = 160;
-int last_my = 100;
-int joy_recal = 0;
-int key_accel = 1;                      /* held keypad arrows speed up */
-unsigned long key_tick0 = 0;
-long key_unused = 0;
-unsigned long last_key_tick = 0;
-void (_interrupt _far *old_kbd)(void) = 0;
+int16_t last_mx = 160;
+int16_t last_my = 100;
+int16_t joy_recal = 0;
+int16_t key_accel = 1;                      /* held keypad arrows speed up */
+uint32_t key_tick0 = 0;
+int32_t key_unused = 0;
+uint32_t last_key_tick = 0;
 
 void EventInit(void)
 {
@@ -125,7 +121,7 @@ void FlushEvents(void)
     tick_pending = move_pending = 0;
 }
 
-long GetTicks(void)
+int32_t GetTicks(void)
 {
     ReadClock();
     return ticks;
@@ -231,51 +227,11 @@ void PollKeys(void)
 
 void MouseInit(void)
 {
-    int ok;
-
-    ok = 0;
     if (input_dev == INPUT_MOUSE) {
-        _asm {
-            sub ax, ax
-            int 33h
-            cmp ax, 0FFFFh
-            jne l_none
-            mov ax, 7
-            mov cx, 0
-            mov dx, 27Fh
-            int 33h
-            mov ax, 8
-            mov cx, 0
-            mov dx, 0C7h
-            int 33h
-            mov ax, 4
-            mov cx, 27Fh
-            mov dx, 64h
-            int 33h
-            mov mouse_hires, 1
-            mov ax, 3
-            int 33h
-            cmp cx, 27Fh
-            je l_hires
-            cmp cx, 27Eh
-            je l_hires
-            dec mouse_hires
-        l_hires:
-            mov ax, 4
-            mov cx, 140h
-            mov dx, 64h
-            int 33h
-            mov ax, 1
-            jmp short l_done
-        l_none:
-            sub ax, ax
-        l_done:
-            mov ok, ax
-        }
-        if (ok == 0)
+        if (!plat_mouse_init())
             input_dev = INPUT_KEYS;
     } else if (input_dev == INPUT_JOY) {
-        joy_present = 1;
+        joy_present = plat_joy_present();
         JoyCalibrate();
         joy_x = 160;
         joy_y = 100;
@@ -286,20 +242,20 @@ void MouseInit(void)
 
 /* Read the pointer position and buttons from the keypad, mouse or
  * joystick. */
-int ReadPointer(void)
+int16_t ReadPointer(void)
 {
-    int keys;
+    int16_t keys;
 
     keys = (key_b1 ? 1 : 0) | (key_b2 ? 2 : 0);
     if (kbd_mouse) {
         /* the arrows jump to the middle or the edges of the view */
         if (arrow_key || TestAndClear(&arrow_changed)) {
-            int dx;
-            int dy;
-            int cx;
-            int cy;
-            int hw;
-            int hh;
+            int16_t dx;
+            int16_t dy;
+            int16_t cx;
+            int16_t cy;
+            int16_t hw;
+            int16_t hh;
 
             switch (arrow_key) {
             case 0x47:
@@ -348,14 +304,14 @@ int ReadPointer(void)
         /* the arrows move the pointer, faster the longer they are held */
         if (arrow_key && key_accel) {
             if (ticks != last_key_tick) {
-                unsigned step;
-                unsigned long saved;
+                uint16_t step;
+                uint32_t saved;
 
                 if (TestAndClear(&arrow_changed)) {
                     key_tick0 = ticks;
                     step = 1;
                 } else if (ticks <= key_tick0 + 64) {
-                    step = (unsigned)(ticks - key_tick0) / 4;
+                    step = (uint16_t)(ticks - key_tick0) / 4;
                     step = (step + 1) / 2 * step;
                 } else
                     step = 128;
@@ -385,11 +341,11 @@ int ReadPointer(void)
                     mouse_x += step, mouse_y += step;
                     break;
                 }
-                if ((int)mouse_x < 0)
+                if ((int16_t)mouse_x < 0)
                     mouse_x = 0;
                 else if (mouse_x > 319)
                     mouse_x = 319;
-                if ((int)mouse_y < 0)
+                if ((int16_t)mouse_y < 0)
                     mouse_y = 0;
                 else if (mouse_y > 199)
                     mouse_y = 199;
@@ -403,19 +359,12 @@ int ReadPointer(void)
         }
     }
     if (mouse_present) {
-        _asm {
-            mov ax, 3
-            int 33h
-            and bx, 3
-            cmp mouse_hires, 0
-            je l_lores
-            shr cx, 1
-        l_lores:
-            or bx, keys
-            mov buttons, bx
-            mov mouse_x, cx
-            mov mouse_y, dx
-        }
+        int x, y, b;
+
+        plat_mouse_read(&x, &y, &b);
+        buttons = (b & 3) | keys;
+        mouse_x = x;
+        mouse_y = y;
         return 1;
     }
     if (joy_present) {
@@ -425,47 +374,32 @@ int ReadPointer(void)
         mouse_y = joy_y;
         return 1;
     }
+    return 0;
 }
 
-void SetPointer(int x, int y)
+void SetPointer(int16_t x, int16_t y)
 {
     key_tick0 = ticks;
     if (mouse_present) {
-        _asm {
-            mov ax, 4
-            mov cx, x
-            cmp mouse_hires, 0
-            je l_lores
-            shl cx, 1
-        l_lores:
-            mov dx, y
-            int 33h
-        }
+        plat_mouse_set(x, y);
     } else if (joy_present) {
         joy_x = x;
         joy_y = y;
     }
 }
 
+/* The BIOS tick count.  Polling it is how the game's loops pass time, so
+ * this is where the host gets to run. */
 void ReadClock(void)
 {
-    _asm {
-        sub ax, ax
-        int 1Ah
-        mov word ptr ticks, dx
-        mov word ptr ticks+2, cx
-    }
+    plat_pump();
+    ticks = plat_ticks();
 }
 
-/* INT 9: track the keypad keys used as a pointer, then chain to the BIOS. */
-void _interrupt _far KbdISR(void)
+/* A raw key event (the original's INT 9 handler): track the keypad keys
+ * used as a pointer. */
+void KbdScan(int code, int up)
 {
-    int code;
-    int up;
-
-    code = inp(0x60);
-    up = code & 0x80;
-    code &= 0x7F;
     switch (code) {
     case 0x47:
     case 0x48:
@@ -504,80 +438,49 @@ void _interrupt _far KbdISR(void)
         key_b1 = !up;
         break;
     }
-    _chain_intr(old_kbd);
 }
 
 void HookKbd(void)
 {
-    if (old_kbd == 0) {
-        old_kbd = _dos_getvect(9);
-        _dos_setvect(9, KbdISR);
-    }
 }
 
 void UnhookKbd(void)
 {
-    if (old_kbd) {
-        _dos_setvect(9, old_kbd);
-        old_kbd = 0;
-    }
 }
 
-int TestAndClear(int *p)
+int16_t TestAndClear(int16_t *p)
 {
-    int v;
+    int16_t v;
 
-    _disable();
     v = *p;
     *p = 0;
-    _enable();
     return v;
 }
 
-int KeyReady(void)
+int16_t KeyReady(void)
 {
-    _asm {
-        mov ah, 1
-        int 16h
-        mov ax, 0
-        je l_none
-        inc ax
-    l_none:
-    }
+    return plat_key_ready();
 }
 
 void ReadKey(void)
 {
-    _asm {
-        mov ah, 2
-        int 16h
-        sub ah, ah
-        mov key_shift, ax
-        mov key_code, 0
-    l_next:
-        call KeyReady
-        je l_done
-        sub ax, ax
-        int 16h
-        or ax, ax
-        je l_next
-        mov key_code, ax
-    l_done:
+    key_shift = plat_key_shift();
+    key_code = 0;
+    while (plat_key_ready()) {
+        int c = plat_key_read();
+
+        if (c) {
+            key_code = c;
+            break;
+        }
     }
 }
 
+/* The pointer is drawn by the game; the host's is hidden. */
 void MouseShow(void)
 {
-    _asm {
-        mov ax, 1
-        int 33h
-    }
 }
 
 void MouseReset(void)
 {
-    _asm {
-        mov ax, 0
-        int 33h
-    }
 }

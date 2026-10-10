@@ -3,6 +3,8 @@
 #ifndef LIST_H
 #define LIST_H
 
+#include "compat.h"
+
 typedef struct Node {
     struct Node *next;      /* 00 */
     struct Node *prev;      /* 02 */
@@ -16,6 +18,6 @@ typedef struct List {
 void ListInit(List *l);
 void ListAdd(List *l, Node *n);
 void ListRemove(List *l, Node *n);
-int ListCount(List *l);
+int16_t ListCount(List *l);
 
 #endif

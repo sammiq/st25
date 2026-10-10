@@ -1,5 +1,6 @@
 /* seg007: video modes, palettes, fades, rectangles and text */
 
+#include "compat.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -9,296 +10,40 @@
 #include "resource.h"
 #include "sprite.h"
 #include "gfx.h"
+#include "event.h"
 
 /* Globals this file owns (declared in the headers). */
-int video_mode;
+int16_t video_mode;
 unsigned char cur_palette[768];
 unsigned char remap_table[256];
-int fade_level;
+int16_t fade_level;
 
-void Fatal(char *fmt, ...);     /* fatal error */
-
-unsigned char far *cur_glyph;
+unsigned char *cur_glyph;
 
 MemHandle font_handle = 0;
-unsigned char far *font_data = 0;
-int cur_remap_id = -1;
-/* EGA palette register lists (16 colours and the border) for 4 fade steps */
-unsigned char ega_fade[4][18] = {
-    { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
-    { 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 0 },
-    { 0, 1, 2, 3, 4, 5, 6, 0x10, 0, 1, 2, 3, 4, 5, 6, 7, 0 },
-    { 0, 1, 2, 3, 4, 5, 6, 7, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0 }
-};
-
-/* Tandy: set the 16 palette registers (and the border) for a brightness. */
-void SetTandyLevel(int level)
-{
-    char lo;
-    char hi;
-
-    if (level <= 24) {
-        lo = 0, hi = 0;
-    } else if (level <= 49) {
-        lo = 0, hi = 7;
-    } else if (level <= 74) {
-        lo = 7, hi = 7;
-    } else {
-        lo = 7, hi = 15;
-    }
-    _asm {
-        push si
-        push di
-        push bp
-        mov cx, 10h
-        xor bh, bh
-        xor bl, bl
-        mov di, 2
-        call l_set
-    l_next:
-        mov di, 10h
-        call l_set
-        inc bl
-        inc bh
-        loop l_next
-        jmp l_done
-    l_set:
-        mov dx, 3DAh
-        cli
-    l_wait:
-        in al, dx
-        and al, 8
-        je l_wait
-        mov al, bl
-        cbw
-        add ax, di
-        out dx, al
-        mov al, bh
-        test al, 8
-        je l_low
-        and al, hi
-        jmp l_out
-    l_low:
-        and al, lo
-    l_out:
-        mov dx, 3DEh
-        out dx, al
-        mov dx, 3DAh
-        xor ax, ax
-        out dx, al
-        sti
-        _emit 0C3h
-    l_done:
-        pop bp
-        pop di
-        pop si
-    }
-}
-
-/* Tandy 1000 320x200 16 colour mode, programmed from CGA mode 4. */
-void InitTandyMode(void)
-{
-    _asm {
-        push si
-        push di
-        push bp
-        mov ax, 4
-        int 10h
-        mov dx, 3D4h
-        mov ax, 7100h
-        call l_crtc
-        mov ax, 5001h
-        call l_crtc
-        mov ax, 5A02h
-        call l_crtc
-        mov ax, 0E03h
-        call l_crtc
-        mov ax, 0FF04h
-        call l_crtc
-        mov ax, 605h
-        call l_crtc
-        mov ax, 0C806h
-        call l_crtc
-        mov ax, 0E207h
-        call l_crtc
-        mov ax, 9
-        call l_crtc
-        mov ax, 0Ch
-        call l_crtc
-        mov ax, 1810h
-        call l_crtc
-        mov ax, 4612h
-        call l_crtc
-        mov dx, 3D8h
-        mov al, 1Bh
-        out dx, al
-        mov dx, 3D9h
-        mov al, 0
-        out dx, al
-        mov dx, 3DDh
-        mov al, 0
-        out dx, al
-        mov dx, 3DFh
-        mov al, 24h
-        out dx, al
-        mov dx, 3DAh
-        mov al, 1
-        out dx, al
-        mov dx, 3DEh
-        mov al, 0Fh
-        out dx, al
-        mov dx, 3DAh
-        mov al, 2
-        out dx, al
-        mov dx, 3DEh
-        mov al, 0
-        out dx, al
-        mov dx, 3DAh
-        mov al, 3
-        out dx, al
-        mov dx, 3DEh
-        mov al, 10h
-        out dx, al
-        mov dx, 3DAh
-        mov al, 5
-        out dx, al
-        mov dx, 3DEh
-        mov al, 1
-        out dx, al
-        mov dx, 3DAh
-        mov al, 8
-        out dx, al
-        mov dx, 3DEh
-        mov al, 2
-        out dx, al
-        jmp l_done
-    l_crtc:
-        out dx, al
-        mov al, ah
-        inc dx
-        out dx, al
-        dec dx
-        _emit 0C3h
-    l_done:
-        pop bp
-        pop di
-        pop si
-    }
-    SetTandyLevel(100);
-    MemSet((void far *)0xA0000000L, 0xFA00, 0);
-}
-
-/* Detect the display (VGA, EGA or Tandy) on the first call and set the
- * graphics mode. */
+unsigned char *font_data = 0;
+int16_t cur_remap_id = -1;
+/* The display is VGA mode 13h, always: the original's EGA and Tandy modes
+ * are gone.  video_mode keeps its place for the code that checks it. */
 void InitVideo(void)
 {
-    int mode;
-
-    if (video_mode == -1) {
-        _asm {
-            mov video_mode, VIDEO_VGA
-            mov ax, 1A00h
-            int 10h
-            cmp al, 1Ah
-            je l_found
-            mov video_mode, VIDEO_EGA
-            mov ax, 1200h
-            mov bl, 10h
-            int 10h
-            cmp bl, 10h
-            jne l_found
-            mov video_mode, VIDEO_TANDY
-        l_found:
-        }
-    }
-    switch (video_mode) {
-    case VIDEO_VGA:
-        mode = 0x13;
-        break;
-    case VIDEO_EGA:
-        mode = 0x0E;
-        break;
-    case VIDEO_TANDY:
-        InitTandyMode();
-        return;
-    default:
-        Fatal("Unsupport display type");
-    }
-    _asm {
-        push bp
-        push si
-        push di
-        mov ax, mode
-        int 10h
-        pop di
-        pop si
-        pop bp
-    }
+    video_mode = VIDEO_VGA;
+    memset(plat_vram(), 0, VGA_W * VGA_H);
 }
 
 void TextMode(void)
 {
-    _asm {
-        push bp
-        push si
-        push di
-        mov ax, 3
-        int 10h
-        pop di
-        pop si
-        pop bp
-    }
 }
 
-void SetPalette(unsigned char far *pal)
+/* Set all 256 DAC registers from 768 bytes of 6 bit components. */
+void SetPalette(unsigned char *pal)
 {
-    switch (video_mode) {
-    case VIDEO_VGA:
-        _asm {
-            mov ax, 1012h
-            mov bx, 0
-            mov cx, 100h
-            les dx, pal
-            int 10h
-        }
-        break;
-    case VIDEO_EGA:
-    case VIDEO_TANDY:
-        MatchPalette(pal, 0, 256);
-        break;
-    }
+    plat_set_palette(0, 256, pal);
 }
 
-void SetPaletteRange(unsigned char far *pal, int first, int count)
+void SetPaletteRange(unsigned char *pal, int16_t first, int16_t count)
 {
-    switch (video_mode) {
-    case VIDEO_VGA:
-        _asm {
-            mov dx, 3C8h
-            mov al, byte ptr first
-            out dx, al
-            push ds
-            push si
-            lds si, pal
-            mov cx, count
-            inc dx
-        l_next:
-            lodsb
-            out dx, al
-            lodsb
-            out dx, al
-            lodsb
-            out dx, al
-            loop l_next
-            pop si
-            pop ds
-        }
-        break;
-    case VIDEO_EGA:
-    case VIDEO_TANDY:
-        MatchPalette(pal, first, count);
-        break;
-    }
+    plat_set_palette(first, count, pal);
 }
 
 /* Load name.pal and its shading table name.lut. */
@@ -306,26 +51,15 @@ void LoadPalette(char *name)
 {
     LoadFilePacked(name, "pal", cur_palette);
     LoadFilePacked(name, "lut", shade_table);
-    switch (video_mode) {
-    case VIDEO_EGA:
-    case VIDEO_TANDY:
-        if (strcmpi(name, "bridge") == 0 || strcmpi(name, "palette") == 0)
-            LoadRemap(name);
-        else
-            MatchPalette(cur_palette, 0, 256);
-        break;
-    case VIDEO_VGA:
-        break;
-    }
 }
 
-void CopyRect(Bitmap far *dst, int x, int y, Bitmap far *src, int sx, int sy, int w, int h)
+void CopyRect(Bitmap *dst, int16_t x, int16_t y, Bitmap *src, int16_t sx, int16_t sy, int16_t w, int16_t h)
 {
-    char far *d;
-    char far *s;
-    int unused;
-    int dskip;
-    int sskip;
+    char *d;
+    char *s;
+    int16_t unused;
+    int16_t dskip;
+    int16_t sskip;
 
     d = dst->data;
     d += y * dst->w + x;
@@ -341,13 +75,13 @@ void CopyRect(Bitmap far *dst, int x, int y, Bitmap far *src, int sx, int sy, in
 }
 
 /* CopyRect skipping 0 pixels. */
-void CopyRectNZ(Bitmap far *dst, int x, int y, Bitmap far *src, int sx, int sy, int w, int h)
+void CopyRectNZ(Bitmap *dst, int16_t x, int16_t y, Bitmap *src, int16_t sx, int16_t sy, int16_t w, int16_t h)
 {
-    char far *d;
-    char far *s;
-    int unused;
-    int dskip;
-    int sskip;
+    char *d;
+    char *s;
+    int16_t unused;
+    int16_t dskip;
+    int16_t sskip;
 
     d = dst->data;
     d += y * dst->w + x;
@@ -364,15 +98,16 @@ void CopyRectNZ(Bitmap far *dst, int x, int y, Bitmap far *src, int sx, int sy, 
 
 /* CopyRect through the colour table cloak<remap>.lut; runs of 0 are copied
  * as 0. */
-void CopyRectRemap(Bitmap far *dst, int x, int y, Bitmap far *src, int sx, int sy, int w, int h,
-                   int remap)
+void CopyRectRemap(Bitmap *dst, int16_t x, int16_t y, Bitmap *src, int16_t sx, int16_t sy, int16_t w, int16_t h,
+                   int16_t remap)
 {
-    char far *d;
-    char far *s;
-    int unused;
-    int dskip;
-    int sskip;
+    char *d;
+    char *s;
+    int16_t unused;
+    int16_t dskip;
+    int16_t sskip;
     char name[10];
+    int16_t i;
 
     if (w == 0 || h == 0)
         return;
@@ -387,95 +122,12 @@ void CopyRectRemap(Bitmap far *dst, int x, int y, Bitmap far *src, int sx, int s
         LoadFilePacked(name, "lut", remap_table);
         cur_remap_id = remap;
     }
-    _asm {
-        push si
-        push di
-        push ds
-        lds si, s
-        les di, s
-        sub ax, ax
-        mov bx, offset remap_table
-    l_row:
-        mov cx, w
-        cmp [si], al
-        jne l_solid
-    l_zero:
-        repe scasb
-        je l_zero_end
-        dec di
-        inc cx
-        mov dx, di
-        sub dx, si
-        xchg cx, dx
-        mov si, di
-        les di, d
-        rep stosb
-        mov cx, dx
-        mov word ptr d, di
-        mov es, word ptr s+2
-        mov di, si
-    l_solid:
-        repne scasb
-        jne l_solid_end
-        dec di
-        inc cx
-        mov dx, di
-        sub dx, si
-        xchg cx, dx
-        les di, d
-    l_copy:
-        lodsb
-        _emit 36h
-        xlat [bx]
-        stosb
-        loop l_copy
-        sub ax, ax
-        mov cx, dx
-        mov word ptr d, di
-        mov es, word ptr s+2
-        mov di, si
-        jmp l_zero
-    l_zero_end:
-        mov cx, di
-        sub cx, si
-        mov si, di
-        les di, d
-        rep stosb
-        add si, sskip
-        add di, dskip
-        mov word ptr d, di
-        mov es, word ptr s+2
-        mov di, si
-        dec h
-        jne l_row
-        jmp l_done
-    l_solid_end:
-        mov cx, di
-        sub cx, si
-        les di, d
-    l_copy2:
-        lodsb
-        _emit 36h
-        xlat [bx]
-        stosb
-        loop l_copy2
-        sub ax, ax
-        add si, sskip
-        add di, dskip
-        mov word ptr d, di
-        mov es, word ptr s+2
-        mov di, si
-        dec h
-        je l_done
-        jmp l_row
-    l_done:
-        pop ds
-        pop di
-        pop si
-    }
+    for (; h != 0; h--, s += sskip, d += dskip)
+        for (i = w; i != 0; i--, s++, d++)
+            *d = *s ? remap_table[(unsigned char)*s] : 0;
 }
 
-int PointInRect(Rect *r, int x, int y)
+int16_t PointInRect(Rect *r, int16_t x, int16_t y)
 {
     if (r->x0 > x || r->x1 < x || r->y0 > y || r->y1 < y)
         return 0;
@@ -483,7 +135,7 @@ int PointInRect(Rect *r, int x, int y)
 }
 
 /* out = a & b; 0 if they don't overlap. */
-int ClipRect(Rect *out, Rect *a, Rect *b)
+int16_t ClipRect(Rect *out, Rect *a, Rect *b)
 {
     if (a->x0 > b->x1 || a->x1 < b->x0 || a->y0 > b->y1 || a->y1 < b->y0)
         return 0;
@@ -508,10 +160,10 @@ void UnionRect(Rect *out, Rect *a, Rect *b)
 /* Copy the first line of src into dst, breaking at a newline or the last
  * space within width characters. Returns where the next line starts, or 0
  * at the end of the text. */
-char *WrapLine(char *src, char *dst, int width)
+char *WrapLine(char *src, char *dst, int16_t width)
 {
-    int i;
-    int brk_i;
+    int16_t i;
+    int16_t brk_i;
     char *brk_src;
     char *brk_dst;
 
@@ -554,14 +206,14 @@ char *WrapLine(char *src, char *dst, int width)
     return src + 1;
 }
 
-void SetGlyph(int c)
+void SetGlyph(int16_t c)
 {
     cur_glyph = font_data + c * 64;
 }
 
-void BlitRows(char far *src, int sskip, char far *dst, int dskip, int w, int h)
+void BlitRows(char *src, int16_t sskip, char *dst, int16_t dskip, int16_t w, int16_t h)
 {
-    int unused;
+    int16_t unused;
 
     sskip += w;
     dskip += w;
@@ -572,46 +224,47 @@ void BlitRows(char far *src, int sskip, char far *dst, int dskip, int w, int h)
     }
 }
 
-int DrawString(char *s, int x, int y, Bitmap far *bmp)
+int16_t DrawString(char *s, int16_t x, int16_t y, Bitmap *bmp)
 {
-    int len;
+    int16_t len;
 
     if (s == 0)
         return 0;
     len = strlen(s);
     DrawText(s, len, x, y, bmp);
+    return len;
 }
 
 /* Draw len characters of s with the 8x8 font at (x, y) in bmp. */
-void DrawText(char *s, int len, int x, int y, Bitmap far *bmp)
+void DrawText(char *s, int16_t len, int16_t x, int16_t y, Bitmap *bmp)
 {
-    int x0;
-    int x1;
-    int y0;
-    int y1;
-    int bx0;
-    int bx1;
-    int by0;
-    int by1;
-    int cx0;
-    int dx;
-    int cx1;
-    int unused1;
-    int cy0;
-    int cy1;
-    int dy;
-    int unused2;
-    int w;
-    int h;
-    int i;
-    int cw;
-    int ch;
-    int sskip;
-    int dskip;
-    int soff;
-    int doff;
-    char far *src;
-    char far *dst;
+    int16_t x0;
+    int16_t x1;
+    int16_t y0;
+    int16_t y1;
+    int16_t bx0;
+    int16_t bx1;
+    int16_t by0;
+    int16_t by1;
+    int16_t cx0;
+    int16_t dx;
+    int16_t cx1;
+    int16_t unused1;
+    int16_t cy0;
+    int16_t cy1;
+    int16_t dy;
+    int16_t unused2;
+    int16_t w;
+    int16_t h;
+    int16_t i;
+    int16_t cw;
+    int16_t ch;
+    int16_t sskip;
+    int16_t dskip;
+    int16_t soff;
+    int16_t doff;
+    char *src;
+    char *dst;
 
     cw = 8;
     ch = 8;
@@ -648,7 +301,7 @@ void DrawText(char *s, int len, int x, int y, Bitmap far *bmp)
             w = cx1 - cx0 + 1;
             h = cy1 - cy0 + 1;
             soff = cy0 * cw + cx0;
-            doff = dx + (long)dy * (bx1 - bx0 + 1);
+            doff = dx + (int32_t)dy * (bx1 - bx0 + 1);
             sskip = cw - w;
             dskip = bx1 - bx0 + 1 - w;
             src = cur_glyph + soff;
@@ -676,7 +329,7 @@ void VideoNop(void)
 
 void FadeIn(void)
 {
-    unsigned long t;
+    uint32_t t;
 
     while (fade_level <= 100) {
         t = GetTicks() + 1;
@@ -690,7 +343,7 @@ void FadeIn(void)
 
 void FadeOut(void)
 {
-    unsigned long t;
+    uint32_t t;
 
     while (fade_level >= 0) {
         t = GetTicks() + 1;
@@ -703,106 +356,16 @@ void FadeOut(void)
 }
 
 /* Show pal at level percent brightness. */
-void SetFade(unsigned char far *pal, int level)
+void SetFade(unsigned char *pal, int16_t level)
 {
-    unsigned char far *p;
-    int lv;
-    int scale;
+    uint16_t scale;
     unsigned char buf[768];
+    int16_t i;
 
-    switch (video_mode) {
-    case VIDEO_EGA:
-        if (level <= 24)
-            p = ega_fade[0];
-        else if (level <= 49)
-            p = ega_fade[1];
-        else if (level <= 74)
-            p = ega_fade[2];
-        else
-            p = ega_fade[3];
-        _asm {
-            mov ax, 1002h
-            les dx, p
-            push bp
-            push si
-            push di
-            int 10h
-            pop di
-            pop si
-            pop bp
-        }
-        break;
-    case VIDEO_TANDY:
-        SetTandyLevel(level);
-        break;
-    case VIDEO_VGA:
-        lv = level;
-        _asm {
-            mov ah, byte ptr lv
-            xor al, al
-            mov dx, 0
-            mov cx, 64h
-            div cx
-            mov scale, ax
-            les si, pal
-            lea di, buf
-            mov bx, 300h
-        l_scale:
-            xor ah, ah
-            mov al, es:[si]
-            mov cx, scale
-            mul cx
-            mov [di], ah
-            inc si
-            inc di
-            dec bx
-            jne l_scale
-        l_wait1:
-            mov dx, 3DAh
-            in al, dx
-            test al, 8
-            jne l_wait1
-        l_wait2:
-            in al, dx
-            test al, 8
-            je l_wait2
-            mov dx, 3C8h
-            mov al, 0
-            out dx, al
-            mov dx, 3C9h
-            lea si, buf
-            mov cx, 180h
-        l_out1:
-            mov al, [si]
-            out dx, al
-            inc si
-            dec cx
-            jne l_out1
-        l_wait3:
-            mov dx, 3DAh
-            in al, dx
-            test al, 8
-            jne l_wait3
-        l_wait4:
-            in al, dx
-            test al, 8
-            je l_wait4
-            mov dx, 3C8h
-            mov al, 80h
-            out dx, al
-            mov dx, 3C9h
-            lea si, buf
-            add si, 180h
-            mov cx, 180h
-        l_out2:
-            mov al, [si]
-            out dx, al
-            inc si
-            dec cx
-            jne l_out2
-        }
-        break;
-    }
+    scale = ((uint16_t)level << 8) / 100;
+    for (i = 0; i < 768; i++)
+        buf[i] = (unsigned char)(((uint16_t)pal[i] * scale) >> 8);
+    plat_set_palette(0, 256, buf);
 }
 
 void FadeUp(void)

@@ -1,6 +1,7 @@
 /* seg030: the bridge script for the second mission, "Hijacked" (the Elasi
  * pirates and the USS Masada) */
 
+#include "compat.h"
 #include <string.h>
 #include <stdio.h>
 #include "mem.h"
@@ -19,10 +20,10 @@ typedef struct Msg {
 } Msg;
 
 /* seg001 */
-void BridgeSfx(int n);
+void BridgeSfx(int16_t n);
 void BridgeMsg(void);
 Msg *PeekMsg(void);
-char *GetText(int n);
+char *GetText(int16_t n);
 void FreeText(char *p);
 void SetTextFile(char *name);
 void CutScene(char *name, char *voc);
@@ -30,21 +31,21 @@ void HailShow(char *name);
 void HailRestart(void);
 void HailEnd(void);
 void HailSay(char *name, char *title, char *text);
-void Orbit(int arrive, int say);
-void Debrief(int n, int msg, int score, int max);
-void ShuttleFlyby(int kind);
+void Orbit(int16_t arrive, int16_t say);
+void Debrief(int16_t n, int16_t msg, int16_t score, int16_t max);
+void ShuttleFlyby(int16_t kind);
 void ShuttleEnd(void);
 void ClearMsgs(void);
-char *GetChoice(int n, int *list, int x);
+char *GetChoice(int16_t n, int16_t *list, char *x);
 /* seg002 */
 char *InputCode(void);
 /* seg008 */
-void MsgBox(char *title, char *text, int x, int y, int color, int msg);
-long TextBox(char *(far *fn)(), int *arg, int x, int y, int color, int choice, int maxl,
-             int flag);
+void MsgBox(char *title, char *text, int16_t x, int16_t y, int16_t color, int16_t msg);
+int32_t TextBox(void *fn, void *arg, int16_t x, int16_t y, int16_t color, int16_t choice, int16_t maxl,
+             int16_t flag);
 /* seg000 */
-int StartAnim(int n, char *name, int x, int y, int scale);
-void EndAnim(int n);
+int16_t StartAnim(int16_t n, char *name, int16_t x, int16_t y, int16_t scale);
+void EndAnim(int16_t n);
 /* seg020 */
 void BoostEnd(void);
 void InitShips(char *name);
@@ -74,37 +75,37 @@ void MissionCalledOff(void);
 void ElasiTalk(void);
 
 extern char *crew_names[8];
-extern int word_45AA2;
-extern int in_orbit;
-extern int under_attack;
-extern void (far *bridge_tick)(void);
-extern int word_45AB2;
-extern int word_45AB4;
-extern int msg_head;
-extern int word_50CA6;
-extern int word_51156;
+extern int16_t word_45AA2;
+extern int16_t in_orbit;
+extern int16_t under_attack;
+extern void (*bridge_tick)(void);
+extern int16_t word_45AB2;
+extern int16_t word_45AB4;
+extern int16_t msg_head;
+extern int16_t word_50CA6;
+extern int16_t word_51156;
 extern Obj3D ships[4];
-extern unsigned long bridge_ticks;
-extern int mission_vars[6];
-extern void (far *saved_tick)(void);
-extern int word_52C1E;
+extern uint32_t bridge_ticks;
+extern int16_t mission_vars[6];
+extern void (*saved_tick)(void);
+extern int16_t word_52C1E;
 extern char mission[16];
 Sprite flash_sprite;
 
 char elasi_cereth[] = "Elasi Cereth";
 char elasi_captain[] = "Elasi Captain";
 char admiral[] = "Admiral";
-int talk_choices1[] = { 0x12, 0x13, -1 };
-int talk_choices2[] = { 0x30, 0x31, -1 };
-int talk_choices3[] = { 0x37, 0x38, 0x39, -1 };
-int talk_choices4[] = { 0x3D, 0x3E, -1 };
-int talk_choices5[] = { 0x42, 0x43, 0x44, -1 };
+int16_t talk_choices1[] = { 0x12, 0x13, -1 };
+int16_t talk_choices2[] = { 0x30, 0x31, -1 };
+int16_t talk_choices3[] = { 0x37, 0x38, 0x39, -1 };
+int16_t talk_choices4[] = { 0x3D, 0x3E, -1 };
+int16_t talk_choices5[] = { 0x42, 0x43, 0x44, -1 };
 
 /* Arriving: the fly-by and Starfleet's orders. */
 void TugArrive(void)
 {
     Msg m;
-    int k;
+    int16_t k;
 
     word_45AB4 = 14;
     m = *PeekMsg();
@@ -164,9 +165,9 @@ void TugArrive(void)
 void TugPirates(void)
 {
     Msg m;
-    int k;
+    int16_t k;
     ShipPart *p;
-    int i;
+    int16_t i;
 
     m = *PeekMsg();
     if (m.type == 0) {
@@ -227,7 +228,7 @@ void TugPirates(void)
 void TugDisabled(void)
 {
     Msg m;
-    int unused;
+    int16_t unused;
 
     m = *PeekMsg();
     switch (m.type) {
@@ -261,7 +262,7 @@ void TugDisabled(void)
 void TugOrbit(void)
 {
     Msg m;
-    int k;
+    int16_t k;
 
     m = *PeekMsg();
     if (m.type == 0) {
@@ -276,7 +277,7 @@ void TugOrbit(void)
     case 1:
         switch (m.arg) {
         case 0x40: {
-            int choice;
+            int16_t choice;
 
             choice = 0;
             msg_head = (msg_head + 1) % 16;
@@ -483,8 +484,8 @@ void MissionCalledOff(void)
 /* The talk with Elasi Cereth. */
 void ElasiTalk(void)
 {
-    int unused;
-    int r;
+    int16_t unused;
+    int16_t r;
 
     r = 0;
     HailShow("pira");
@@ -579,9 +580,9 @@ end:
 
 /* Show bitmap name over everything at layer z (5 if out of range) for a
  * few ticks. */
-void FlashBitmap(char *name, int z)
+void FlashBitmap(char *name, int16_t z)
 {
-    unsigned long t;
+    uint32_t t;
 
     if (z < 0 || z > 15)
         z = 5;

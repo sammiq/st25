@@ -1,53 +1,53 @@
 /* seg024: bitmap scaling with generated code */
 
+#include "compat.h"
 #include <stdlib.h>
 #include "mem.h"
 #include "bitmap.h"
 
 /* Globals this file owns (declared in the headers). */
-char scale_code[0x502];
+uint16_t scale_idx[SCALE_MAX_W];
+int16_t scale_count;
 char scale_row[0x140];
 
-void Fatal(char *fmt, ...);     /* fatal error */
-
 /* Scale a bitmap by scale/256, returning a new bitmap. */
-MemHandle ScaleBitmap(MemHandle handle, int scale)
+MemHandle ScaleBitmap(MemHandle handle, int16_t scale)
 {
-    int unused1[12];
-    char far *srcrow;
-    char far *dstrow;
-    long unused2;
-    int srcw;
-    int srch;
-    int w;
-    int h;
-    int err;
-    int inc1;
-    int inc2;
-    int y;
+    int16_t unused1[12];
+    char *srcrow;
+    char *dstrow;
+    int32_t unused2;
+    int16_t srcw;
+    int16_t srch;
+    int16_t w;
+    int16_t h;
+    int16_t err;
+    int16_t inc1;
+    int16_t inc2;
+    int16_t y;
     char drawn;
-    Bitmap far *src;
+    Bitmap *src;
     MemHandle nh;
-    Bitmap far *dst;
+    Bitmap *dst;
 
     src = LockMem(handle);
-    w = ((long)src->w * scale) >> 8;
-    h = ((long)src->h * scale) >> 8;
+    w = ((int32_t)src->w * scale) >> 8;
+    h = ((int32_t)src->h * scale) >> 8;
     UnlockMem(handle);
     w = max(1, w);
     h = max(1, h);
     nh = AllocMemAbort(w * h + 8, 0);
     src = LockMem(handle);
     dst = LockMem(nh);
-    dst->x = ((long)src->x * scale) >> 8;
-    dst->y = ((long)src->y * scale) >> 8;
+    dst->x = ((int32_t)src->x * scale) >> 8;
+    dst->y = ((int32_t)src->y * scale) >> 8;
     dst->w = w;
     dst->h = h;
     srcw = src->w;
     srch = src->h;
     srcrow = src->data;
     dstrow = dst->data;
-    BuildScaler(scale_code, w, srcw);
+    scale_count = BuildScaler(scale_idx, w, srcw);
     --srch;
     --h;
     if (scale <= 0x100) {
@@ -60,7 +60,7 @@ MemHandle ScaleBitmap(MemHandle handle, int scale)
                 err += inc1;
             else {
                 err += inc2;
-                RunScaler(scale_row, srcrow, scale_code);
+                RunScaler(scale_row, srcrow, scale_idx, scale_count);
                 MemCpy(dstrow, scale_row, w);
                 dstrow += w;
             }
@@ -75,7 +75,7 @@ MemHandle ScaleBitmap(MemHandle handle, int scale)
         srcw = src->w;
         for (y = 0; y <= h; y++) {
             if (!drawn) {
-                RunScaler(scale_row, srcrow, scale_code);
+                RunScaler(scale_row, srcrow, scale_idx, scale_count);
                 drawn = 1;
             }
             MemCpy(dstrow, scale_row, w);
@@ -94,108 +94,60 @@ MemHandle ScaleBitmap(MemHandle handle, int scale)
     return nh;
 }
 
-/* Generate code that scales a row of sw pixels to dw pixels: unrolled
- * movsb / mov al,[si]; stosb / inc si / add si,n, ending in retf. */
-void BuildScaler(register char *p, int dw, int sw)
+/* Work out how to scale a row of sw pixels to dw: idx[i] is the source
+ * pixel of destination pixel i (a Bresenham step).  The original generated
+ * machine code for this; returns the number of destination pixels. */
+int16_t BuildScaler(uint16_t *idx, int16_t dw, int16_t sw)
 {
-    int err;
-    int inc1;
-    int inc2;
-    int count;
-    int i;
-    register int n;
-    int pending;
-    char *start;
+    int16_t err;
+    int16_t inc1;
+    int16_t inc2;
+    int16_t count;
+    int16_t i;
+    int16_t n;
 
-    start = p;
+    n = 0;
+    if (dw > SCALE_MAX_W)
+        Fatal("too many inst %d.\n", dw);
     if (sw >= dw) {
         err = dw * 2 - sw;
         inc1 = dw * 2;
         inc2 = (dw - sw) * 2;
-        pending = n = 0;
-        i = 0;
-        for (count = sw; count--; i++) {
+        for (i = 0; i < sw; i++) {
             if (err < 0)
                 err += inc1;
             else {
                 err += inc2;
-                if (n != 0) {
-                    if (pending) {
-                        p[-3] = 0xA4;           /* movsb */
-                        p -= 2;
-                        pending = 0;
-                        --n;
-                    }
-                    if (n > 2) {
-                        *p++ = 0x83;            /* add si, n */
-                        *p++ = 0xC6;
-                        *p++ = n;
-                    } else {
-                        while (n--)
-                            *p++ = 0x46;        /* inc si */
-                    }
-                    n = 0;
-                }
-                *p++ = 0x8A;                    /* mov al, [si] */
-                *p++ = 0x04;
-                *p++ = 0xAA;                    /* stosb */
-                pending = 1;
+                if (n < SCALE_MAX_W)
+                    idx[n++] = i;
             }
-            ++n;
         }
-        *p++ = 0xCB;                            /* retf */
     } else {
+        int16_t src = 0;
+
         err = (sw - 1) * 2 - (dw - 1);
         inc1 = (sw - 1) * 2;
         inc2 = ((sw - 1) - (dw - 1)) * 2;
-        n = 0;
-        i = 0;
-        for (count = dw; count--; i++) {
-            if (n != 0) {
-                if (n > 2) {
-                    *p++ = 0x83;                /* add si, n */
-                    *p++ = 0xC6;
-                    *p++ = n;
-                } else {
-                    while (n--)
-                        *p++ = 0x46;            /* inc si */
-                }
-                n = 0;
-            }
-            *p++ = 0x8A;                        /* mov al, [si] */
-            *p++ = 0x04;
-            *p++ = 0xAA;                        /* stosb */
+        for (count = dw; count--; ) {
+            idx[n++] = src;
             if (err < 0)
                 err += inc1;
             else {
                 err += inc2;
-                ++n;
+                ++src;
             }
         }
-        *p++ = 0xCB;                            /* retf */
     }
-    if (p > start + SCALE_CODE_MAX)
-        Fatal("too many inst %d.\n", p - start);
+    return n;
 }
 
-/* Call the generated code with es:di = dst, ds:si = src. */
-void RunScaler(void far *dst, void far *src, char *code)
+/* Scale a row with the table BuildScaler made. */
+void RunScaler(void *dst, void *src, uint16_t *idx, int16_t count)
 {
-    _asm {
-        push si
-        push di
-        push ds
-        push cs
-        mov ax, offset back
-        push ax
-        push ds
-        push code
-        les di, dst
-        lds si, src
-        retf
-    back:
-        pop ds
-        pop di
-        pop si
-    }
+    unsigned char *d = dst;
+    unsigned char *s = src;
+    int16_t i;
+
+    for (i = 0; i < count; i++)
+        d[i] = s[idx[i]];
 }

@@ -1,5 +1,6 @@
 /* seg017: the intro (logo, title flyby and credits) */
 
+#include "compat.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include "mem.h"
@@ -11,25 +12,21 @@
 #include "resource.h"
 #include "fixmath.h"
 #include "obj3d.h"
-#define SpriteAddRect SpriteAddRect_
 #include "sprite.h"
-#undef SpriteAddRect
 
-/* Called here with the rectangle passed whole. */
-void SpriteAddRect(Sprite *s, MemHandle h, Rect r);
 
 void ClearScreen(void);               /* seg001 */
 
 /* seg006 */
 void CamReset(void);
-void SetView(int x0, int y0, int x1, int y1, int fov);
+void SetView(int16_t x0, int16_t y0, int16_t x1, int16_t y1, int16_t fov);
 void AddR3(Obj3D *o);
 void DelR3(Obj3D *o);
-void RenderR3(int statics);
+void RenderR3(int16_t statics);
 
 extern Rect clip_rect;
-extern Bitmap far *screen;
-extern long proj_dist;
+extern Bitmap *screen;
+extern int32_t proj_dist;
 extern Vec32 cam_pos;
 extern Obj3D player_ship;
 extern Sprite view_sprite;
@@ -42,8 +39,8 @@ extern unsigned char byte_45B3C[];
 char intro_titles = 0;              /* show the title text bitmaps */
 
 void Intro(void);
-void PlaceObj(Obj3D *o, int a0, int r0, int a1, int r1, int frames);
-void IntroTitle(int n, Sprite *s);
+void PlaceObj(Obj3D *o, int16_t a0, int16_t r0, int16_t a1, int16_t r1, int16_t frames);
+void IntroTitle(int16_t n, Sprite *s);
 
 #define CREDIT(name) \
     CacheRelease(obj.r3s); \
@@ -57,15 +54,15 @@ void Intro(void)
 {
     Sprite spr;
     Obj3D obj;
-    long unused[2];
-    long dz;
-    int frame;
+    int32_t unused[2];
+    int32_t dz;
+    int16_t frame;
     char name[10];
-    long t;
-    long now;
+    int32_t t;
+    int32_t now;
     Event ev;
-    int quit;
-    int i;
+    int16_t quit;
+    int16_t i;
     char path[62];
 
     quit = 0;
@@ -114,7 +111,7 @@ void Intro(void)
     }
     LoadSfx("kirkintr");
     t += 540;
-    while (GetTicks() < (unsigned long)t && MusicPlaying())
+    while (GetTicks() < (uint32_t)t && MusicPlaying())
         ;
     if (midi_driver == 10) {
         PlaySeq(0, 1);
@@ -272,13 +269,13 @@ void Intro(void)
 
 /* Put o at angle a0 (degrees), distance r0 from the camera, heading for
  * angle a1, distance r1, which it reaches after the given frames. */
-void PlaceObj(Obj3D *o, int a0, int r0, int a1, int r1, int frames)
+void PlaceObj(Obj3D *o, int16_t a0, int16_t r0, int16_t a1, int16_t r1, int16_t frames)
 {
     Vec32 d;
-    int ang;
+    int16_t ang;
 
-    a0 = ((long)a0 << 9) / 180;
-    a1 = ((long)a1 << 9) / 180;
+    a0 = ((int32_t)a0 << 9) / 180;
+    a1 = ((int32_t)a1 << 9) / 180;
     o->pos.x = FixMul(r0, FixSin(a0)) + cam_pos.x;
     o->pos.z = FixMul(r0, FixCos(a0)) + cam_pos.z;
     o->pos.y = 0;
@@ -299,7 +296,7 @@ void PlaceObj(Obj3D *o, int a0, int r0, int a1, int r1, int frames)
 }
 
 /* Show title text n, or nothing for -1. */
-void IntroTitle(int n, Sprite *s)
+void IntroTitle(int16_t n, Sprite *s)
 {
     char name[16];
 

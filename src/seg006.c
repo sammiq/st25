@@ -1,5 +1,6 @@
 /* seg006: the 3D space view (ships, planets, shots and explosions) */
 
+#include "compat.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -12,8 +13,6 @@
 #include "fixmath.h"
 #include "obj3d.h"
 
-#define FP_SEG(fp) (*((unsigned _far *)&(fp) + 1))
-#define FP_OFF(fp) (*((unsigned _far *)&(fp)))
 
 #define ABS(x)  ((x) > 0 ? (x) : -(x))
 #define SGN(x)  ((x) > 0 ? 1 : ((x) < 0 ? -1 : 0))
@@ -22,47 +21,46 @@
 
 /* One row of a filled shape. */
 typedef struct Span {
-    int right;
-    int left;
+    int16_t right;
+    int16_t left;
 } Span;
 
 typedef struct Point {
-    int x;
-    int y;
+    int16_t x;
+    int16_t y;
 } Point;
 
-void Fatal(char *fmt, ...);     /* fatal error */
-void MsgBox(char *title, char *msg, int a, int b, int c, int d);    /* seg008: message box */
+void MsgBox(char *title, char *msg, int16_t a, int16_t b, int16_t c, int16_t d);    /* seg008: message box */
 void GameOverMenu(void);               /* seg019: game over */
-void SaveWrite(void *p, int n);     /* seg019: save game I/O */
-void SaveRead(void *p, int n);
-void BridgeSfx(int n);              /* seg001 */
-void SetRepair(int n);
+void SaveWrite(void *p, int16_t n);     /* seg019: save game I/O */
+void SaveRead(void *p, int16_t n);
+void BridgeSfx(int16_t n);              /* seg001 */
+void SetRepair(int16_t n);
 
 /* seg023 */
 void StarsReset(void);
 void DrawStars(void);
 
 /* seg027 */
-int Project(long a, long z);
+int16_t Project(int16_t a, int16_t z);
 
 /* seg018 */
-int DrawPlanet(Obj3D *o);
+int16_t DrawPlanet(Obj3D *o);
 void FreePlanet(Obj3D *o);
 
-int view_cx;
-int view_cy;
-int view_w;                  /* half the view width */
-int view_h;
-int view_x0;
-int view_x1;
-int view_y0;
-int view_y1;
+int16_t view_cx;
+int16_t view_cy;
+int16_t view_w;                  /* half the view width */
+int16_t view_h;
+int16_t view_x0;
+int16_t view_x1;
+int16_t view_y0;
+int16_t view_y1;
 Rect clip_rect;
-char far *view_ptr;          /* first row of the view on the screen */
-extern Bitmap far *screen;
-extern Bitmap far *backbuf;
-long proj_dist;
+char *view_ptr;          /* first row of the view on the screen */
+extern Bitmap *screen;
+extern Bitmap *backbuf;
+int32_t proj_dist;
 float star_near;
 Vec32 fr_left;               /* frustum edges */
 Vec32 fr_right;
@@ -76,10 +74,10 @@ extern Obj3D player_ship;
 extern Shot shot_obj;
 extern Obj3D dummy_planet;
 extern Obj3D ships[4];
-extern unsigned long blink_count;
+extern uint32_t blink_count;
 extern unsigned char byte_45B3C[];
-int span_fill;
-extern int view_tab[24][13];        /* bitmap for each yaw and pitch, 0x8000 mirrored */
+int16_t span_fill;
+extern int16_t view_tab[24][13];        /* bitmap for each yaw and pitch, 0x8000 mirrored */
 
 Obj3D *r3_list[MAX_R3] = { 0 };
 Obj3D *r3_sorted[MAX_R3] = { 0 };
@@ -87,32 +85,32 @@ char *shape_names[4] = { "ENT", "KLING", "ORION", "ROM" };
 unsigned char dither[8] = { 0x00, 0x80, 0x40, 0xC0, 0x20, 0xA0, 0x60, 0xE0 };
 
 void CamReset(void);
-void SetView(int x0, int y0, int x1, int y1, int fov);
+void SetView(int16_t x0, int16_t y0, int16_t x1, int16_t y1, int16_t fov);
 void DrawStatic(void);
 void ClearR3List(void);
 void AddR3(Obj3D *o);
 void DelR3(Obj3D *o);
 void ClearView(void);
 void DrawStarfield(void);
-int CompareR3(Obj3D **a, Obj3D **b);
-void RenderR3(int statics);
+int CompareR3(const void *a, const void *b);
+void RenderR3(int16_t statics);
 Obj3D *ProjectR3(Obj3D *o);
-int LoadShotShape(Obj3D *o);
+int16_t LoadShotShape(Obj3D *o);
 void FreeShotShape(Obj3D *o);
-int SelectView(Obj3D *o);
+int16_t SelectView(Obj3D *o);
 void ReleaseShipShape(Obj3D *o);
 double DDiv(double a, double b);
 void DrawR3Shape(Obj3D *o);
-int InView(Obj3D *o);
+int16_t InView(Obj3D *o);
 void OrthoR3(void);
 void DrawBeam(Obj3D *o);
-void SpanCircle(Span *s, int cx, int cy, int r);
-void SpanQuad(Span *s, int x0, int y0, int x1, int y1, int r0, int r1);
-void DrawLine(int x0, int y0, int x1, int y1, int c);
-Point *LinePoints(int x0, int y0, int x1, int y1);
-void SpanLine(Span *s, int x0, int y0, int x1, int y1);
-void FillSpans(Span *s, int c);
-void OutlineSpans(Span *s, int c);
+void SpanCircle(Span *s, int16_t cx, int16_t cy, int16_t r);
+void SpanQuad(Span *s, int16_t x0, int16_t y0, int16_t x1, int16_t y1, int16_t r0, int16_t r1);
+void DrawLine(int16_t x0, int16_t y0, int16_t x1, int16_t y1, int16_t c);
+Point *LinePoints(int16_t x0, int16_t y0, int16_t x1, int16_t y1);
+void SpanLine(Span *s, int16_t x0, int16_t y0, int16_t x1, int16_t y1);
+void FillSpans(Span *s, int16_t c);
+void OutlineSpans(Span *s, int16_t c);
 void SaveR3(Obj3D *o);
 void SaveR3Shot(Obj3D *o);
 void RestoreR3(Obj3D *o);
@@ -127,7 +125,7 @@ void CamReset(void)
 }
 
 /* Set the view rectangle and the field of view. */
-void SetView(int x0, int y0, int x1, int y1, int fov)
+void SetView(int16_t x0, int16_t y0, int16_t x1, int16_t y1, int16_t fov)
 {
     view_cx = (x0 + x1) / 2;
     view_cy = (y0 + y1) / 2;
@@ -158,20 +156,20 @@ void SetView(int x0, int y0, int x1, int y1, int fov)
 /* Fill the view with one of the static bitmaps, tiled. */
 void DrawStatic(void)
 {
-    int vw;
-    int vh;
-    int bw;
-    int bh;
-    int x;
-    int y;
-    int xx;
-    int yy;
-    int step;
-    char far *p;
-    unsigned char far *src;
-    char far *rowp;
-    char far *dst;
-    Bitmap far *bmp;
+    int16_t vw;
+    int16_t vh;
+    int16_t bw;
+    int16_t bh;
+    int16_t x;
+    int16_t y;
+    int16_t xx;
+    int16_t yy;
+    int16_t step;
+    char *p;
+    unsigned char *src;
+    char *rowp;
+    char *dst;
+    Bitmap *bmp;
     MemHandle h;
     char name[10];
     char c;
@@ -238,9 +236,9 @@ void DelR3(Obj3D *o)
 
 void ClearView(void)
 {
-    int w;
-    int h;
-    char far *p;
+    int16_t w;
+    int16_t h;
+    char *p;
 
     w = clip_rect.x1 - clip_rect.x0 + 1;
     h = clip_rect.y1 - clip_rect.y0 + 1;
@@ -257,9 +255,11 @@ void DrawStarfield(void)
 }
 
 /* qsort order: furthest first */
-int CompareR3(Obj3D **a, Obj3D **b)
+int CompareR3(const void *pa, const void *pb)
 {
-    long d;
+    Obj3D *const *a = pa;
+    Obj3D *const *b = pb;
+    int32_t d;
 
     d = (*a)->scale - (*b)->scale;
     if (d < 0)
@@ -270,14 +270,14 @@ int CompareR3(Obj3D **a, Obj3D **b)
 }
 
 /* Draw the view: stars, then everything in r3_list from back to front. */
-void RenderR3(int statics)
+void RenderR3(int16_t statics)
 {
-    unsigned n;
-    unsigned i;
-    int unused;
+    uint16_t n;
+    uint16_t i;
+    int16_t unused;
     Obj3D *o;
     Obj3D *p;
-    int dead;
+    int16_t dead;
 
     dead = 0;
     view_sprite.dirty = 1;
@@ -299,8 +299,8 @@ void RenderR3(int statics)
                         DelR3(o);
                     o = 0;
                 } else {
-                    int reach;
-                    int size;
+                    int16_t reach;
+                    int16_t size;
                     Obj3D *q;
 
                     reach = o->reach;
@@ -341,9 +341,9 @@ void RenderR3(int statics)
                 break;
             case R3_SHIP:
                 if (p->expl) {
-                    int size;
-                    int visible;
-                    int kind;
+                    int16_t size;
+                    int16_t visible;
+                    int16_t kind;
 
                     if (p->expl_frame < 21)
                         DrawR3Shape(p);
@@ -386,7 +386,7 @@ Obj3D *ProjectR3(Obj3D *o)
     o->view_m = o->orient;
     o->view = o->pos;
     Vec32Sub(&o->view, &cam_pos);
-    o->scale = (unsigned)VecLen32(&o->view.x);
+    o->scale = (uint16_t)VecLen32(&o->view.x);
     MatTVecMul32(&o->view, &cam_matrix, &v);
     o->view = v;
     if (!InView(o))
@@ -401,7 +401,7 @@ Obj3D *ProjectR3(Obj3D *o)
 }
 
 /* draw: load the bitmap of a shot or explosion */
-int LoadShotShape(Obj3D *o)
+int16_t LoadShotShape(Obj3D *o)
 {
     char name[16];
 
@@ -448,6 +448,7 @@ int LoadShotShape(Obj3D *o)
         o->r3s_type = 0;
         break;
     }
+    return 0;
 }
 
 /* free: release a shot's bitmap */
@@ -462,16 +463,16 @@ void FreeShotShape(Obj3D *o)
 }
 
 /* draw: pick the ship bitmap that shows the side facing the camera */
-int SelectView(Obj3D *o)
+int16_t SelectView(Obj3D *o)
 {
     Vec32 rel;
     Vec32 v;
     Matrix m;
-    long pitch;
-    long yaw;
-    int idx;
-    int j;
-    unsigned len;
+    int32_t pitch;
+    int32_t yaw;
+    int16_t idx;
+    int16_t j;
+    uint16_t len;
     char name[8];
 
     if (o->kind == 4) {
@@ -503,7 +504,7 @@ int SelectView(Obj3D *o)
             yaw -= 0x400;
         j = yaw * 12 / 0x400;
         idx = view_tab[j * 2][idx * 2];
-        LoadR3S((R3SOwner *)o, shape_names[o->kind], idx & 0x7FFF);
+        LoadR3S(o, shape_names[o->kind], idx & 0x7FFF);
         if ((idx & 0x8000) != 0) {
             o->rot.e[0][1] = -o->rot.e[0][1];
             o->rot.e[0][2] = -o->rot.e[0][2];
@@ -515,6 +516,7 @@ int SelectView(Obj3D *o)
         strcpy(o->shape, shape_names[o->kind]);
         o->view_idx = idx;
     }
+    return 0;
 }
 
 /* free: release a ship's bitmap */
@@ -535,6 +537,35 @@ double DDiv(double a, double b)
 /* Draw an object's bitmap rotated and scaled: map the bitmap's corners to
  * the screen, scan-convert the outline, then step through the bitmap for
  * each row. */
+/* One row of a texture mapped shape: n pixels from the 256 wide bitmap at
+ * tex, stepping (u, v) in 8.8 fixed point; pixels of colour 0 are skipped.
+ * The dithered form (blur) steps the 8 pixel cycle starting at slot d so
+ * that the sampling points jitter, and cancel out over the cycle. */
+void DrawTexRow(unsigned char *tex, char *dst, int16_t n, uint16_t u, uint16_t v,
+                       int16_t du, int16_t dv, int blur, int d)
+{
+    static const int16_t jitter[8] = { 0, 0xC0, 0, 0x120, 0, 0xC0, 0, 0x160 };
+    unsigned char t;
+
+    if (blur) {
+        du += 0x80;
+        dv += 0x80;
+    }
+    for (; n > 0; n--, dst++) {
+        t = tex[((v >> 8) << 8) | (u >> 8)];
+        if (t)
+            *dst = t;
+        if (blur) {
+            u += du - jitter[d];
+            v += dv - jitter[d];
+            d = (d + 1) & 7;
+        } else {
+            u += du;
+            v += dv;
+        }
+    }
+}
+
 void DrawR3Shape(Obj3D *o)
 {
     double t[2];
@@ -544,19 +575,19 @@ void DrawR3Shape(Obj3D *o)
     double k;
     double invk;
     double pts[4][2];
-    int top;
-    int bot;
-    int left[200];
-    int right[200];
-    int i;
-    int y;
-    Bitmap far *hdr;
+    int16_t top;
+    int16_t bot;
+    int16_t left[200];
+    int16_t right[200];
+    int16_t i;
+    int16_t y;
+    Bitmap *hdr;
 
     if (o->draw)
         o->draw(o);
     if (o->r3s == 0)
         goto release;
-    hdr = (Bitmap far *)((char far *)LockMem(o->r3s) + o->r3s_type);
+    hdr = (Bitmap *)((char *)LockMem(o->r3s) + o->r3s_type);
     k = (double)(o->size * proj_dist) / o->view.z;
     invk = 1.0 / k;
     switch (o->visible) {
@@ -573,7 +604,7 @@ void DrawR3Shape(Obj3D *o)
     case R3_PLANET:
     case R3_EXPL:
         {
-            int ang;
+            int16_t ang;
             double c;
             double s;
             Matrix mt;
@@ -608,14 +639,14 @@ void DrawR3Shape(Obj3D *o)
         break;
     default:
         {
-            int d0;
-            int d1;
-            int d2;
-            int ia;
-            int ib;
-            int a[2][3];
-            int px;
-            int py;
+            int16_t d0;
+            int16_t d1;
+            int16_t d2;
+            int16_t ia;
+            int16_t ib;
+            int16_t a[2][3];
+            int16_t px;
+            int16_t py;
 
             d0 = FixMul2(o->rot.e[0][0], o->rot.e[1][1], -o->rot.e[1][0], o->rot.e[0][1]);
             d1 = FixMul2(o->rot.e[1][0], o->rot.e[2][1], -o->rot.e[2][0], o->rot.e[1][1]);
@@ -639,7 +670,7 @@ void DrawR3Shape(Obj3D *o)
             a[1][1] = FixMul2(-o->rot.e[ib][0], o->view_m.e[ia][1], o->rot.e[ia][0], o->view_m.e[ib][1]);
             a[1][2] = FixMul2(-o->rot.e[ib][0], o->view_m.e[ia][2], o->rot.e[ia][0], o->view_m.e[ib][2]);
             {
-                int lim;
+                int16_t lim;
 
                 lim = ABS(o->view.z) << 1;
                 if (ABS(o->view.x) >= lim || ABS(o->view.y) >= lim)
@@ -651,7 +682,7 @@ void DrawR3Shape(Obj3D *o)
             m[1] = (a[0][1] - FixMul(a[0][2], py)) / 16384.0;
             m[2] = (a[1][0] - FixMul(a[1][2], px)) / 16384.0;
             m[3] = (a[1][1] - FixMul(a[1][2], py)) / 16384.0;
-            k = DDiv(k, (int)FixMul2(o->rot.e[ia][0], o->rot.e[ib][1], -o->rot.e[ib][0], o->rot.e[ia][1]) / 16384.0);
+            k = DDiv(k, (int16_t)FixMul2(o->rot.e[ia][0], o->rot.e[ib][1], -o->rot.e[ib][0], o->rot.e[ia][1]) / 16384.0);
             m[1] = -m[1];
             m[2] = -m[2];
             if (o->mirror) {
@@ -706,12 +737,12 @@ void DrawR3Shape(Obj3D *o)
     top = clip_rect.y1;
     bot = clip_rect.y0;
     for (i = 0; i < 4; i++) {
-        int a;
-        int b;
-        int y0;
-        int y1;
-        long x;
-        long dx;
+        int16_t a;
+        int16_t b;
+        int16_t y0;
+        int16_t y1;
+        int32_t x;
+        int32_t dx;
         double slope;
 
         a = i;
@@ -739,8 +770,8 @@ void DrawR3Shape(Obj3D *o)
         dx = 65536L * slope;
         x = 65536L * (pts[a][0] + (y0 - pts[a][1]) * slope);
         for (y = y0; y <= y1; y++) {
-            int xr;
-            int xl;
+            int16_t xr;
+            int16_t xl;
 
             xr = x >> 16;
             xl = (x + 0xFFFF) >> 16;
@@ -762,18 +793,18 @@ void DrawR3Shape(Obj3D *o)
     if (top > bot)
         goto done;
     {
-        char far *row;
-        char far *dst;
-        Bitmap far *buf;
-        char far *p;
-        int du;
-        int dv;
-        int ddu;
-        int ddv;
-        int u0;
-        int v0;
-        int opaque;
-        int hash;
+        char *row;
+        char *dst;
+        Bitmap *buf;
+        char *p;
+        int16_t du;
+        int16_t dv;
+        int16_t ddu;
+        int16_t ddv;
+        int16_t u0;
+        int16_t v0;
+        int16_t opaque;
+        int16_t hash;
 
         if (o->visible == R3_SHIP) {
             if (byte_45B3C[0])
@@ -796,22 +827,20 @@ void DrawR3Shape(Obj3D *o)
         dv = 256 * im[1];
         ddu = 256 * im[2];
         ddv = 256 * im[3];
-        u0 = ddu * top + (int)(256 * uv[0]);
-        v0 = ddv * top + (int)(256 * uv[1]);
+        u0 = ddu * top + (int16_t)(256 * uv[0]);
+        v0 = ddv * top + (int16_t)(256 * uv[1]);
         {
-            int w;
-            int h;
-            int i;
-            char far *q;
+            int16_t w;
+            int16_t h;
+            int16_t i;
+            char *q;
 
             /* copy the bitmap into a 256 wide buffer with a clear border,
              * so the drawing loops can step through it with byte maths */
-            buf = (Bitmap far *)backbuf->data;
+            buf = (Bitmap *)backbuf->data;
             buf->w = 256;
             buf->h = 249;
-            p = backbuf->data;
-            ++FP_SEG(p);
-            FP_OFF(p) = 0;
+            p = buf->data;
             w = hdr->w;
             h = hdr->h;
             q = p;
@@ -824,18 +853,9 @@ void DrawR3Shape(Obj3D *o)
             for (i = 0; i < 2; i++)
                 MemSet(q + ((h + 2 + i) << 8), w + 4, 0);
             q += 0x200;
-            _asm {
-                les bx, q
-                mov cx, h
-                mov al, byte ptr w
-                add al, 2
-            l_clear:
-                mov word ptr es:[bx], 0
-                mov bl, al
-                mov word ptr es:[bx], 0
-                xor bl, bl
-                inc bh
-                loop l_clear
+            for (i = 0; i < h; i++) {
+                q[i << 8] = q[(i << 8) + 1] = 0;
+                q[(i << 8) + w + 2] = q[(i << 8) + w + 3] = 0;
             }
             if (o->visible == R3_SHIP && o->has_shields) {
                 if (o->shields_on)
@@ -851,12 +871,12 @@ void DrawR3Shape(Obj3D *o)
         }
         row = screen->data + top * 320;
         for (y = top; y <= bot; y++) {
-            int x;
-            int n;
-            int u;
-            int v;
-            int d;
-            int dd;
+            int16_t x;
+            int16_t n;
+            int16_t u;
+            int16_t v;
+            int16_t d;
+            int16_t dd;
 
             x = left[y];
             n = right[y] + 1 - x;
@@ -870,49 +890,7 @@ void DrawR3Shape(Obj3D *o)
                 if (opaque) {
                     u += 128;
                     v += 128;
-                    _asm {
-                        push si
-                        push di
-                        push bp
-                        mov cx, u
-                        mov bx, v
-                        mov dx, du
-                        mov si, dv
-                        mov ds, word ptr p+2
-                        les di, dst
-                        mov bp, n
-                        jmp o_next
-                    o_put:
-                        stosb
-                        dec bp
-                        je o_end
-                    o_next:
-                        xchg ch, bl
-                        mov al, [bx]
-                        xchg ch, bl
-                        add cx, dx
-                        add bx, si
-                        or al, al
-                        jne o_put
-                    o_skip:
-                        inc di
-                        dec bp
-                        je o_end
-                        xchg ch, bl
-                        mov al, [bx]
-                        xchg ch, bl
-                        add cx, dx
-                        add bx, si
-                        or al, al
-                        je o_skip
-                        jmp o_put
-                    o_end:
-                        pop bp
-                        pop di
-                        pop si
-                        mov ax, ss
-                        mov ds, ax
-                    }
+                    DrawTexRow((unsigned char *)p, dst, n, u, v, du, dv, 0, 0);
                 } else {
                     d = (x + y + hash) & 7;
                     dd = dither[d];
@@ -920,244 +898,7 @@ void DrawR3Shape(Obj3D *o)
                     v += dd;
                     /* every other pixel skips a little, in a pattern that
                      * depends on d, to blur distant shapes */
-                    _asm {
-                        push si
-                        push di
-                        push bp
-                        mov cx, u
-                        mov bx, v
-                        mov dx, du
-                        mov si, dv
-                        mov ds, word ptr p+2
-                        les di, dst
-                        add dx, 80h
-                        add si, 80h
-                        mov al, byte ptr d
-                        mov bp, n
-                        or al, al
-                        je m0
-                        dec al
-                        je m1
-                        dec al
-                        je m2
-                        dec al
-                        je m3
-                        jmp m_hi
-                    m0:
-                        xchg ch, bl
-                        mov al, [bx]
-                        xchg ch, bl
-                        add cx, dx
-                        add bx, si
-                        or al, al
-                        je s0
-                    w0:
-                        stosb
-                        dec bp
-                        je e1
-                    m1:
-                        xchg ch, bl
-                        mov al, [bx]
-                        xchg ch, bl
-                        add cx, dx
-                        sub cx, 0C0h
-                        lea bx, [bx+si-0C0h]
-                        or al, al
-                        je s1
-                    w1:
-                        stosb
-                        dec bp
-                        je e1
-                    m2:
-                        xchg ch, bl
-                        mov al, [bx]
-                        xchg ch, bl
-                        add cx, dx
-                        add bx, si
-                        or al, al
-                        je s2
-                    w2:
-                        stosb
-                        dec bp
-                        je e1
-                    m3:
-                        xchg ch, bl
-                        mov al, [bx]
-                        xchg ch, bl
-                        add cx, dx
-                        sub cx, 120h
-                        lea bx, [bx+si-120h]
-                        or al, al
-                        je s3
-                    w3:
-                        stosb
-                        dec bp
-                        jne m4
-                    e1:
-                        jmp m_end
-                    r0:
-                        xchg ch, bl
-                        mov al, [bx]
-                        xchg ch, bl
-                        add cx, dx
-                        add bx, si
-                        or al, al
-                        jne w0
-                    s0:
-                        inc di
-                        dec bp
-                        je e2
-                        xchg ch, bl
-                        mov al, [bx]
-                        xchg ch, bl
-                        add cx, dx
-                        sub cx, 0C0h
-                        lea bx, [bx+si-0C0h]
-                        or al, al
-                        jne w1
-                    s1:
-                        inc di
-                        dec bp
-                        je e2
-                        xchg ch, bl
-                        mov al, [bx]
-                        xchg ch, bl
-                        add cx, dx
-                        add bx, si
-                        or al, al
-                        jne w2
-                    s2:
-                        inc di
-                        dec bp
-                        je e2
-                        xchg ch, bl
-                        mov al, [bx]
-                        xchg ch, bl
-                        add cx, dx
-                        sub cx, 120h
-                        lea bx, [bx+si-120h]
-                        or al, al
-                        jne w3
-                    s3:
-                        inc di
-                        dec bp
-                        jne r4
-                    e2:
-                        jmp m_end
-                    m_hi:
-                        dec al
-                        je m4
-                        dec al
-                        je m5
-                        dec al
-                        je m6
-                        jmp m7
-                    m4:
-                        xchg ch, bl
-                        mov al, [bx]
-                        xchg ch, bl
-                        add cx, dx
-                        add bx, si
-                        or al, al
-                        je s4
-                    w4:
-                        stosb
-                        dec bp
-                        je e2
-                    m5:
-                        xchg ch, bl
-                        mov al, [bx]
-                        xchg ch, bl
-                        add cx, dx
-                        sub cx, 0C0h
-                        lea bx, [bx+si-0C0h]
-                        or al, al
-                        je s5
-                    w5:
-                        stosb
-                        dec bp
-                        je e2
-                    m6:
-                        xchg ch, bl
-                        mov al, [bx]
-                        xchg ch, bl
-                        add cx, dx
-                        add bx, si
-                        or al, al
-                        je s6
-                    w6:
-                        stosb
-                        dec bp
-                        je e2
-                    m7:
-                        xchg ch, bl
-                        mov al, [bx]
-                        xchg ch, bl
-                        add cx, dx
-                        sub cx, 160h
-                        lea bx, [bx+si-160h]
-                        or al, al
-                        je s7
-                    w7:
-                        stosb
-                        dec bp
-                        je e2
-                        jmp m0
-                    r4:
-                        xchg ch, bl
-                        mov al, [bx]
-                        xchg ch, bl
-                        add cx, dx
-                        add bx, si
-                        or al, al
-                        jne w4
-                    s4:
-                        inc di
-                        dec bp
-                        je m_end
-                        xchg ch, bl
-                        mov al, [bx]
-                        xchg ch, bl
-                        add cx, dx
-                        sub cx, 0C0h
-                        lea bx, [bx+si-0C0h]
-                        or al, al
-                        jne w5
-                    s5:
-                        inc di
-                        dec bp
-                        je m_end
-                        xchg ch, bl
-                        mov al, [bx]
-                        xchg ch, bl
-                        add cx, dx
-                        add bx, si
-                        or al, al
-                        jne w6
-                    s6:
-                        inc di
-                        dec bp
-                        je m_end
-                        xchg ch, bl
-                        mov al, [bx]
-                        xchg ch, bl
-                        add cx, dx
-                        sub cx, 160h
-                        lea bx, [bx+si-160h]
-                        or al, al
-                        jne w7
-                    s7:
-                        inc di
-                        dec bp
-                        je m_end
-                        jmp r0
-                    m_end:
-                        pop bp
-                        pop di
-                        pop si
-                        mov ax, ss
-                        mov ds, ax
-                    }
+                    DrawTexRow((unsigned char *)p, dst, n, u, v, du, dv, 1, d);
                 }
             }
         }
@@ -1170,11 +911,11 @@ release:
 }
 
 /* Is any of the object inside the view frustum? */
-int InView(Obj3D *o)
+int16_t InView(Obj3D *o)
 {
     Vec32 v;
-    long dx;
-    long dy;
+    int32_t dx;
+    int32_t dy;
 
     v = o->view;
     if (v.z < star_near)
@@ -1193,7 +934,7 @@ int InView(Obj3D *o)
 /* Straighten the orientation matrices of ships and planets. */
 void OrthoR3(void)
 {
-    int i;
+    int16_t i;
     Obj3D *o;
 
     for (i = 0; i != MAX_R3; i++) {
@@ -1209,19 +950,19 @@ void DrawBeam(Obj3D *o)
 {
     Vec32 a;
     Vec32 b;
-    long d[3];
-    int sx0;
-    int sy0;
-    int sx1;
-    int sy1;
-    int unused1;
-    int r0;
-    int r1;
-    int n;
-    int unused2;
+    int32_t d[3];
+    int16_t sx0;
+    int16_t sy0;
+    int16_t sx1;
+    int16_t sy1;
+    int16_t unused1;
+    int16_t r0;
+    int16_t r1;
+    int16_t n;
+    int16_t unused2;
     Span *spans;
-    int unused3;
-    int unused4;
+    int16_t unused3;
+    int16_t unused4;
 
     o->r3s = 0;
     a = b = o->view;
@@ -1263,12 +1004,12 @@ void DrawBeam(Obj3D *o)
     }
 
 /* Add a filled circle to the spans. */
-void SpanCircle(Span *s, int cx, int cy, int r)
+void SpanCircle(Span *s, int16_t cx, int16_t cy, int16_t r)
 {
-    int x;
-    int y;
-    int d;
-    int row;
+    int16_t x;
+    int16_t y;
+    int16_t d;
+    int16_t row;
 
     for (x = 0, y = r, d = 3 - r * 2; x < y; ++x) {
         SPAN_ROW(cy + y, cx - x, cx + x)
@@ -1291,37 +1032,37 @@ void SpanCircle(Span *s, int cx, int cy, int r)
 }
 
 /* Add the quadrilateral joining two circles to the spans. */
-void SpanQuad(Span *s, int x0, int y0, int x1, int y1, int r0, int r1)
+void SpanQuad(Span *s, int16_t x0, int16_t y0, int16_t x1, int16_t y1, int16_t r0, int16_t r1)
 {
-    int a;
-    int unused1;
-    int unused2;
-    int p[8];
-    int unused3;
-    int unused4;
+    int16_t a;
+    int16_t unused1;
+    int16_t unused2;
+    int16_t p[8];
+    int16_t unused3;
+    int16_t unused4;
 
     a = FixAtan2(y1 - y0, x1 - x0);
     ++r0;
     ++r1;
-    p[0] = x0 + (long)r0 * FixCos(a + 0x100) / 0x4000;
-    p[1] = y0 + (long)r0 * FixSin(a + 0x100) / 0x4000;
-    p[2] = x1 + (long)r1 * FixCos(a + 0x100) / 0x4000;
-    p[3] = y1 + (long)r1 * FixSin(a + 0x100) / 0x4000;
-    p[4] = x1 + (long)r1 * FixCos(a - 0x100) / 0x4000;
-    p[5] = y1 + (long)r1 * FixSin(a - 0x100) / 0x4000;
-    p[6] = x0 + (long)r0 * FixCos(a - 0x100) / 0x4000;
-    p[7] = y0 + (long)r0 * FixSin(a - 0x100) / 0x4000;
+    p[0] = x0 + (int32_t)r0 * FixCos(a + 0x100) / 0x4000;
+    p[1] = y0 + (int32_t)r0 * FixSin(a + 0x100) / 0x4000;
+    p[2] = x1 + (int32_t)r1 * FixCos(a + 0x100) / 0x4000;
+    p[3] = y1 + (int32_t)r1 * FixSin(a + 0x100) / 0x4000;
+    p[4] = x1 + (int32_t)r1 * FixCos(a - 0x100) / 0x4000;
+    p[5] = y1 + (int32_t)r1 * FixSin(a - 0x100) / 0x4000;
+    p[6] = x0 + (int32_t)r0 * FixCos(a - 0x100) / 0x4000;
+    p[7] = y0 + (int32_t)r0 * FixSin(a - 0x100) / 0x4000;
     SpanLine(s, p[4], p[5], p[6], p[7]);
     SpanLine(s, p[0], p[1], p[2], p[3]);
 }
 
-void DrawLine(int x0, int y0, int x1, int y1, int c)
+void DrawLine(int16_t x0, int16_t y0, int16_t x1, int16_t y1, int16_t c)
 {
-    int n;
-    int unused;
+    int16_t n;
+    int16_t unused;
     Point *p;
     Point *list;
-    char far *base;
+    char *base;
 
     base = screen->data;
     if ((list = p = LinePoints(x0, y0, x1, y1)) == 0)
@@ -1338,19 +1079,19 @@ void DrawLine(int x0, int y0, int x1, int y1, int c)
 
 /* The points of a line clipped to clip_rect: a count, then the points.
  * Returns 0 if the line is outside. */
-Point *LinePoints(int x0, int y0, int x1, int y1)
+Point *LinePoints(int16_t x0, int16_t y0, int16_t x1, int16_t y1)
 {
-    int e;
-    int inc1;
-    int inc2;
-    int sx;
-    int sy;
-    int adx;
-    int ady;
+    int16_t e;
+    int16_t inc1;
+    int16_t inc2;
+    int16_t sx;
+    int16_t sy;
+    int16_t adx;
+    int16_t ady;
     Point *p;
     Point *list;
-    int nx;
-    int ny;
+    int16_t nx;
+    int16_t ny;
 
     sx = x0 < clip_rect.x0 ? 1 : 0;
     sx |= x0 > clip_rect.x1 ? 2 : 0;
@@ -1367,14 +1108,7 @@ Point *LinePoints(int x0, int y0, int x1, int y1)
         adx = x1 - x0;
         ady = y1 - y0;
         if (e & 1) {
-            _asm {
-                mov ax, clip_rect.x0
-                sub ax, x0
-                imul ady
-                idiv adx
-                add ax, y0
-                mov ny, ax
-            }
+            ny = (int16_t)((int32_t)(int16_t)(clip_rect.x0 - x0) * ady / adx) + y0;
             nx = clip_rect.x0;
             if (sx & 1) {
                 x0 = nx;
@@ -1385,14 +1119,7 @@ Point *LinePoints(int x0, int y0, int x1, int y1)
             }
         }
         if (e & 2) {
-            _asm {
-                mov ax, clip_rect.x1
-                sub ax, x0
-                imul ady
-                idiv adx
-                add ax, y0
-                mov ny, ax
-            }
+            ny = (int16_t)((int32_t)(int16_t)(clip_rect.x1 - x0) * ady / adx) + y0;
             nx = clip_rect.x1;
             if (sx & 2) {
                 x0 = nx;
@@ -1403,14 +1130,7 @@ Point *LinePoints(int x0, int y0, int x1, int y1)
             }
         }
         if (e & 4) {
-            _asm {
-                mov ax, clip_rect.y0
-                sub ax, y0
-                imul adx
-                idiv ady
-                add ax, x0
-                mov nx, ax
-            }
+            nx = (int16_t)((int32_t)(int16_t)(clip_rect.y0 - y0) * adx / ady) + x0;
             ny = clip_rect.y0;
             if (sx & 4) {
                 x0 = nx;
@@ -1421,14 +1141,7 @@ Point *LinePoints(int x0, int y0, int x1, int y1)
             }
         }
         if (e & 8) {
-            _asm {
-                mov ax, clip_rect.y1
-                sub ax, y0
-                imul adx
-                idiv ady
-                add ax, x0
-                mov nx, ax
-            }
+            nx = (int16_t)((int32_t)(int16_t)(clip_rect.y1 - y0) * adx / ady) + x0;
             ny = clip_rect.y1;
             if (sx & 8) {
                 x0 = nx;
@@ -1499,16 +1212,16 @@ Point *LinePoints(int x0, int y0, int x1, int y1)
     }
 
 /* Add the points of a line to the spans. */
-void SpanLine(Span *s, int x0, int y0, int x1, int y1)
+void SpanLine(Span *s, int16_t x0, int16_t y0, int16_t x1, int16_t y1)
 {
-    int e;
-    int inc1;
-    int inc2;
-    int sx;
-    int sy;
-    int dx;
-    int dy;
-    int row;
+    int16_t e;
+    int16_t inc1;
+    int16_t inc2;
+    int16_t sx;
+    int16_t sy;
+    int16_t dx;
+    int16_t dy;
+    int16_t row;
 
     dx = ABS(x1 - x0);
     dy = ABS(y1 - y0);
@@ -1544,111 +1257,46 @@ void SpanLine(Span *s, int x0, int y0, int x1, int y1)
 }
 
 /* Fill the spans (one per row of clip_rect) with colour c. */
-void FillSpans(Span *s, int c)
+void FillSpans(Span *s, int16_t c)
 {
-    char far *base;
+    char *base;
+    int16_t n;
 
     base = screen->data + clip_rect.y0 * 320;
     span_fill = (c & 0xFF) | (c << 8);
-    _asm {
-        mov si, s
-        les bx, base
-        mov dx, clip_rect.y1
-        sub dx, clip_rect.y0
-        inc dx
-        push bp
-    f_row:
-        lodsw
-        mov cx, ax
-        lodsw
-        cmp cx, ax
-        jl f_next
-        cmp ax, clip_rect.x1
-        jg f_next
-        cmp cx, clip_rect.x0
-        jl f_next
-        cmp ax, clip_rect.x0
-        jge f_l
-        mov ax, clip_rect.x0
-    f_l:
-        cmp cx, clip_rect.x1
-        jle f_r
-        mov cx, clip_rect.x1
-    f_r:
-        mov di, bx
-        add di, ax
-        sub cx, ax
-        inc cx
-        mov bp, cx
-        mov ax, span_fill
-        cmp cx, 3
-        jl f_bytes
-        test di, 1
-        je f_even
-        stosb
-        dec cx
-        dec bp
-    f_even:
-        shr cx, 1
-        rep stosw
-        test bp, 1
-        je f_next
-        stosb
-        jmp short f_next
-    f_bytes:
-        rep stosb
-    f_next:
-        add bx, 320
-        dec dx
-        jne f_row
-        pop bp
+    for (n = clip_rect.y1 - clip_rect.y0 + 1; n != 0; n--, s++, base += 320) {
+        int16_t l = s->left;
+        int16_t r = s->right;
+
+        if (r < l || l > clip_rect.x1 || r < clip_rect.x0)
+            continue;
+        if (l < clip_rect.x0)
+            l = clip_rect.x0;
+        if (r > clip_rect.x1)
+            r = clip_rect.x1;
+        memset(base + l, c, r - l + 1);
     }
 }
 
 /* Plot the ends of the spans in colour c. */
-void OutlineSpans(Span *s, int c)
+void OutlineSpans(Span *s, int16_t c)
 {
-    char far *base;
+    char *base;
+    int16_t n;
 
     base = screen->data + clip_rect.y0 * 320;
-    _asm {
-        mov si, s
-        les bx, base
-        mov dx, clip_rect.y1
-        sub dx, clip_rect.y0
-        inc dx
-        push bp
-        mov ax, c
-        mov ah, al
-        mov bp, ax
-    o_row:
-        lodsw
-        mov cx, ax
-        lodsw
-        cmp cx, ax
-        jl o_next
-        cmp ax, clip_rect.x1
-        jg o_next
-        cmp cx, clip_rect.x0
-        jl o_next
-        cmp ax, clip_rect.x0
-        jge o_l
-        mov ax, clip_rect.x0
-    o_l:
-        cmp cx, clip_rect.x1
-        jle o_r
-        mov cx, clip_rect.x1
-    o_r:
-        mov di, ax
-        mov ax, bp
-        mov es:[bx+di], al
-        mov di, cx
-        mov es:[bx+di], al
-    o_next:
-        add bx, 320
-        dec dx
-        jne o_row
-        pop bp
+    for (n = clip_rect.y1 - clip_rect.y0 + 1; n != 0; n--, s++, base += 320) {
+        int16_t l = s->left;
+        int16_t r = s->right;
+
+        if (r < l || l > clip_rect.x1 || r < clip_rect.x0)
+            continue;
+        if (l < clip_rect.x0)
+            l = clip_rect.x0;
+        if (r > clip_rect.x1)
+            r = clip_rect.x1;
+        base[l] = c;
+        base[r] = c;
     }
 }
 
@@ -1659,7 +1307,7 @@ void SaveR3(Obj3D *o)
 
 void SaveR3Shot(Obj3D *o)
 {
-    SaveWrite(o, 0xA8);
+    SaveWrite(o, sizeof(Shot));
 }
 
 void RestoreR3(Obj3D *o)
@@ -1685,7 +1333,7 @@ void RestoreR3(Obj3D *o)
 
 void RestoreR3Shot(Obj3D *o)
 {
-    SaveRead(o, 0xA8);
+    SaveRead(o, sizeof(Shot));
     if (o->visible) {
         AddR3(o);
         switch (o->visible) {
@@ -1704,7 +1352,7 @@ void RestoreR3Shot(Obj3D *o)
 void SaveSpace(void)
 {
     Obj3D *o;
-    int i;
+    int16_t i;
 
     SaveR3(&player_ship);
     SaveR3Shot((Obj3D *)&shot_obj);
@@ -1718,7 +1366,7 @@ void SaveSpace(void)
 void LoadSpace(void)
 {
     Obj3D *o;
-    int i;
+    int16_t i;
 
     for (i = 0; i != MAX_R3; i++) {
         if ((o = r3_list[i]) == 0)

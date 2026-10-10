@@ -1,5 +1,7 @@
 /* seg002: the computer: text input box and topic lookup */
 
+#include "compat.h"
+#include <ctype.h>
 #include <stdlib.h>
 #include <string.h>
 #include "mem.h"
@@ -9,50 +11,49 @@
 #include "gfx.h"
 #include "event.h"
 
-int isprint(int c);
-void MsgBox(char *title, char *msg, int a, int b, int c, int d);   /* seg008: message box */
-void TextBox(char *(far *get)(int, void *, char *), void *data, int a, int b, int c, int d,
-               int e, int f);                                        /* seg008: list box */
+void MsgBox(char *title, char *msg, int16_t a, int16_t b, int16_t c, int16_t d);   /* seg008: message box */
+int32_t TextBox(void *get, void *data, int16_t a, int16_t b, int16_t c, int16_t d,
+               int16_t e, int16_t f);                                        /* seg008: list box */
 void TrackMouse(Event *e);                                            /* seg012 */
 
 /* Topics found for a search: 8 character file names. */
 typedef struct DBList {
-    int count;
+    int16_t count;
     char names[16][8];
 } DBList;
 
-extern int key_accel;
+extern int16_t key_accel;
 unsigned char cursor_on;
 MemHandle input_bg;          /* the empty box */
 MemHandle input_bmp;         /* the box with the text */
-int input_size;
+int16_t input_size;
 Sprite input_sprite;
-extern long blink_count;
+extern int32_t blink_count;
 char *dialog_title;
 
 char input_buf[134] = "some input";
-int cursor = 0;
+int16_t cursor = 0;
 
-char *GetDBEntry(int idx, DBList *db, char *out);
+char *GetDBEntry(int16_t idx, DBList *db, char *out);
 void DrawInput(void);
-void InsertChar(int pos, int unused, char c);
-void DeleteChar(int pos, int unused);
+void InsertChar(int16_t pos, int16_t unused, char c);
+void DeleteChar(int16_t pos, int16_t unused);
 void DelAtCursor(void);
 void TypeChar(char c);
-int InputBox(int x, int y, char *prompt);
-void OpenInputBox(int x, int y, char *prompt);
+int16_t InputBox(int16_t x, int16_t y, char *prompt);
+void OpenInputBox(int16_t x, int16_t y, char *prompt);
 void CloseInputBox(void);
 
 /* List box callback: put the title of topic idx in out ("R: title") and
  * return its text, from <name>.db. */
-char *GetDBEntry(int idx, DBList *db, char *out)
+char *GetDBEntry(int16_t idx, DBList *db, char *out)
 {
     MemHandle h;
-    char far *p;
+    char *p;
     char *text;
-    char far *q;
+    char *q;
     char name[10];
-    int n;
+    int16_t n;
 
     if (idx >= db->count)
         return 0;
@@ -85,7 +86,7 @@ void Computer(void)
 {
     DBList list;
     MemHandle h;
-    char far *p;
+    char *p;
 
     for (;;) {
         list.count = 0;
@@ -97,7 +98,7 @@ void Computer(void)
             h = CacheLoad("db", "key");
             p = LockMem(h);
             {
-                int i;
+                int16_t i;
 
                 for (i = 131; i != 0; i--)
                     input_buf[i] = input_buf[i - 1];
@@ -105,7 +106,7 @@ void Computer(void)
             input_buf[0] = ' ';
             while (*p != '$') {
                 char name[9];
-                char far *s;
+                char *s;
 
                 s = _fstrchr(p, '\n');
                 if (s == 0)
@@ -153,10 +154,10 @@ char *InputCode(void)
 
 void DrawInput(void)
 {
-    int unused;
+    int16_t unused;
     char text[40];
-    Bitmap far *bg;
-    Bitmap far *bmp;
+    Bitmap *bg;
+    Bitmap *bmp;
 
     memset(text, 0, 40);
     strcpy(text, input_buf);
@@ -172,16 +173,16 @@ void DrawInput(void)
     UpdateSprites();
 }
 
-void InsertChar(int pos, int unused, char c)
+void InsertChar(int16_t pos, int16_t unused, char c)
 {
-    int i;
+    int16_t i;
 
     for (i = 18; i >= pos; i--)
         input_buf[i + 1] = input_buf[i];
     input_buf[pos] = c;
 }
 
-void DeleteChar(int pos, int unused)
+void DeleteChar(int16_t pos, int16_t unused)
 {
     for (pos = pos; pos < 20; pos++)
         input_buf[pos] = input_buf[pos + 1];
@@ -194,12 +195,12 @@ void DelAtCursor(void)
 
 void TypeChar(char c)
 {
-    int unused1;
-    int unused2;
-    int unused3;
-    int unused4;
-    int len;
-    int n;
+    int16_t unused1;
+    int16_t unused2;
+    int16_t unused3;
+    int16_t unused4;
+    int16_t len;
+    int16_t n;
 
     len = strlen(input_buf);
     if (len < cursor) {
@@ -211,20 +212,20 @@ void TypeChar(char c)
 
 /* Edit input_buf in a box at (x, y) under prompt. Returns 1 when entered
  * (Enter, F1 or click), 0 when cancelled (Esc, F2 or right click). */
-int InputBox(int x, int y, char *prompt)
+int16_t InputBox(int16_t x, int16_t y, char *prompt)
 {
-    int unused1;
-    int unused2;
-    int unused3;
-    int unused4;
-    int unused5;
-    int unused6;
-    int running;
+    int16_t unused1;
+    int16_t unused2;
+    int16_t unused3;
+    int16_t unused4;
+    int16_t unused5;
+    int16_t unused6;
+    int16_t running;
     Event e;
-    int unused7;
-    int unused8;
-    int key;
-    int ok;
+    int16_t unused7;
+    int16_t unused8;
+    int16_t key;
+    int16_t ok;
 
     unused7 = -1;
     ok = 0;
@@ -314,22 +315,22 @@ int InputBox(int x, int y, char *prompt)
 
 /* Build the box bitmap: the prompt word wrapped under the dialog title,
  * with a dotted border. */
-void OpenInputBox(int x, int y, char *prompt)
+void OpenInputBox(int16_t x, int16_t y, char *prompt)
 {
-    int i;
-    long pad;
-    int unused1;
-    int unused2;
-    int unused3;
+    int16_t i;
+    int32_t pad;
+    int16_t unused1;
+    int16_t unused2;
+    int16_t unused3;
     char lines[11][26];
     char *text;
-    int w;
-    int h;
-    int cols;
-    int nlines;
-    long unused4;
-    Bitmap far *bmp;
-    Bitmap far *bmp2;
+    int16_t w;
+    int16_t h;
+    int16_t cols;
+    int16_t nlines;
+    int32_t unused4;
+    Bitmap *bmp;
+    Bitmap *bmp2;
 
     cols = strlen(prompt);
     if (cols > 25)
@@ -364,8 +365,8 @@ void OpenInputBox(int x, int y, char *prompt)
     bmp->y = h + 20;
     MemSet(bmp->data, w * h, 0);
     {
-        int px;
-        int py;
+        int16_t px;
+        int16_t py;
 
         for (px = 1, py = 1; px < w - 1; px++)
             bmp->data[py * w + px] = 'x';

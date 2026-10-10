@@ -1,5 +1,6 @@
 /* seg022: the star chart */
 
+#include "compat.h"
 #include "mem.h"
 #include "bitmap.h"
 #include "cache.h"
@@ -10,21 +11,21 @@
 #include "obj3d.h"
 
 typedef struct Point {
-    int x;
-    int y;
+    int16_t x;
+    int16_t y;
 } Point;
 
 #define NUM_STARS 45
 
 void CyclePalette(void);               /* seg000 */
 void WarpOut(void);               /* seg025 */
-void CreatePlanet(Obj3D *o, char *name, int radius, int small, unsigned seed, int pal);
+void CreatePlanet(Obj3D *o, char *name, int16_t radius, int16_t small, uint16_t seed, int16_t pal);
 void RandomPlanet(Obj3D *o);
 
 Obj3D dummy_planet;
-extern Bitmap far *backbuf;
-extern Bitmap far *screen;
-extern long blink_count;
+extern Bitmap *backbuf;
+extern Bitmap *screen;
+extern int32_t blink_count;
 
 /* Positions of the stars on StarMap.bmp. */
 Point star_pos[NUM_STARS] = {
@@ -38,10 +39,10 @@ Point star_pos[NUM_STARS] = {
     { 156, 16 }, { 83, 72 }, { 150, 102 }
 };
 
-Point *NearestStar(int x, int y);
+Point *NearestStar(int16_t x, int16_t y);
 
 /* Make dummy_planet the planet of star n. */
-void SetPlanet(int n)
+void SetPlanet(int16_t n)
 {
     switch (n) {
     case 0:
@@ -112,14 +113,14 @@ void SetPlanet(int n)
 
 /* Let the player pick a star on the chart. Returns its number and sets up
  * its planet. */
-int StarMap(void)
+int16_t StarMap(void)
 {
     char unused[76];
     Event *e;
     Point *star;
     Sprite cursor;
     MemHandle old_bmp;
-    int sel;
+    int16_t sel;
 
     old_bmp = mouse_sprite.handle;
     SpriteSetBitmap(&mouse_sprite, LoadBitmap("cross"));
@@ -143,7 +144,7 @@ int StarMap(void)
                 blink_count++;
                 break;
             case EV_KEY:
-                switch (((unsigned)e->key >> 8) & 0xFF) {
+                switch (((uint16_t)e->key >> 8) & 0xFF) {
                 case 0x1C:
                 case 0x39:
                 case 0x3B:
@@ -180,7 +181,7 @@ done:
     return sel;
 }
 
-void OffsetRect(Rect *out, Rect *r, int dx, int dy)
+void OffsetRect(Rect *out, Rect *r, int16_t dx, int16_t dy)
 {
     out->x0 = r->x0 + dx;
     out->y0 = r->y0 + dy;
@@ -190,11 +191,11 @@ void OffsetRect(Rect *out, Rect *r, int dx, int dy)
 
 #define ABS(v) ((v) > 0 ? (v) : -(v))
 
-Point *NearestStar(int x, int y)
+Point *NearestStar(int16_t x, int16_t y)
 {
-    int n;
-    int d;
-    int best;
+    int16_t n;
+    int16_t d;
+    int16_t best;
     Point *p;
     Point *found;
 

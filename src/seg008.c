@@ -1,6 +1,8 @@
 /* seg008: the away team - rooms, their scripts and objects, conversation
  * boxes and the player's actions */
 
+#include "compat.h"
+#include <ctype.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -18,33 +20,36 @@
 #undef MenuWait
 #include "actor.h"
 #include "room.h"
+#include "obj3d.h"
+#include "rdfvm.h"
 
 /* Globals this file owns (declared in the headers). */
 Actor actors[MAX_ACTORS];
 MemHandle rdf_handle;
-Rdf far *rdf;
+Rdf *rdf;
+static uint32_t rdf_size;            /* bytes in the .rdf image */
+static int32_t ScriptServiceVM(int16_t *a);
+int32_t ScriptService(int16_t cmd, int16_t a1, int16_t a2, int16_t a3, int16_t a4, uint16_t a5);
 char room_mission[16];
 RoomState room;
 
-int MenuWait();
-int ItemGive();
-int ItemHave();
-void ItemTake(int id);
+int16_t MenuWait();
+int16_t ItemGive();
+int16_t ItemHave();
+void ItemTake(int16_t id);
 void ItemsInit(void);
 void ItemsSave(void);
 void ItemsLoad(void);
-int PickItem(int x, int y, int restore);
-void Fatal();
-int tolower(int c);
-char *WrapLine(char *src, char *dst, int width);
+int16_t PickItem(int16_t x, int16_t y, int16_t restore);
+char *WrapLine(char *src, char *dst, int16_t width);
 MemHandle getanyfile(char *name, char *ext);
 void FreeAnyFile(MemHandle h);
-long GetFileSize(char *name, char *ext);
+int32_t GetFileSize(char *name, char *ext);
 char *InputCode(void);
 void GameOverMenu(void);
-int ActionPanel(void);
-void SaveWrite(void *p, unsigned n);
-void SaveRead(void *p, unsigned n);
+int16_t ActionPanel(void);
+void SaveWrite(void *p, uint16_t n);
+void SaveRead(void *p, uint16_t n);
 void SaveClose(void);
 void SaveSpace(void);
 void LoadSpace(void);
@@ -57,22 +62,22 @@ void LoadActors(void);
 void InitActors(void);
 void FreeActors(void);
 void UpdateActors(void);
-void EndOrStand(int n);
+void EndOrStand(int16_t n);
 void LoadBan(char *name);
 void LoadWalkGraph(char *name);
 void DrawBans(void);
 void UpdateBans(void);
-void BridgeSfx(int n);              /* seg001 */
+void BridgeSfx(int16_t n);              /* seg001 */
 void BridgeLeave(void);
-void BridgeEnter(int reset);
+void BridgeEnter(int16_t reset);
 void SetTextFile(char *name);
-char *GetText(int n);
+char *GetText(int16_t n);
 void FreeText(char *p);
-void SendScript(int n);
-int LeverPuzzle(void);              /* seg012 */
-int Turbolift(int unused, int deck);
-int ItemCase(int mask);
-void FlashBitmap(char *name);         /* seg030 */
+void SendScript(int16_t n);
+int16_t LeverPuzzle(void);              /* seg012 */
+int16_t Turbolift(int16_t unused, int16_t deck);
+int16_t ItemCase(int16_t mask);
+void FlashBitmap(char *name, int16_t z);         /* seg030 */
 void StartCrew(void);
 
 typedef struct Msg {
@@ -85,21 +90,21 @@ typedef struct Msg {
 /* A room script: a key (action, target, target2, extra; FF matches any)
  * and the machine code to run. */
 typedef struct Script {
-    long key;
-    unsigned next;
+    int32_t key;
+    uint16_t next;
     char code[1];
 } Script;
 
 typedef struct Point {
-    int x;
-    int y;
+    int16_t x;
+    int16_t y;
 } Point;
 
 typedef struct Item {
-    int have;                   /* 00 */
-    int code;                   /* 02 */
+    int16_t have;                   /* 00 */
+    int16_t code;                   /* 02 */
     char name[10];              /* 04 bitmap name */
-    int text;                   /* 0E description */
+    int16_t text;                   /* 0E description */
 } Item;
 
 /* Deferred messages: posted when the crew member walking there arrives. */
@@ -108,105 +113,104 @@ typedef struct Timer {
     unsigned char msg[4];
 } Timer;
 
-extern Bitmap far *screen;
-extern Bitmap far *backbuf;
-extern unsigned char far *mask_buf;
-extern unsigned long blink_count;
-extern int kbd_mouse;
-extern int in_orbit;
-extern int under_attack;
-extern int encounter_kind;
-extern int encounter_delay;
-extern unsigned long bridge_ticks;
-extern int word_45AB2;
-extern int word_45AB4;
-extern int view_dir;
-extern int word_45ABA;
+extern Bitmap *screen;
+extern Bitmap *backbuf;
+extern unsigned char *mask_buf;
+extern uint32_t blink_count;
+extern int16_t kbd_mouse;
+extern int16_t in_orbit;
+extern int16_t under_attack;
+extern int16_t encounter_kind;
+extern int16_t encounter_delay;
+extern uint32_t bridge_ticks;
+extern int16_t word_45AB2;
+extern int16_t word_45AB4;
+extern int16_t view_dir;
+extern int16_t word_45ABA;
 char mission[16];
-extern int boost_active[6];
-int mission_vars[6];
-extern int last_mission;
-extern int mission_ranks[7];
+int16_t mission_vars[6];
+extern int16_t last_mission;
+extern int16_t mission_ranks[7];
 char sfx_name[10];
-extern void (far *bridge_tick)(void);
-extern void (far *tick_fns[32])(void);
-extern int game_mode;
-extern int prev_mode;
-extern int key_accel;
-int voc_wait;
-extern int sfx_on;
-extern int digi_ok;
+extern void (*bridge_tick)(void);
+extern void (*tick_fns[32])(void);
+extern int16_t game_mode;
+extern int16_t prev_mode;
+extern int16_t key_accel;
+int16_t voc_wait;
+extern int16_t sfx_on;
+extern int16_t digi_ok;
 jmp_buf game_jmp;
 jmp_buf room_jmp;
 Msg msg_queue[16];
-extern int msg_head;
-int msg_tail;
+extern int16_t msg_head;
+int16_t msg_tail;
 char room_name[16];
 char room_file[16];
-int room_num;
-long room_ticks;
-long scale_k;
+int16_t room_num;
+int32_t room_ticks;
+int32_t scale_k;
 MemHandle map_handle;
-int cur_region;
-int cur_exit;
+int16_t cur_region;
+int16_t cur_exit;
 Timer timers[31];
-int hit_valid;
-int hit_x;
-int hit_y;
+int16_t hit_valid;
+int16_t hit_x;
+int16_t hit_y;
 Sprite item_sprite;
 Sprite inv_sprite;
-int word_52C14;
-int word_53798;
-int word_50CA6;
-int word_52C1E;
-extern int word_51156;
+int16_t word_52C14;
+int16_t word_53798;
+int16_t word_50CA6;
+int16_t word_52C1E;
+extern int16_t word_51156;
 
-int HasScript(unsigned char a, unsigned char b, unsigned char c, unsigned char d);
-int RunScripts(unsigned char a, unsigned char b, unsigned char c, unsigned char d);
-int RunWildScripts(unsigned char a, unsigned char b, unsigned char c, unsigned char d);
-char far *RdfPtr(unsigned off);
-void PlayScaled(int n, char *name, int x, int y);
-int DepthScale(int y);
+int16_t HasScript(unsigned char a, unsigned char b, unsigned char c, unsigned char d);
+int16_t RunScripts(unsigned char a, unsigned char b, unsigned char c, unsigned char d);
+int16_t RunWildScripts(unsigned char a, unsigned char b, unsigned char c, unsigned char d);
+char *RdfPtr(uint16_t off);
+void PlayScaled(int16_t n, char *name, int16_t x, int16_t y);
+int16_t DepthScale(int16_t y);
 void PostRoomMsg(unsigned char a, unsigned char b, unsigned char c, unsigned char d);
-long PopRoomMsg(void);
-void TraceMsg(long msg);
+int32_t PopRoomMsg(void);
+void TraceMsg(int32_t msg);
 void RoomMsg(void);
-void CallScript(void far *code);
-long ScriptService(int cmd, int a1, int a2, int a3, int a4, unsigned a5);
+void CallScript(void *code);
+int32_t ScriptService(int16_t cmd, int16_t a1, int16_t a2, int16_t a3, int16_t a4, uint16_t a5);
 void CentreLine(char *dst, char *src);
-void ChoiceTitle(char *dst, char far *name, int n);
-long Converse(int text, int x, int y);
-long TextBox(char *(far *fn)(int, void *, char *), void *arg, int x, int y,
-               int color, int choice, int maxl, int flag);
-void MsgBox(char *title, char *text, int x, int y, int color, int msg);
+void ChoiceTitle(char *dst, char *name, int16_t n);
+int32_t Converse(int16_t text, int16_t x, int16_t y);
+int32_t TextBox(void *fn, void *arg, int16_t x, int16_t y,
+               int16_t color, int16_t choice, int16_t maxl, int16_t flag);
+void MsgBox(char *title, char *text, int16_t x, int16_t y, int16_t color, int16_t msg);
 char *SkipVoice(char *p);
 char *PlayVoiceTag(char *p);
-int WrapCount(char *s);
+int16_t WrapCount(char *s);
 void WrapText(char *dst, char *s);
-Bitmap *MakeTextBox(int *px, int *py, int color, int lines, unsigned titled, Sprite *spr);
-void BoxLines(Bitmap *box, int n, int max, char *src, unsigned titled);
+Bitmap *MakeTextBox(int16_t *px, int16_t *py, int16_t color, int16_t lines, uint16_t titled, Sprite *spr);
+void BoxLines(Bitmap *box, int16_t n, int16_t max, char *src, uint16_t titled);
 void BoxTitle(Bitmap *box, char *title);
-char *LayoutChoice(char *(far *fn)(int, void *, char *), void *arg, unsigned sel,
-                Bitmap *box, int max, int *nlines);
-void ActionCursor(int action, int on);
-int FindObject(int x, int y);
-int InPoly(int far *poly, int x, int y);
-int far *NextPoly(int far *poly);
-void CheckRegions(int x, int y);
+char *LayoutChoice(void *fn, void *arg, uint16_t sel,
+                Bitmap *box, int16_t max, int16_t *nlines);
+void ActionCursor(int16_t action, int16_t on);
+int16_t FindObject(int16_t x, int16_t y);
+int16_t InPoly(int16_t *poly, int16_t x, int16_t y);
+int16_t *NextPoly(int16_t *poly);
+void CheckRegions(int16_t x, int16_t y);
 void RoomTimers(void);
-int WalkBlocked(int x, int y);
-int PickUseTarget(void);
+int16_t WalkBlocked(int16_t x, int16_t y);
+int16_t PickUseTarget(void);
 Event WaitAction(void);
-void CrewAnim(char *buf, int crew, char *what);
+void CrewAnim(char *buf, int16_t crew, char *what);
 void HiliteCursor(void);
-int WalkToHit(void);
-int CantAct(int obj, int action);
+int16_t WalkToHit(void);
+int16_t CantAct(int16_t obj, int16_t action);
 void StunTick(void);
-void ShowInvIcon(int on);
+void ShowInvIcon(int16_t on);
 void HideInvIcon(void);
-int AwayInput(void);
-void LoadRoom(char *mission, int n);
-void EnterRoom(int entry);
+int16_t AwayInput(void);
+void LoadRoom(char *mission, int16_t n);
+void EnterRoom(int16_t entry);
 void BeamUp(void);
 void FreeRoom(void);
 void SaveRoom(void);
@@ -287,23 +291,23 @@ Item items[137] = {
     { 0, 0x87, "iDeck", 71 },
     { 0, 0x88, "iTech", 72 }
 };
-int exits_open = 1;                 /* the crew may leave by an exit */
+int16_t exits_open = 1;                 /* the crew may leave by an exit */
 char dir_letters[6] = "nsew";
-int mccoy_lines[8] = { 0x57, 0x58, 0x59, 0x5A, 0x5B, 0x5C, 0x5D, 0x5E };
-int spock_lines[8] = { 0x5F, 0x60, 0x61, 0x62, 0x63, 0x64, 0x65, 0x66 };
-int redshirt_lines[8] = { 0x67, 0x68, 0x69, 0x6A, 0x6B, 0x6C, 0x6D, 0x6E };
-int misc_lines[7] = { 0x6F, 0x70, 0x71, 0x72, 0x73, 0x74, 0x75 };
-unsigned long last_talk = 0;
+int16_t mccoy_lines[8] = { 0x57, 0x58, 0x59, 0x5A, 0x5B, 0x5C, 0x5D, 0x5E };
+int16_t spock_lines[8] = { 0x5F, 0x60, 0x61, 0x62, 0x63, 0x64, 0x65, 0x66 };
+int16_t redshirt_lines[8] = { 0x67, 0x68, 0x69, 0x6A, 0x6B, 0x6C, 0x6D, 0x6E };
+int16_t misc_lines[7] = { 0x6F, 0x70, 0x71, 0x72, 0x73, 0x74, 0x75 };
+uint32_t last_talk = 0;
 
 /* Save the room: its state, then the bytes of the .rdf the scripts
  * changed (with a checksum of the original file). */
 void SaveRoom(void)
 {
-    unsigned size;
-    unsigned i;
-    unsigned long sum;
-    char far *orig;
-    char far *cur;
+    uint16_t size;
+    uint16_t i;
+    uint32_t sum;
+    char *orig;
+    char *cur;
     char c;
 
     SaveWrite(room_mission, 16);
@@ -321,7 +325,7 @@ void SaveRoom(void)
     orig = backbuf->data;
     LoadFilePacked(room_name, "rdf", orig);
     rdf = LockMem(rdf_handle);
-    cur = (char far *)rdf;
+    cur = (char *)rdf;
     for (i = 6; i < size; i++) {
         sum = sum << 1 | sum >> 31;
         sum += orig[i];
@@ -347,7 +351,7 @@ void SaveRoom(void)
  * mission. */
 void SaveGameState(void)
 {
-    int i;
+    int16_t i;
 
     SaveWrite(&game_mode, 2);
     SaveSpace();
@@ -363,7 +367,7 @@ void SaveGameState(void)
     SaveWrite(&word_45AB4, 2);
     SaveWrite(&view_dir, 2);
     SaveWrite(mission, 16);
-    SaveWrite(boost_active, 12);
+    SaveWrite(&boost, sizeof(boost));
     SaveWrite(mission_vars, 12);
     SaveWrite(&last_mission, 2);
     SaveWrite(mission_ranks, 14);
@@ -381,11 +385,11 @@ void SaveGameState(void)
 /* Load the room saved by SaveRoom, patching the .rdf the same way. */
 void RestoreRoom(void)
 {
-    unsigned size;
-    unsigned i;
-    unsigned long saved;
-    unsigned long sum;
-    char far *cur;
+    uint16_t size;
+    uint16_t i;
+    uint32_t saved;
+    uint32_t sum;
+    char *cur;
     char c;
 
     FadeOut();
@@ -408,19 +412,19 @@ void RestoreRoom(void)
     size = GetFileSize(room_name, "rdf");
     sum = 0;
     rdf = LockMem(rdf_handle);
-    cur = (char far *)rdf;
+    cur = (char *)rdf;
     for (i = 6; i < size; i++) {
         sum = sum << 1 | sum >> 31;
         sum += cur[i];
     }
     SaveRead(&saved, 4);
     if (saved == sum) {
-        while (SaveRead(&i, 2), i != -1) {
+        while (SaveRead(&i, 2), i != 0xFFFF) {
             SaveRead(&c, 1);
             cur[i] = c;
         }
     } else {
-        while (SaveRead(&i, 2), i != -1)
+        while (SaveRead(&i, 2), i != 0xFFFF)
             SaveRead(&c, 1);
     }
     UnlockMem(rdf_handle);
@@ -438,7 +442,7 @@ void RestoreRoom(void)
 /* Read the game state back from the save file. */
 void LoadGameState(void)
 {
-    int i;
+    int16_t i;
 
     if (prev_mode == 1)
         BridgeLeave();
@@ -458,7 +462,7 @@ void LoadGameState(void)
     SaveRead(&word_45AB4, 2);
     SaveRead(&view_dir, 2);
     SaveRead(mission, 16);
-    SaveRead(boost_active, 12);
+    SaveRead(&boost, sizeof(boost));
     SaveRead(mission_vars, 12);
     SaveRead(&last_mission, 2);
     SaveRead(mission_ranks, 14);
@@ -501,8 +505,8 @@ void StartAway(void)
 /* The away team's main loop. */
 void AwayLoop(void)
 {
-    int unused[2];
-    int r;
+    int16_t unused[2];
+    int16_t r;
 
     r = setjmp(room_jmp);
     for (;;) {
@@ -527,8 +531,8 @@ void EndAway(void)
 void BeamUp(void)
 {
     char buf[12];
-    int i;
-    int n;
+    int16_t i;
+    int16_t n;
 
     room.busy = 1;
     n = room.redshirt_dead ? 3 : 4;
@@ -548,7 +552,7 @@ void BeamUp(void)
 }
 
 /* Load room n of mission. */
-void LoadRoom(char *mission, int n)
+void LoadRoom(char *mission, int16_t n)
 {
     key_accel = 1;
     strcpy(room_mission, mission);
@@ -556,7 +560,7 @@ void LoadRoom(char *mission, int n)
     room_ticks = 0;
     room.busy = 0;
     FadeOut();
-    FreeAllEMSFiles();
+    FreeAllSfxFiles();
     sprintf(room_name, "%s%d", room_mission, n);
     LoadFilePacked(room_name, "bmp", screen);
     LoadFilePacked(room_name, "pri", mask_buf);
@@ -565,8 +569,9 @@ void LoadRoom(char *mission, int n)
     BlitToScreen(&screen_rect);
     rdf_handle = getanyfile(room_name, "rdf");
     rdf = LockMem(rdf_handle);
-    rdf->service = ScriptService;
-    rdf->state = (unsigned)&room;
+    rdf->service = 0;                   /* the scripts' game call is ScriptServiceVM */
+    rdf->state = RDF_ROOM_BASE;
+    rdf_size = GetFileSize(room_name, "rdf");
     UnlockMem(rdf_handle);
     room.action = 1;
     strcpy(room_file, room_name);
@@ -577,9 +582,9 @@ void LoadRoom(char *mission, int n)
     rdf = LockMem(rdf_handle);
     scale_k = (rdf->scale_max - rdf->scale_min) * 256.0 / (rdf->y_max - rdf->y_min + 1);
     if (rdf->bans != rdf->bans_end) {
-        unsigned i;
-        unsigned last;
-        char far *p;
+        uint16_t i;
+        uint16_t last;
+        char *p;
         char name[16];
 
         i = rdf->bans;
@@ -600,18 +605,18 @@ void LoadRoom(char *mission, int n)
 
 /* Bring the landing party into the room: by entrance 0 to 3, beamed in
  * (4), standing (5), or the bridge crew (6). */
-void EnterRoom(int entry)
+void EnterRoom(int16_t entry)
 {
-    int off;
-    int i;
-    int n;
+    int16_t off;
+    int16_t i;
+    int16_t n;
     char buf[16];
-    int x0;
-    int y0;
-    int x1;
-    int y1;
+    int16_t x0;
+    int16_t y0;
+    int16_t x1;
+    int16_t y1;
 
-    FreeAllEMSFiles();
+    FreeAllSfxFiles();
     MemSet(room.fall, 4, 0xFF);
     switch (entry) {
     case 0:
@@ -669,11 +674,11 @@ void EnterRoom(int entry)
 }
 
 /* The away team's input. */
-int AwayInput(void)
+int16_t AwayInput(void)
 {
     Event ev;
-    int obj;
-    int k;
+    int16_t obj;
+    int16_t k;
     char buf[14];
 
     if (GetEvent(&ev)) {
@@ -689,7 +694,7 @@ int AwayInput(void)
             RoomTimers();
             blink_count++;
             room_ticks++;
-            PostRoomMsg(0, (int)room_ticks & 0xFF, (int)(room_ticks >> 8) & 0xFF, 0);
+            PostRoomMsg(0, (int16_t)room_ticks & 0xFF, (int16_t)(room_ticks >> 8) & 0xFF, 0);
             if (room_ticks >= 2)
                 FadeUp();
             break;
@@ -815,7 +820,7 @@ int AwayInput(void)
         case EV_KEY:
             if (room.busy)
                 break;
-            switch (k = ((unsigned)ev.key >> 8) & 0xFF) {
+            switch (k = ((uint16_t)ev.key >> 8) & 0xFF) {
             case 0x1C:
             case 0x3B:
                 goto click;
@@ -857,6 +862,7 @@ int AwayInput(void)
             }
         }
     }
+    return 0;
 }
 
 /* Free the room and its actors. */
@@ -870,37 +876,37 @@ void FreeRoom(void)
 }
 
 /* A pointer into the .rdf. */
-char far *RdfPtr(unsigned off)
+char *RdfPtr(uint16_t off)
 {
-    char far *p;
+    char *p;
 
-    p = (char far *)rdf;
+    p = (char *)rdf;
     p += off;
     return p;
 }
 
 /* Play an animation scaled for its depth. */
-void PlayScaled(int n, char *name, int x, int y)
+void PlayScaled(int16_t n, char *name, int16_t x, int16_t y)
 {
-    int scale;
+    int16_t scale;
 
     scale = DepthScale(y);
     StartAnim(n, name, x, y, scale);
 }
 
 /* The scale for depth y. */
-int DepthScale(int y)
+int16_t DepthScale(int16_t y)
 {
     rdf = LockMem(rdf_handle);
     y = min(rdf->y_max, y);
     y = max(rdf->y_min, y);
-    y = ((long)(y - rdf->y_min) * scale_k >> 8) + (unsigned long)rdf->scale_min;
+    y = ((int32_t)(y - rdf->y_min) * scale_k >> 8) + (uint32_t)rdf->scale_min;
     UnlockMem(rdf_handle);
     return y;
 }
 
 /* The priority at y. */
-int DepthPri(int y)
+int16_t DepthPri(int16_t y)
 {
     return ((unsigned char)mask_buf[y * 160] >> 4) & 0x0F;
 }
@@ -919,20 +925,20 @@ void PostRoomMsg(unsigned char a, unsigned char b, unsigned char c, unsigned cha
 }
 
 /* The next room message, as a long. */
-long PopRoomMsg(void)
+int32_t PopRoomMsg(void)
 {
     Msg *m;
 
     m = &msg_queue[msg_head];
     msg_head %= 16;
-    return *(long *)m;
+    return *(int32_t *)m;
 }
 
 /* A message trace, compiled out (an empty switch). */
-void TraceMsg(long msg)
+void TraceMsg(int32_t msg)
 {
     char unused[10];
-    long m;
+    int32_t m;
 
     m = msg;
     switch (m) {
@@ -940,25 +946,25 @@ void TraceMsg(long msg)
 }
 
 /* Is there a script for this message? */
-int HasScript(unsigned char a, unsigned char b, unsigned char c, unsigned char d)
+int16_t HasScript(unsigned char a, unsigned char b, unsigned char c, unsigned char d)
 {
-    unsigned long key;
+    uint32_t key;
 
-    key = ((unsigned long)a & 0xFF) << 0 | ((unsigned long)b & 0xFF) << 8
-        | ((unsigned long)c & 0xFF) << 16 | ((unsigned long)d & 0xFF) << 24;
+    key = ((uint32_t)a & 0xFF) << 0 | ((uint32_t)b & 0xFF) << 8
+        | ((uint32_t)c & 0xFF) << 16 | ((uint32_t)d & 0xFF) << 24;
     rdf = LockMem(rdf_handle);
     {
-        Script far *p;
-        Script far *end;
+        Script *p;
+        Script *end;
 
-        p = (Script far *)RdfPtr(rdf->scripts);
-        end = (Script far *)RdfPtr(rdf->scripts_end);
+        p = (Script *)RdfPtr(rdf->scripts);
+        end = (Script *)RdfPtr(rdf->scripts_end);
         while (p < end) {
             if (p->key == key) {
                 UnlockMem(rdf_handle);
                 return 1;
             }
-            p = (Script far *)RdfPtr(p->next);
+            p = (Script *)RdfPtr(p->next);
         }
     }
     UnlockMem(rdf_handle);
@@ -966,19 +972,19 @@ int HasScript(unsigned char a, unsigned char b, unsigned char c, unsigned char d
 }
 
 /* Run the scripts for this message. */
-int RunScripts(unsigned char a, unsigned char b, unsigned char c, unsigned char d)
+int16_t RunScripts(unsigned char a, unsigned char b, unsigned char c, unsigned char d)
 {
-    unsigned long key;
+    uint32_t key;
 
-    key = ((unsigned long)a & 0xFF) << 0 | ((unsigned long)b & 0xFF) << 8
-        | ((unsigned long)c & 0xFF) << 16 | ((unsigned long)d & 0xFF) << 24;
+    key = ((uint32_t)a & 0xFF) << 0 | ((uint32_t)b & 0xFF) << 8
+        | ((uint32_t)c & 0xFF) << 16 | ((uint32_t)d & 0xFF) << 24;
     rdf = LockMem(rdf_handle);
     {
-        Script far *p;
-        Script far *end;
+        Script *p;
+        Script *end;
 
-        p = (Script far *)RdfPtr(rdf->scripts);
-        end = (Script far *)RdfPtr(rdf->scripts_end);
+        p = (Script *)RdfPtr(rdf->scripts);
+        end = (Script *)RdfPtr(rdf->scripts_end);
         while (p < end) {
             if (p->key == key) {
                 room.more = 0;
@@ -988,7 +994,7 @@ int RunScripts(unsigned char a, unsigned char b, unsigned char c, unsigned char 
                     return 1;
                 }
             }
-            p = (Script far *)RdfPtr(p->next);
+            p = (Script *)RdfPtr(p->next);
         }
     }
     UnlockMem(rdf_handle);
@@ -996,21 +1002,21 @@ int RunScripts(unsigned char a, unsigned char b, unsigned char c, unsigned char 
 }
 
 /* As RunScripts, with FF bytes in a script's key matching anything. */
-int RunWildScripts(unsigned char a, unsigned char b, unsigned char c, unsigned char d)
+int16_t RunWildScripts(unsigned char a, unsigned char b, unsigned char c, unsigned char d)
 {
-    unsigned long key;
+    uint32_t key;
 
-    key = ((unsigned long)a & 0xFF) << 0 | ((unsigned long)b & 0xFF) << 8
-        | ((unsigned long)c & 0xFF) << 16 | ((unsigned long)d & 0xFF) << 24;
+    key = ((uint32_t)a & 0xFF) << 0 | ((uint32_t)b & 0xFF) << 8
+        | ((uint32_t)c & 0xFF) << 16 | ((uint32_t)d & 0xFF) << 24;
     rdf = LockMem(rdf_handle);
     {
-        Script far *p;
-        Script far *end;
-        unsigned long mask;
-        unsigned long k;
+        Script *p;
+        Script *end;
+        uint32_t mask;
+        uint32_t k;
 
-        p = (Script far *)RdfPtr(rdf->scripts);
-        end = (Script far *)RdfPtr(rdf->scripts_end);
+        p = (Script *)RdfPtr(rdf->scripts);
+        end = (Script *)RdfPtr(rdf->scripts_end);
         while (p < end) {
             k = p->key;
             mask = (k & 0xFF000000L) == 0xFF000000L ? 0 : 0xFF000000L;
@@ -1025,7 +1031,7 @@ int RunWildScripts(unsigned char a, unsigned char b, unsigned char c, unsigned c
                     return 1;
                 }
             }
-            p = (Script far *)RdfPtr(p->next);
+            p = (Script *)RdfPtr(p->next);
         }
     }
     UnlockMem(rdf_handle);
@@ -1046,7 +1052,7 @@ void RoomMsg(void)
         return;
     }
     if (m->type == 12 && m->arg >= 0xE0) {
-        int n;
+        int16_t n;
 
         n = m->arg - 0xE0;
         PostRoomMsg(timers[n].msg[0], timers[n].msg[1], timers[n].msg[2], timers[n].msg[3]);
@@ -1066,7 +1072,7 @@ void RoomMsg(void)
         break;
     }
     case 6: {
-        unsigned n;
+        uint16_t n;
 
         if (RunWildScripts(m->type, m->arg, m->b2, m->b3))
             break;
@@ -1144,29 +1150,29 @@ void RoomMsg(void)
         case 0x40:
         case 0x41: {
             char *who;
-            int *tab;
-            int color;
-            int r;
-            char far *text;
+            int16_t *tab;
+            int16_t color;
+            int16_t r;
+            char *text;
 
             switch (m->b2) {
             case 2:
                 tab = mccoy_lines;
-                r = (unsigned)rand() % 8;
+                r = (uint16_t)rand() % 8;
                 who = "McCoy";
                 color = 0xC0;
                 text = GetText(tab[r]);
                 break;
             case 1:
                 tab = spock_lines;
-                r = (unsigned)rand() % 8;
+                r = (uint16_t)rand() % 8;
                 who = "Spock";
                 color = 0xC0;
                 text = GetText(tab[r]);
                 break;
             case 3:
                 tab = redshirt_lines;
-                r = (unsigned)rand() % 8;
+                r = (uint16_t)rand() % 8;
                 who = "Security Officer";
                 color = 0xA1;
                 text = GetText(tab[r]);
@@ -1178,7 +1184,7 @@ void RoomMsg(void)
                 if (RunWildScripts(m->type, m->arg, m->b2, m->b3))
                     return;
                 tab = misc_lines;
-                r = (unsigned)rand() % 7;
+                r = (uint16_t)rand() % 7;
                 who = r & 1 ? "McCoy" : "Spock";
                 color = r & 1 ? 0xC0 : 0xC0;
                 text = GetText(tab[r]);
@@ -1212,24 +1218,28 @@ void RoomMsg(void)
 }
 
 /* Run a script's machine code with SI at the room state. */
-void CallScript(void far *code)
+void CallScript(void *code)
 {
-    _asm {
-        push si
-        push di
-        mov ax, ds
-        mov es, ax
-        mov bx, offset room
-        mov si, bx
-        call dword ptr code
-        pop di
-        pop si
+    uint16_t ip;
+
+    if (RdfRun((unsigned char *)rdf, rdf_size, (unsigned char *)code - (unsigned char *)rdf, &room,
+               sizeof(room), ScriptServiceVM)) {
+        const char *why = RdfError(&ip);
+
+        Fatal("room script: %s at %04X", why, ip);
     }
+}
+
+/* The scripts' call into the game: the words on their stack are ScriptService's
+ * arguments. */
+static int32_t ScriptServiceVM(int16_t *a)
+{
+    return ScriptService(a[0], a[1], a[2], a[3], a[4], a[5]);
 }
 
 /* Play name.anm as actor n at (x, y) (its sprite's place for -1) and
  * report msg when it ends. */
-void PlayRoomAnim(int n, char *name, int x, int y, unsigned msg)
+void PlayRoomAnim(int16_t n, char *name, int16_t x, int16_t y, uint16_t msg)
 {
     Actor *a;
     char buf[10];
@@ -1248,19 +1258,12 @@ void PlayRoomAnim(int n, char *name, int x, int y, unsigned msg)
 }
 
 /* The scripts' service call (rdf->service). */
-long ScriptService(int cmd, int a1, int a2, int a3, int a4, unsigned a5)
+int32_t ScriptService(int16_t cmd, int16_t a1, int16_t a2, int16_t a3, int16_t a4, uint16_t a5)
 {
-    long r;
+    int32_t r;
     Actor *a;
 
     r = 0;
-    _asm {
-        mov ax, [bp+4]
-        cmp ax, word ptr rdf+2
-        jne seg_ok
-        mov word ptr [bp+4], 0
-    seg_ok:
-    }
     UnlockMem(rdf_handle);
     switch (cmd) {
     case 0:
@@ -1319,9 +1322,9 @@ long ScriptService(int cmd, int a1, int a2, int a3, int a4, unsigned a5)
         break;
     case 8: {
         char buf[14];
-        int unused;
+        int16_t unused;
         Actor *b;
-        int ok;
+        int16_t ok;
 
         b = &actors[a1];
         if (a1 >= 0 && a1 <= 3) {
@@ -1329,19 +1332,19 @@ long ScriptService(int cmd, int a1, int a2, int a3, int a4, unsigned a5)
             ok = StartWalk(a1, buf, b->x, b->y, a2, a3);
             if (ok && a4) {
                 b->notify = 1;
-                b->notify_arg = (unsigned)a4;
+                b->notify_arg = (uint16_t)a4;
             }
         } else
             Fatal("Tried to walk a non PC");
         break;
     }
     case 10: {
-        char name[8];
+        char name[12];
 
         rdf = LockMem(rdf_handle);
         MemCpy(name, RdfPtr(a1), 10);
         UnlockMem(rdf_handle);
-        FlashBitmap(name);
+        FlashBitmap(name, 5);
         break;
     }
     case 9:
@@ -1360,13 +1363,13 @@ long ScriptService(int cmd, int a1, int a2, int a3, int a4, unsigned a5)
         break;
     case 13:
         a = &actors[a1];
-        r = a->sprite.x | (long)a->sprite.y << 16;
+        r = a->sprite.x | (int32_t)a->sprite.y << 16;
         break;
     case 14:
         r = rand() % (a2 - a1 + 1) + a1;
         break;
     case 21: {
-        char name[8];
+        char name[12];
 
         rdf = LockMem(rdf_handle);
         MemCpy(name, RdfPtr(a1), 10);
@@ -1381,7 +1384,7 @@ long ScriptService(int cmd, int a1, int a2, int a3, int a4, unsigned a5)
         BridgeSfx(a1);
         break;
     case 16:
-        PlayMusic((unsigned)a1, (unsigned)a2);
+        PlayMusic((uint16_t)a1, (uint16_t)a2);
         break;
     case 17:
         word_50CA6 = a1;
@@ -1392,10 +1395,10 @@ long ScriptService(int cmd, int a1, int a2, int a3, int a4, unsigned a5)
     case 18:
         GameOverMenu();
     case 19: {
-        char buf[28];
+        char buf[32];
         char *p;
         char *code;
-        int i;
+        int16_t i;
 
         rdf = LockMem(rdf_handle);
         MemCpy(buf, RdfPtr(a1), 30);
@@ -1420,21 +1423,13 @@ long ScriptService(int cmd, int a1, int a2, int a3, int a4, unsigned a5)
         Fatal("unknown room cmd");
     }
     rdf = LockMem(rdf_handle);
-    _asm {
-        mov ax, [bp+4]
-        or ax, ax
-        jne seg_set
-        mov ax, word ptr rdf+2
-        mov [bp+4], ax
-    seg_set:
-    }
     return r;
 }
 
 /* Centre src in a 24 character line. */
 void CentreLine(char *dst, char *src)
 {
-    int len;
+    int16_t len;
 
     MemSet(dst, 24, ' ');
     len = strlen(src);
@@ -1444,10 +1439,10 @@ void CentreLine(char *dst, char *src)
 }
 
 /* A choice's title: the speaker, numbered when there are choices. */
-void ChoiceTitle(char *dst, char far *name, int n)
+void ChoiceTitle(char *dst, char *name, int16_t n)
 {
     char buf[44];
-    int len;
+    int16_t len;
 
     len = _fstrlen(name) + 1;
     MemCpy(buf, name, min(len, 25));
@@ -1461,15 +1456,15 @@ void ChoiceTitle(char *dst, char far *name, int n)
 
 /* Choice n of a conversation (for TextBox): its text, and its title
  * in title. */
-char *TalkChoice(unsigned n, int *list, char *title)
+char *TalkChoice(uint16_t n, int16_t *list, char *title)
 {
-    unsigned far *entry;
-    char far *str;
+    uint16_t *entry;
+    char *str;
     char *buf;
-    int len;
+    int16_t len;
 
     rdf = LockMem(rdf_handle);
-    entry = (unsigned far *)RdfPtr(*list);
+    entry = (uint16_t *)RdfPtr(*list);
     if (entry[n + 1] == 0) {
         UnlockMem(rdf_handle);
         return 0;
@@ -1490,15 +1485,15 @@ char *TalkChoice(unsigned n, int *list, char *title)
 }
 
 /* A conversation from the .rdf. Returns the choice. */
-long Converse(int text, int x, int y)
+int32_t Converse(int16_t text, int16_t x, int16_t y)
 {
-    unsigned far *entry;
+    uint16_t *entry;
     char name[26];
-    int color;
-    int list;
+    int16_t color;
+    int16_t list;
 
     rdf = LockMem(rdf_handle);
-    entry = (unsigned far *)RdfPtr(text);
+    entry = (uint16_t *)RdfPtr(text);
     if (entry[0])
         MemCpy(name, RdfPtr(entry[0]), 25);
     if (entry[0] && name[0]) {
@@ -1531,9 +1526,9 @@ typedef struct TextArg {
 } TextArg;
 
 /* The single choice of a message box (for TextBox). */
-char *MsgChoice(unsigned n, TextArg *arg, char *title)
+char *MsgChoice(uint16_t n, TextArg *arg, char *title)
 {
-    int len;
+    int16_t len;
     char *buf;
 
     if (n)
@@ -1546,10 +1541,10 @@ char *MsgChoice(unsigned n, TextArg *arg, char *title)
 }
 
 /* A message box: title (a speaker) and text. Then post msg. */
-void MsgBox(char *title, char *text, int x, int y, int color, int msg)
+void MsgBox(char *title, char *text, int16_t x, int16_t y, int16_t color, int16_t msg)
 {
     TextArg arg;
-    int n;
+    int16_t n;
 
     if (title && *title)
         CentreLine(arg.title, title);
@@ -1583,7 +1578,7 @@ char *PlayVoiceTag(char *p)
 {
     char *q;
     char name[256];
-    int i;
+    int16_t i;
 
     q = p;
     if (*q == '#') {
@@ -1602,35 +1597,35 @@ char *PlayVoiceTag(char *p)
 
 /* A conversation box: fn gives the choices. Returns the one picked, -1
  * if cancelled (flag). */
-long TextBox(char *(far *fn)(int, void *, char *), void *arg, int x, int y,
-               int color, int choice, int maxl, int flag)
+int32_t TextBox(void *fn, void *arg, int16_t x, int16_t y,
+               int16_t color, int16_t choice, int16_t maxl, int16_t flag)
 {
     char *lines;
     char buf[24];
-    int ntitled;
-    int n;
-    int maxlines;
-    int sel;
-    int nlines;
+    int16_t ntitled;
+    int16_t n;
+    int16_t maxlines;
+    int16_t sel;
+    int16_t nlines;
     char *text;
-    int top;
+    int16_t top;
     Sprite box;
     Bitmap *boxbuf;
     char unused[14];
-    int done;
-    int mx;
-    int my;
+    int16_t done;
+    int16_t mx;
+    int16_t my;
     MemHandle bmp;
-    int kbd;
-    int vw;
-    unsigned long timeout;
+    int16_t kbd;
+    int16_t vw;
+    uint32_t timeout;
 
     vw = voc_wait;
     timeout = blink_count > last_talk + 1 ? 16 : 8;
     ntitled = 0;
     maxlines = 0;
-    for (n = 0; (text = (*fn)(n, arg, buf)) != 0; n++) {
-        int r;
+    for (n = 0; (text = ((char *(*)())fn)(n, arg, buf)) != 0; n++) {
+        int16_t r;
 
         r = WrapCount(SkipVoice(text));
         if (r > maxlines)
@@ -1660,7 +1655,7 @@ long TextBox(char *(far *fn)(int, void *, char *), void *arg, int x, int y,
     if (lines == 0) {
         DelSprite(&box);
         for (done = 0; !done; ) {
-            int r;
+            int16_t r;
 
             r = MenuWait(timeout, 1);
             if (timeout)
@@ -1704,7 +1699,7 @@ long TextBox(char *(far *fn)(int, void *, char *), void *arg, int x, int y,
         if (choice == 0)
             MenuDisable(8L);
         for (done = 0; !done; ) {
-            int r;
+            int16_t r;
 
             r = MenuLoop(timeout, 1);
             if (timeout)
@@ -1814,10 +1809,10 @@ long TextBox(char *(far *fn)(int, void *, char *), void *arg, int x, int y,
 }
 
 /* The number of 24 character lines s wraps to. */
-int WrapCount(char *s)
+int16_t WrapCount(char *s)
 {
     char buf[26];
-    int n;
+    int16_t n;
 
     for (n = 0; (s = WrapLine(s, buf, 24)) != 0; n++)
         ;
@@ -1828,7 +1823,7 @@ int WrapCount(char *s)
 void WrapText(char *dst, char *s)
 {
     char buf[26];
-    int i;
+    int16_t i;
 
     s = WrapLine(s, buf, 24);
     while (s) {
@@ -1842,16 +1837,16 @@ void WrapText(char *dst, char *s)
 
 /* Make the text box sprite: a frame of font characters, placed near
  * (*px, *py) and on screen. */
-Bitmap *MakeTextBox(int *px, int *py, int color, int lines, unsigned titled, Sprite *spr)
+Bitmap *MakeTextBox(int16_t *px, int16_t *py, int16_t color, int16_t lines, uint16_t titled, Sprite *spr)
 {
-    int unused;
+    int16_t unused;
     Bitmap *bmp;
     char *p;
-    int i;
-    int extra;
-    int t;
-    int x;
-    int y;
+    int16_t i;
+    int16_t extra;
+    int16_t t;
+    int16_t x;
+    int16_t y;
 
     extra = titled ? 4 : 2;
     x = *px;
@@ -1907,9 +1902,9 @@ Bitmap *MakeTextBox(int *px, int *py, int color, int lines, unsigned titled, Spr
 }
 
 /* Put n lines of src in the box (blank the rest of max). */
-void BoxLines(Bitmap *box, int n, int max, char *src, unsigned titled)
+void BoxLines(Bitmap *box, int16_t n, int16_t max, char *src, uint16_t titled)
 {
-    int i;
+    int16_t i;
     char *p;
 
     p = (char *)box + 35;
@@ -1940,15 +1935,15 @@ void BoxTitle(Bitmap *box, char *title)
 
 /* Lay out choice sel in the box, speaking its voice tag. Returns the
  * lines (0 when only spoken). */
-char *LayoutChoice(char *(far *fn)(int, void *, char *), void *arg, unsigned sel,
-                Bitmap *box, int max, int *nlines)
+char *LayoutChoice(void *fn, void *arg, uint16_t sel,
+                Bitmap *box, int16_t max, int16_t *nlines)
 {
     char *text;
     char *q;
     char *out;
     char title[24];
 
-    text = (*fn)(sel, arg, title);
+    text = ((char *(*)())fn)(sel, arg, title);
     if (voc_wait == 2 && sfx_on == 1 && digi_ok == 1) {
         q = PlayVoiceTag(text);
         if (q == text)
@@ -1972,7 +1967,7 @@ char *LayoutChoice(char *(far *fn)(int, void *, char *), void *arg, unsigned sel
 }
 
 /* The pointer for action (highlighted when on something). */
-void ActionCursor(int action, int on)
+void ActionCursor(int16_t action, int16_t on)
 {
     char *name;
 
@@ -1987,7 +1982,7 @@ void ActionCursor(int action, int on)
         static char *look_cursors[8] = {
             "lookh0", "lookh0", "lookh0", "lookh0", "lookh0", "lookh1", "lookh2", "lookh3"
         };
-        static int look_idx = 0;
+        static int16_t look_idx = 0;
 
         if (on) {
             if ((rand() & 7) == 0)
@@ -2019,14 +2014,14 @@ void ActionCursor(int action, int on)
 
 /* What's at (x, y): a crew member or other actor, the inventory icon,
  * the selected item, an object polygon, or -1. */
-int FindObject(int x, int y)
+int16_t FindObject(int16_t x, int16_t y)
 {
     Sprite *s;
-    int far *e;
-    int far *end;
-    int far *q;
-    int mask;
-    int i;
+    int16_t *e;
+    int16_t *end;
+    int16_t *q;
+    int16_t mask;
+    int16_t i;
     Actor *a;
 
     s = SpriteAt(x, y);
@@ -2041,8 +2036,8 @@ int FindObject(int x, int y)
         Fatal("FindObject: clicked on unknown sprite.");
     }
     rdf = LockMem(rdf_handle);
-    e = (int far *)RdfPtr(rdf->objects);
-    end = (int far *)RdfPtr(rdf->objects_end);
+    e = (int16_t *)RdfPtr(rdf->objects);
+    end = (int16_t *)RdfPtr(rdf->objects_end);
     hit_valid = 0;
     mask = 1 << (room.action - 1);
     while (e != end) {
@@ -2069,16 +2064,16 @@ int FindObject(int x, int y)
 }
 
 /* Is (x, y) inside the convex polygon poly (id, n, points)? */
-int InPoly(int far *poly, int x, int y)
+int16_t InPoly(int16_t *poly, int16_t x, int16_t y)
 {
-    int i;
-    int n;
-    Point far *p;
+    int16_t i;
+    int16_t n;
+    Point *p;
     Point e;
     Point d;
     Point a;
 
-    p = (Point far *)(poly + 2);
+    p = (Point *)(poly + 2);
     n = poly[1] - 1;
     for (i = 0; i != n; ++i, ++p) {
         a = p[0];
@@ -2091,7 +2086,7 @@ int InPoly(int far *poly, int x, int y)
             return 0;
     }
     a = p[0];
-    e = *(Point far *)(poly + 2);
+    e = *(Point *)(poly + 2);
     e.x -= a.x;
     e.y -= a.y;
     d.x = x - a.x;
@@ -2102,24 +2097,24 @@ int InPoly(int far *poly, int x, int y)
 }
 
 /* The polygon after poly. */
-int far *NextPoly(int far *poly)
+int16_t *NextPoly(int16_t *poly)
 {
-    char far *p;
+    char *p;
 
-    p = (char far *)poly;
+    p = (char *)poly;
     p += poly[1] * 4 + 4;
-    return (int far *)p;
+    return (int16_t *)p;
 }
 
 /* Report the region, else the exit, the pointer moves into. */
-void CheckRegions(int x, int y)
+void CheckRegions(int16_t x, int16_t y)
 {
-    unsigned far *e;
-    unsigned far *end;
+    uint16_t *e;
+    uint16_t *end;
 
     rdf = LockMem(rdf_handle);
-    e = (unsigned far *)RdfPtr(rdf->regions);
-    end = (unsigned far *)RdfPtr(rdf->regions_end);
+    e = (uint16_t *)RdfPtr(rdf->regions);
+    end = (uint16_t *)RdfPtr(rdf->regions_end);
     while (e != end) {
         if (InPoly(e, x, y) == 1) {
             if (*e != cur_region) {
@@ -2133,8 +2128,8 @@ void CheckRegions(int x, int y)
     }
     cur_region = -1;
     if (room.flags == 0 && exits_open) {
-        e = (unsigned far *)RdfPtr(rdf->exits);
-        end = (unsigned far *)RdfPtr(rdf->exits_end);
+        e = (uint16_t *)RdfPtr(rdf->exits);
+        end = (uint16_t *)RdfPtr(rdf->exits_end);
         while (e != end) {
             if (InPoly(e, x, y) == 1) {
                 if (*e != cur_exit) {
@@ -2154,7 +2149,7 @@ void CheckRegions(int x, int y)
 /* Count down the room timers. */
 void RoomTimers(void)
 {
-    int i;
+    int16_t i;
 
     for (i = 0; i != 8; i++)
         if (room.timers[i] && --room.timers[i] == 0)
@@ -2162,7 +2157,7 @@ void RoomTimers(void)
 }
 
 /* x on screen. */
-int ClampX(int x)
+int16_t ClampX(int16_t x)
 {
     if (x <= 0)
         x = 0;
@@ -2172,7 +2167,7 @@ int ClampX(int x)
 }
 
 /* y on screen. */
-int ClampY(int y)
+int16_t ClampY(int16_t y)
 {
     if (y <= 0)
         y = 0;
@@ -2182,12 +2177,12 @@ int ClampY(int y)
 }
 
 /* Is (x, y) blocked in the walk map? */
-int WalkBlocked(int x, int y)
+int16_t WalkBlocked(int16_t x, int16_t y)
 {
     unsigned char bit;
-    int off;
-    int r;
-    unsigned char far *map;
+    int16_t off;
+    int16_t r;
+    unsigned char *map;
 
     map = LockMem(map_handle);
     bit = 0x80 >> (x & 7);
@@ -2199,16 +2194,16 @@ int WalkBlocked(int x, int y)
 }
 
 /* Pick what to use the selected object on. Returns it or -1. */
-int PickUseTarget(void)
+int16_t PickUseTarget(void)
 {
     Event ev;
-    int obj;
+    int16_t obj;
 
     for (;;) {
         if ((room.flags & 1) == 0)
             ShowInvIcon(0);
         ev = WaitAction();
-        if (ev.type == EV_KEY && (((unsigned)ev.key >> 8) & 0xFF) == 0x17) {
+        if (ev.type == EV_KEY && (((uint16_t)ev.key >> 8) & 0xFF) == 0x17) {
             HideInvIcon();
             obj = PickItem(50, 50, 1);
             if (obj == -1)
@@ -2268,7 +2263,7 @@ Event WaitAction(void)
             case EV_DOWN2:
                 return *e;
             case EV_KEY:
-                switch (((unsigned)e->key >> 8) & 0xFF) {
+                switch (((uint16_t)e->key >> 8) & 0xFF) {
                 case 0x17:
                     PopEvent();
                     return *e;
@@ -2296,10 +2291,10 @@ Event WaitAction(void)
 }
 
 char crew_letters[6] = "ksmr";
-int action_masks[5] = { 0, 7, 6, 7, 3 };
+int16_t action_masks[5] = { 0, 7, 6, 7, 3 };
 
 /* Crew member crew's animation name for what. */
-void CrewAnim(char *buf, int crew, char *what)
+void CrewAnim(char *buf, int16_t crew, char *what)
 {
     sprintf(buf, "%c%s", crew_letters[crew], what);
 }
@@ -2307,9 +2302,9 @@ void CrewAnim(char *buf, int crew, char *what)
 /* Highlight the pointer when it's over something the action applies to. */
 void HiliteCursor(void)
 {
-    int mask;
-    int obj;
-    int on;
+    int16_t mask;
+    int16_t obj;
+    int16_t on;
 
     mask = action_masks[room.action - 1];
     obj = FindObject(mouse_x, mouse_y);
@@ -2320,11 +2315,11 @@ void HiliteCursor(void)
 
 /* Walk the crew member to the spot clicked, with the action posted
  * when they get there. Returns 0 if the spot isn't a walk-to spot. */
-int WalkToHit(void)
+int16_t WalkToHit(void)
 {
-    int crew;
-    unsigned timer;
-    int i;
+    int16_t crew;
+    uint16_t timer;
+    int16_t i;
     char buf[16];
 
     if (hit_valid) {
@@ -2343,18 +2338,18 @@ int WalkToHit(void)
         Fatal("Jay didn't think about pmcheck.");
     timer = 0;
     if (room.action != 1) {
-        Script far *e;
-        Script far *end;
-        unsigned long key;
-        int found;
+        Script *e;
+        Script *end;
+        uint32_t key;
+        int16_t found;
 
         found = 0;
         rdf = LockMem(rdf_handle);
-        e = (Script far *)RdfPtr(rdf->scripts);
-        end = (Script far *)RdfPtr(rdf->scripts_end);
-        key = room.action | (unsigned long)room.target << 8;
+        e = (Script *)RdfPtr(rdf->scripts);
+        end = (Script *)RdfPtr(rdf->scripts_end);
+        key = room.action | (uint32_t)room.target << 8;
         if (room.action == 2)
-            key |= (unsigned long)room.target2 << 16;
+            key |= (uint32_t)room.target2 << 16;
         while (e < end) {
             if (e->key == key) {
                 for (i = 0; i != 31; i++)
@@ -2373,7 +2368,7 @@ int WalkToHit(void)
                     }
                 break;
             }
-            e = (Script far *)RdfPtr(e->next);
+            e = (Script *)RdfPtr(e->next);
         }
         UnlockMem(rdf_handle);
         if (found == 0) {
@@ -2394,7 +2389,7 @@ int WalkToHit(void)
 }
 
 /* Can't act on obj (a stunned or dead crew member)? */
-int CantAct(int obj, int action)
+int16_t CantAct(int16_t obj, int16_t action)
 {
     if (action == 4)
         return 0;
@@ -2412,12 +2407,12 @@ int CantAct(int obj, int action)
 /* Stunned crew members get up when their time is up. */
 void StunTick(void)
 {
-    int bit;
-    int i;
+    int16_t bit;
+    int16_t i;
     char buf[10];
-    int dx;
-    int dy;
-    int scale;
+    int16_t dx;
+    int16_t dy;
+    int16_t scale;
 
     if (room.flags == 0)
         return;
@@ -2448,10 +2443,10 @@ void StunTick(void)
 }
 
 /* Show the inventory icon, and the selected object for use. */
-void ShowInvIcon(int on)
+void ShowInvIcon(int16_t on)
 {
     char *name;
-    int x;
+    int16_t x;
 
     name = 0;
     if (on) {
@@ -2510,7 +2505,7 @@ void HideInvIcon(void)
 }
 
 /* A crew member who fell stands facing the way they fell. */
-void StandUp(Actor *a, int n)
+void StandUp(Actor *a, int16_t n)
 {
     char c;
 

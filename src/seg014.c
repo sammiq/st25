@@ -1,5 +1,6 @@
 /* seg014: menus */
 
+#include "compat.h"
 #include "mem.h"
 #include "bitmap.h"
 #include "cache.h"
@@ -11,40 +12,40 @@
 #include "menu.h"
 
 /* Globals this file owns (declared in the headers). */
-int menu_sel;
-int menu_count;
-unsigned mouse_x;
-unsigned mouse_y;
+int16_t menu_sel;
+int16_t menu_count;
+uint16_t mouse_x;
+uint16_t mouse_y;
 
 void UpdateActors(void);               /* seg000 */
 void DrawBans(void);
 void UpdateBans(void);
-void BridgeSfx(int a);              /* seg001 */
-void ActionCursor(int a, int b);       /* seg008 */
+void BridgeSfx(int16_t a);              /* seg001 */
+void ActionCursor(int16_t a, int16_t b);       /* seg008 */
 void SaveMenu(void);               /* seg019: save game */
 void LoadGameMenu(void);           /* seg019: load game */
-void QuitMenu(int x, int y);       /* seg019: quit */
-void TextModeMenu(int a);
+void QuitMenu(int16_t x, int16_t y);       /* seg019: quit */
+void TextModeMenu(int16_t a);
 
-extern int kbd_mouse;
-extern int key_accel;
-extern long blink_count;
-int stream_done;
-extern int voc_wait;
+extern int16_t kbd_mouse;
+extern int16_t key_accel;
+extern int32_t blink_count;
+int16_t stream_done;
+extern int16_t voc_wait;
 MemHandle menu_handle;
-int menu_saved_accel;
+int16_t menu_saved_accel;
 
 Sprite *menu_sprites = 0;
-int *menu_ids = 0;
-long menu_disabled = 0;
+int16_t *menu_ids = 0;
+int32_t menu_disabled = 0;
 MenuSave *menu_stack = 0;
 
 /* The button of s[0..n-1] at (x, y), or -1. */
-int MenuHit(Sprite *s, int n, int x, int y)
+int16_t MenuHit(Sprite *s, int16_t n, int16_t x, int16_t y)
 {
     Rect r;
-    int i;
-    Bitmap far *bmp;
+    int16_t i;
+    Bitmap *bmp;
 
     for (i = 0; i != n; ++i, ++s) {
         if (s->type == SPRITE_SHADOW) {
@@ -64,20 +65,20 @@ int MenuHit(Sprite *s, int n, int x, int y)
 
 /* Move the pointer to the middle of the button next to button cur in
  * direction dir, wrapping round. */
-void MenuMove(Sprite *s, int n, int cur, int dir)
+void MenuMove(Sprite *s, int16_t n, int16_t cur, int16_t dir)
 {
-    int i;
-    unsigned bx;
-    unsigned by;
-    unsigned wx;
-    unsigned wy;
-    Bitmap far *bmp;
-    unsigned x0;
-    unsigned x1;
-    unsigned y0;
-    unsigned y1;
-    unsigned mx;
-    unsigned my;
+    int16_t i;
+    uint16_t bx;
+    uint16_t by;
+    uint16_t wx;
+    uint16_t wy;
+    Bitmap *bmp;
+    uint16_t x0;
+    uint16_t x1;
+    uint16_t y0;
+    uint16_t y1;
+    uint16_t mx;
+    uint16_t my;
 
     bx = 0x7FFF;
     by = 0x7FFF;
@@ -172,14 +173,14 @@ void MenuMove(Sprite *s, int n, int cur, int dir)
 }
 
 /* Draw a frame of colour c just inside the edge of bitmap h. */
-void DrawButtonFrame(MemHandle h, int c)
+void DrawButtonFrame(MemHandle h, int16_t c)
 {
-    int n;
-    int n2;
-    int stride;
-    int off;
-    unsigned char far *p;
-    Bitmap far *bmp;
+    int16_t n;
+    int16_t n2;
+    int16_t stride;
+    int16_t off;
+    unsigned char *p;
+    Bitmap *bmp;
 
     bmp = LockMem(h);
     n = bmp->w - 2;
@@ -203,13 +204,13 @@ void DrawButtonFrame(MemHandle h, int c)
 }
 
 /* The options menu: save, load, music and sound on/off, quit. */
-void OptionsMenu(int x, int y)
+void OptionsMenu(int16_t x, int16_t y)
 {
-    int sel;
-    int flags;
-    int old_kbd;
-    unsigned old_x;
-    unsigned old_y;
+    int16_t sel;
+    int16_t flags;
+    int16_t old_kbd;
+    uint16_t old_x;
+    uint16_t old_y;
     MemHandle old_bmp;
 
     old_kbd = kbd_mouse;
@@ -271,25 +272,25 @@ void OptionsMenu(int x, int y)
 
 /* The action panel: walk, look, talk, use, get and options. The pointer
  * changes to the action under it. Returns the action chosen (1 walk). */
-int ActionPanel(void)
+int16_t ActionPanel(void)
 {
     char unused1[16];
-    int mode;
-    int unused2;
-    int sel;
-    int running;
+    int16_t mode;
+    int16_t unused2;
+    int16_t sel;
+    int16_t running;
     Event e;
     Sprite panel;
-    int x;
-    int y;
-    int dx;
-    int dy;
-    unsigned old_x;
-    unsigned old_y;
-    int w;
-    int h;
-    int clicked;
-    int old_accel;
+    int16_t x;
+    int16_t y;
+    int16_t dx;
+    int16_t dy;
+    uint16_t old_x;
+    uint16_t old_y;
+    int16_t w;
+    int16_t h;
+    int16_t clicked;
+    int16_t old_accel;
     char *cursor;
 
     sel = 1;
@@ -301,7 +302,7 @@ int ActionPanel(void)
     mode = 2;
     panel.handle = LoadBitmap("action");
     {
-        Bitmap far *bmp;
+        Bitmap *bmp;
 
         bmp = LockMem(panel.handle);
         w = bmp->w;
@@ -326,10 +327,10 @@ int ActionPanel(void)
             switch (e.type) {
             case EV_KEY:
                 {
-                    int key;
-                    int sel2;
+                    int16_t key;
+                    int16_t sel2;
 
-                    key = ((unsigned)e.key >> 8) & 0xFF;
+                    key = ((uint16_t)e.key >> 8) & 0xFF;
                     switch (key) {
                     case 0x1C:
                     case 0x3B:
@@ -494,16 +495,16 @@ int ActionPanel(void)
 }
 
 /* Open menu name.mnu at (x, y), over any menu already open. */
-void LoadMenu(char *name, int x, int y)
+void LoadMenu(char *name, int16_t x, int16_t y)
 {
-    char bname[10];
-    int i;
-    int any;
+    char bname[11];
+    int16_t i;
+    int16_t any;
 
     if (menu_sprites) {
         MenuSave *save;
 
-        save = AllocMemPtr(16);
+        save = AllocMemPtr(sizeof(MenuSave));
         save->sprites = menu_sprites;
         save->ids = menu_ids;
         save->disabled = menu_disabled;
@@ -520,7 +521,7 @@ void LoadMenu(char *name, int x, int y)
     menu_ids = AllocMemPtr(menu_count * 2);
     any = 0;
     for (i = 0; i != menu_count; i++) {
-        MenuEntry far *ents;
+        MenuEntry *ents;
         MemHandle h;
 
         AddSprite(&menu_sprites[i]);
@@ -528,6 +529,7 @@ void LoadMenu(char *name, int x, int y)
         ents = LockMem(menu_handle);
         SpriteSetPos(&menu_sprites[i], ents[i].x + x, ents[i].y + y, 15);
         MemCpy(bname, ents[i].name, 10);
+        bname[10] = 0;
         menu_ids[i] = ents[i].id;
         any |= ents[i].id;
         UnlockMem(menu_handle);
@@ -544,10 +546,10 @@ void LoadMenu(char *name, int x, int y)
 }
 
 /* Show the buttons whose bits are set in mask and hide the others. */
-void MenuShow(long mask)
+void MenuShow(int32_t mask)
 {
-    int i;
-    long bit;
+    int16_t i;
+    int32_t bit;
 
     for (i = 0, bit = 1; i != menu_count && bit; ++i, bit <<= 1) {
         if ((mask & bit) && menu_sprites[i].type == 0) {
@@ -571,7 +573,7 @@ void MenuShow(long mask)
     }
 }
 
-void MenuDisable(long mask)
+void MenuDisable(int32_t mask)
 {
     menu_disabled |= mask;
     if (menu_sel != -1 && ((1L << menu_sel) & menu_disabled)) {
@@ -581,7 +583,7 @@ void MenuDisable(long mask)
     }
 }
 
-void MenuEnable(long mask)
+void MenuEnable(int32_t mask)
 {
     menu_disabled &= ~mask;
 }
@@ -594,13 +596,13 @@ void MenuHome(void)
 /* Run the open menu until a button is chosen. Returns its id, or one of
  * the MENU_ results. keys: the keypad picks buttons 1-8 directly instead
  * of moving between them. */
-int MenuLoop(unsigned long timeout, int keys)
+int16_t MenuLoop(uint32_t timeout, int16_t keys)
 {
-    int hit;
+    int16_t hit;
     Event e;
-    unsigned long end;
-    int result;
-    int unused;
+    uint32_t end;
+    int16_t result;
+    int16_t unused;
 
     end = ticks + timeout;
     for (;;) {
@@ -608,7 +610,7 @@ int MenuLoop(unsigned long timeout, int keys)
             switch (e.type) {
             case EV_KEY:
                 if (keys) {
-                    switch (((unsigned)e.key >> 8) & 0xFF) {
+                    switch (((uint16_t)e.key >> 8) & 0xFF) {
                     case 0x1C:
                     case 0x3B:
                         result = 0;
@@ -672,7 +674,7 @@ int MenuLoop(unsigned long timeout, int keys)
                         break;
                     }
                 } else {
-                    switch (((unsigned)e.key >> 8) & 0xFF) {
+                    switch (((uint16_t)e.key >> 8) & 0xFF) {
                     case 0x1C:
                     case 0x3B:
                         goto select;
@@ -757,20 +759,20 @@ done:
 }
 
 /* MenuLoop without the pointer highlighting buttons. */
-int MenuWait(unsigned long timeout)
+int16_t MenuWait(uint32_t timeout)
 {
-    int unused1;
+    int16_t unused1;
     Event e;
-    unsigned long end;
-    int result;
-    int unused2;
+    uint32_t end;
+    int16_t result;
+    int16_t unused2;
 
     end = ticks + timeout;
     for (;;) {
         if (GetEvent(&e)) {
             switch (e.type) {
             case EV_KEY:
-                switch (((unsigned)e.key >> 8) & 0xFF) {
+                switch (((uint16_t)e.key >> 8) & 0xFF) {
                 case 0x1C:
                 case 0x3B:
                     result = 0;
@@ -834,7 +836,7 @@ done:
 /* Close the menu and reopen the one under it. */
 void MenuClose(void)
 {
-    int i;
+    int16_t i;
     MenuSave *save;
 
     if (menu_sel != -1)

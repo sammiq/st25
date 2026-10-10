@@ -1,5 +1,6 @@
 /* seg025: space cutscenes (warp, arriving at and leaving a planet) */
 
+#include "compat.h"
 #include <stdio.h>
 #include "mem.h"
 #include "bitmap.h"
@@ -11,28 +12,28 @@
 #include "fixmath.h"
 #include "obj3d.h"
 
-#define VGA_MEM ((char far *)0xA0000000L)
+#define VGA_MEM ((char *)0xA0000000L)
 
-void BridgeSfx(int n);              /* seg001 */
+void BridgeSfx(int16_t n);              /* seg001 */
 void CyclePalette(void);               /* seg000 */
 void ClearShots(void);               /* seg020 */
 void UpdateShips(void);
-void SetSpeed(Obj3D *o, long speed);
-void Bearing(Obj3D *o, Vec32 *to, int *pitch, int *yaw);
+void SetSpeed(Obj3D *o, int32_t speed);
+void Bearing(Obj3D *o, Vec32 *to, int16_t *pitch, int16_t *yaw);
 
 /* seg006 */
 void CamReset(void);
 void AddR3(Obj3D *o);
 void DelR3(Obj3D *o);
-void RenderR3(int statics);
+void RenderR3(int16_t statics);
 
-extern Bitmap far *screen;
-extern Bitmap far *backbuf;
+extern Bitmap *screen;
+extern Bitmap *backbuf;
 Vec32 cam_pos;
 extern Matrix cam_orient;
 extern Obj3D player_ship;
 extern Obj3D dummy_planet;
-extern long blink_count;
+extern int32_t blink_count;
 
 void WarpOut(void);
 void OrbitArrive(void);
@@ -43,15 +44,15 @@ void StopShip(Obj3D *o);
 void WarpOut(void)
 {
     char name[16];
-    int i;
+    int16_t i;
     Vec32 rel;
     Vec32 v;
     Matrix m;
-    int ang;
-    long dx;
-    long dy;
-    long dz;
-    long t;
+    int16_t ang;
+    int32_t dx;
+    int32_t dy;
+    int32_t dz;
+    int32_t t;
     Obj3D obj;
 
     MemSet(&obj, sizeof(obj), 0);
@@ -122,7 +123,7 @@ void WarpOut(void)
         UpdateSprites();
         CyclePalette();
         ++blink_count;
-        while ((unsigned long)t == GetTicks())
+        while ((uint32_t)t == GetTicks())
             ;
     }
     FadeOut();
@@ -143,12 +144,12 @@ void WarpOut(void)
 void OrbitArrive(void)
 {
     char unused[16];
-    int i;
-    int speed;
-    int yaw;
-    int pitch;
+    int16_t i;
+    int16_t speed;
+    int16_t yaw;
+    int16_t pitch;
     Vec32 unused2;
-    long t;
+    int32_t t;
     Obj3D obj;
 
     ClearShots();
@@ -179,7 +180,7 @@ void OrbitArrive(void)
         UpdateSprites();
         CyclePalette();
         ++blink_count;
-        while ((unsigned long)t == GetTicks())
+        while ((uint32_t)t == GetTicks())
             ;
     }
     FadeOut();
@@ -200,9 +201,9 @@ void OrbitArrive(void)
 /* The Enterprise turns away from the planet and speeds off. */
 void OrbitDepart(void)
 {
-    int i;
-    int speed;
-    long t;
+    int16_t i;
+    int16_t speed;
+    int32_t t;
     Matrix m;
     Vec32 d;
 
@@ -221,9 +222,9 @@ void OrbitDepart(void)
         t = GetTicks();
         if (i < 32)
             MatRotYPre(8, &player_ship.orient);
-        player_ship.pos.x += (long)player_ship.orient.e[2][0] * speed >> 14;
-        player_ship.pos.y += (long)player_ship.orient.e[2][1] * speed >> 14;
-        player_ship.pos.z += (long)player_ship.orient.e[2][2] * speed >> 14;
+        player_ship.pos.x += (int32_t)player_ship.orient.e[2][0] * speed >> 14;
+        player_ship.pos.y += (int32_t)player_ship.orient.e[2][1] * speed >> 14;
+        player_ship.pos.z += (int32_t)player_ship.orient.e[2][2] * speed >> 14;
         d = player_ship.pos;
         Vec32Sub(&d, &cam_pos);
         if (MatFromVecs(&d.x, player_ship.orient.e[1], 0, &m))
@@ -237,7 +238,7 @@ void OrbitDepart(void)
         UpdateSprites();
         CyclePalette();
         ++blink_count;
-        while ((unsigned long)t == GetTicks())
+        while ((uint32_t)t == GetTicks())
             ;
     }
     FadeOut();

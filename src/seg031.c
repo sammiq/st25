@@ -1,6 +1,7 @@
 /* seg031: the bridge script for the third mission, "Love's Labor
  * Jeopardized" (the Romulans and Ark 7) */
 
+#include "compat.h"
 #include <string.h>
 #include "mem.h"
 #include "sound.h"
@@ -15,24 +16,24 @@ typedef struct Msg {
 } Msg;
 
 /* seg001 */
-void BridgeSfx(int n);
+void BridgeSfx(int16_t n);
 void BridgeMsg(void);
 Msg *PeekMsg(void);
-char *GetText(int n);
+char *GetText(int16_t n);
 void SetTextFile(char *name);
 void CutScene(char *name, char *voc);
 void HailSay(char *name, char *title, char *text);
-void Orbit(int arrive, int say);
-void Debrief(int n, int msg, int score, int max);
-void ShuttleFlyby(int kind);
+void Orbit(int16_t arrive, int16_t say);
+void Debrief(int16_t n, int16_t msg, int16_t score, int16_t max);
+void ShuttleFlyby(int16_t kind);
 void ShuttleEnd(void);
 void ClearMsgs(void);
 /* seg008 */
-void MsgBox(char *title, char *text, int x, int y, int color, int msg);
+void MsgBox(char *title, char *text, int16_t x, int16_t y, int16_t color, int16_t msg);
 void PostRoomMsg(unsigned char a, unsigned char b, unsigned char c, unsigned char d);
 /* seg000 */
-int StartAnim(int n, char *name, int x, int y, int scale);
-void EndAnim(int n);
+int16_t StartAnim(int16_t n, char *name, int16_t x, int16_t y, int16_t scale);
+void EndAnim(int16_t n);
 /* seg020 */
 void BoostEnd(void);
 void InitShips(char *name);
@@ -47,26 +48,26 @@ void LoveAway(void);
 void LoveReturn(void);
 
 extern char *crew_names[8];
-extern int word_45AA2;
-extern int kbd_mouse;
-extern int under_attack;
-extern void (far *bridge_tick)(void);
-extern int word_45AB2;
-extern int word_45AB4;
-extern int msg_head;
-extern int word_50CA6;
+extern int16_t word_45AA2;
+extern int16_t kbd_mouse;
+extern int16_t under_attack;
+extern void (*bridge_tick)(void);
+extern int16_t word_45AB2;
+extern int16_t word_45AB4;
+extern int16_t msg_head;
+extern int16_t word_50CA6;
 extern Obj3D ships[4];
-extern unsigned long bridge_ticks;
-extern int mission_vars[6];
-extern void (far *saved_tick)(void);
-extern int word_52C1E;
+extern uint32_t bridge_ticks;
+extern int16_t mission_vars[6];
+extern void (*saved_tick)(void);
+extern int16_t word_52C1E;
 extern char mission[16];
 
 /* Arriving: the fly-by and Starfleet's orders. */
 void LoveArrive(void)
 {
     Msg m;
-    int unused;
+    int16_t unused;
 
     m = *PeekMsg();
     if (m.type == 0) {
@@ -103,7 +104,7 @@ void LoveArrive(void)
 void LoveTravel(void)
 {
     Msg m;
-    int was_there;
+    int16_t was_there;
 
     if (under_attack == 0 && GetMusicSeq() == 2)
         PlayMusic(-1, -1);

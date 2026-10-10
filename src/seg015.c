@@ -1,97 +1,95 @@
 /* seg015: music and digitised sound */
 
-#include <dos.h>
+#include "compat.h"
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include "mem.h"
 #include "list.h"
-#include "ems.h"
 #include "cache.h"
 #include "resource.h"
 #include "sound.h"
 
 /* Globals this file owns (declared in the headers). */
-int digi_driver;
-int midi_driver;
+int16_t digi_driver;
+int16_t midi_driver;
 SndChan snd_chan[4];
 
-int toupper(int c);
-int isalnum(int c);
 
 /* seg 2505: the digital sound driver interface (asm/t35052) */
-int sub_35345(int a, int b);
-void sub_35373(int a, int b);
-void sub_35388(char far *msg);
-void sub_3571B(DmaReq far *req);
-unsigned sub_3577A(void);
+int16_t sub_35345(int16_t a, int16_t b);
+void sub_35373(int16_t a, int16_t b);
+void sub_35388(char *msg);
+void sub_3571B(DmaReq *req);
+uint16_t sub_3577A(void);
 void sub_357C0(void);
-void sub_357EB(DmaReq far *req);
-int sub_357FE(void);
-int far *sub_35828(void);
-void sub_3585E(int on);
-int sub_3586D(void);
-void sub_35873(char far *buf, unsigned len);
-int sub_3588D(char far *buf, unsigned len);
-int sub_358B3(void);
+void sub_357EB(DmaReq *req);
+int16_t sub_357FE(void);
+int16_t *sub_35828(void);
+void sub_3585E(int16_t on);
+int16_t sub_3586D(void);
+void sub_35873(char *buf, uint16_t len);
+int16_t sub_3588D(char *buf, uint16_t len);
+int16_t sub_358B3(void);
 
 /* seg019: save game I/O */
-void SaveWrite(void *p, int n);
-void SaveRead(void *p, int n);
+void SaveWrite(void *p, int16_t n);
+void SaveRead(void *p, int16_t n);
 
-int timer_busy;
-void (_interrupt _far *old_timer)(void);
-int far *digi_status;
-long rom_sum1;
-long rom_sum2;
-int rom_errors;
-int ems_save_err;
-int ems_restore_err;
-int digi_handle;
-int midi_handle;
-extern int sb_port;
-extern int sb_irq;
-char far *dma_buf;
-int dma_buf_moved;
-void far *seq_state[NUM_SEQ];
-int seq_handles[NUM_SEQ];
-int seq_ids[NUM_SEQ];
+int16_t timer_busy;
+void (*old_timer)(void);
+int16_t *digi_status;
+int32_t rom_sum1;
+int32_t rom_sum2;
+int16_t rom_errors;
+int16_t ems_save_err;
+int16_t ems_restore_err;
+int16_t digi_handle;
+int16_t midi_handle;
+extern int16_t sb_port;
+extern int16_t sb_irq;
+char *dma_buf;
+int16_t dma_buf_moved;
+void *seq_state[NUM_SEQ];
+int16_t seq_handles[NUM_SEQ];
+int16_t seq_ids[NUM_SEQ];
 char midi_suffix[4];
-unsigned timbre_cache_size;
+uint16_t timbre_cache_size;
 char music_name[10];
 List seq_list;
 SeqNode seq_nodes[NUM_SEQ];
 drvr_desc blaster_desc;
-int blaster_type;
-int music_next;
-int music_cur;
-int stream_mixed;
-int voc_abort;
-unsigned long voc_left;
+int16_t blaster_type;
+int16_t music_next;
+int16_t music_cur;
+int16_t stream_mixed;
+int16_t voc_abort;
+uint32_t voc_left;
 char voc_name[80];
-int voc_rate;
-int voc_pack;
+int16_t voc_rate;
+int16_t voc_pack;
 extern char sfx_name[];
-int dma_auto;
+int16_t dma_auto;
 DmaReq dma_req;
-int dma_half_pos;
+int16_t dma_half_pos;
 char dma_half;
 char mix_half;
-int digi_running;
-int digi_ticks;
-int mix_first;
-int dma_state;
-int dma_count;
-extern int stream_done;
-int stream_filling;
+int16_t digi_running;
+int16_t digi_ticks;
+int16_t mix_first;
+int16_t dma_state;
+int16_t dma_count;
+extern int16_t stream_done;
+int16_t stream_filling;
 
-int music_on = 1;
-int sfx_on = 1;
-int no_midi = 0;
-int midi_ok = 0;
-int digi_ok = 0;
-int voc_fd = -1;
-char far *music_data = 0;
+int16_t music_on = 1;
+int16_t sfx_on = 1;
+int16_t no_midi = 0;
+int16_t midi_ok = 0;
+int16_t digi_ok = 0;
+int16_t voc_fd = -1;
+char *music_data = 0;
 char *midi_drivers[13] = {
     0, "PCSPKR", "ADLIB", 0, "SBFM", "SBPFM", "SBPFM", "PASFM", "PASFM",
     "MT32MPU", "MT32MPU", 0, 0
@@ -101,205 +99,42 @@ char *digi_drivers[13] = {
 };
 /* BLASTER=A220 I5 D1 T4: the fields read and where they go */
 char blaster_keys[] = "AIDT";
-int blaster_radix[4] = { 16, 10, 10, 10 };
-int *blaster_vals[4] = {
+int16_t blaster_radix[4] = { 16, 10, 10, 10 };
+int16_t *blaster_vals[4] = {
     &blaster_desc.default_IO, &blaster_desc.default_IRQ, &blaster_desc.default_DMA,
     &blaster_type
 };
-int sound_closed = 0;
+int16_t sound_closed = 0;
 
-/* Timer interrupt: run the sound driver tick. The ROM checksums before and
- * after count the times the tick left the EMS page frame at E000 changed. */
-void _interrupt _far TimerISR(void)
-{
-    int err;
-    long i;
-    char far *rom;
-
-    rom = (char far *)0xE0000000L;
-    (*old_timer)();
-    _asm cld
-    timer_busy++;
-    if (timer_busy == 1) {
-        _enable();
-        if (*digi_status == 0) {
-            rom_sum1 = rom_sum2 = 0;
-            for (i = 0; i < 0x10000L; i += 256)
-                rom_sum1 += rom[i];
-            err = EMSSaveMap();
-            if (err)
-                ems_save_err = err;
-            DigiTick();
-            err = EMSRestoreMap();
-            if (err)
-                ems_restore_err = err;
-            for (i = 0; i < 0x10000L; i += 256)
-                rom_sum2 += rom[i];
-            if (rom_sum1 != rom_sum2)
-                rom_errors++;
-        }
-        _disable();
-    }
-    timer_busy--;
-}
-
+/* The original's timer interrupt ran the digital sound tick (DigiTick) 18
+ * times a second; the host calls DigiTick through the audio layer now. */
 void HookTimer(void)
 {
-    int unused;
-
-    old_timer = _dos_getvect(8);
-    _dos_setvect(8, TimerISR);
 }
 
 void UnhookTimer(void)
 {
-    _dos_setvect(8, old_timer);
 }
 
-/* Load and start the music and digital sound drivers chosen in the setup. */
+/* Start the sound system: music and digital sound.  (No sound yet.) */
 void SoundInit(void)
 {
-    char far *midi_drv;
-    char far *digi_drv;
-    drvr_desc far *mdesc;
-    drvr_desc desc;
-    unsigned size;
-    int i;
-
-    if (midi_drivers[midi_driver]) {
-        midi_ok = 1;
-        midi_drv = PushMem(GetFileSize(midi_drivers[midi_driver], "ADV"));
-        LoadFilePacked(midi_drivers[midi_driver], "ADV", midi_drv);
-    } else
-        no_midi = 1;
-    if (digi_drivers[digi_driver]) {
-        digi_ok = 1;
-        digi_drv = PushMem(GetFileSize(digi_drivers[digi_driver], "ADV"));
-        LoadFilePacked(digi_drivers[digi_driver], "ADV", digi_drv);
-    }
-    if (midi_ok == 0 && digi_ok == 0)
-        return;
-    AIL_startup();
-    if (digi_ok) {
-        char buf1[16];
-        char buf2[16];
-
-        digi_handle = AIL_register_driver(digi_drv);
-        if (digi_handle == -1) {
-            AIL_shutdown(0);
-            digi_ok = 0;
-            return;
-        }
-        desc = *AIL_describe_driver(digi_handle);
-        if (digi_driver == 4 || digi_driver == 5 || digi_driver == 12) {
-            if (sb_port) {
-                *(int far *)(digi_drv + 0x106) = sb_port;
-                *(int far *)(digi_drv + 0x108) = sb_irq;
-                desc.default_IO = sb_port;
-                desc.default_IRQ = sb_irq;
-            } else if (ParseBlaster(&desc, buf2, buf1) == 0) {
-                AIL_shutdown(0);
-                digi_ok = 0;
-                return;
-            }
-        }
-        if (desc.drvr_type != DSP_DRVR) {
-            AIL_shutdown(0);
-            digi_ok = 0;
-            return;
-        }
-        if (AIL_detect_device(digi_handle, desc.default_IO, desc.default_IRQ,
-                              desc.default_DMA, desc.default_DRQ) == 0) {
-            AIL_shutdown(0);
-            digi_ok = 0;
-            return;
-        }
-        AIL_init_driver(digi_handle, desc.default_IO, desc.default_IRQ,
-                        desc.default_DMA, desc.default_DRQ);
-        dma_buf = PushMem(0x2000);
-        if (sub_3588D(dma_buf, 0x2000) == 0) {
-            dma_buf = PushMem(0x2000);
-            dma_buf_moved = 1;
-        }
-        HookTimer();
-        StreamInit();
-    }
-    if (midi_ok) {
-        midi_handle = AIL_register_driver(midi_drv);
-        if (midi_handle == -1) {
-            AIL_shutdown(0);
-            no_midi = 1;
-            midi_ok = 0;
-            return;
-        }
-        mdesc = AIL_describe_driver(midi_handle);
-        if (mdesc->drvr_type != XMIDI_DRVR
-                || AIL_detect_device(midi_handle, mdesc->default_IO, mdesc->default_IRQ,
-                                     mdesc->default_DMA, mdesc->default_DRQ) == 0) {
-            AIL_shutdown(0);
-            midi_ok = 0;
-            no_midi = 1;
-            return;
-        }
-        AIL_init_driver(midi_handle, mdesc->default_IO, mdesc->default_IRQ,
-                        mdesc->default_DMA, mdesc->default_DRQ);
-        size = AIL_state_table_size(midi_handle);
-        for (i = 0; i < NUM_SEQ; i++) {
-            seq_state[i] = PushMem(size);
-            seq_handles[i] = -1;
-        }
-        if (mdesc->data_suffix[0])
-            MemCpy(midi_suffix, mdesc->data_suffix, 4);
-        else if (midi_driver == 1)
-            MemCpy(midi_suffix, "pc", 4);
-        else
-            MemCpy(midi_suffix, "td", 4);
-        timbre_cache_size = AIL_default_timbre_cache_size(midi_handle);
-        if (timbre_cache_size) {
-            GTLEntry far *e;
-            MemHandle h;
-            char far *gtl;
-            char far *cache;
-
-            cache = PushMem(timbre_cache_size);
-            AIL_define_timbre_cache(midi_handle, cache, timbre_cache_size);
-            h = getanyfile("gtl", midi_suffix);
-            gtl = LockMem(h);
-            for (e = (GTLEntry far *)gtl; e->bank != -1; e++)
-                AIL_install_timbre(midi_handle, e->bank, e->patch, gtl + e->offset);
-            UnlockMem(h);
-            FreeAnyFile(h);
-        }
-        strcpy(music_name, "");
-        music_data = 0;
-        ListInit(&seq_list);
-        for (i = 1; i < NUM_SEQ; i++) {
-            int slot;
-
-            slot = i;
-            seq_nodes[i].slot = slot;
-            ListAdd(&seq_list, &seq_nodes[i].node);
-            seq_ids[i] = -1;
-        }
-        sub_3B584(midi_handle, "Star Trek");
-        music_on = 1;
-        sfx_on = 1;
-        if (strcmpi(midi_suffix, "mt") == 0)
-            ;
-    }
+    midi_ok = 0;
+    digi_ok = 0;
+    no_midi = 1;
 }
 
 /* Read the BLASTER environment variable into desc (A port, I irq, D dma,
  * T card type). Returns the card type, 0 if not set. */
-int ParseBlaster(drvr_desc *desc, char *a, char *b)
+int16_t ParseBlaster(drvr_desc *desc, char *a, char *b)
 {
-    int k;
-    int j;
-    int key;
-    int i;
-    int c;
-    int val;
-    int pos;
+    int16_t k;
+    int16_t j;
+    int16_t key;
+    int16_t i;
+    int16_t c;
+    int16_t val;
+    int16_t pos;
     char *env;
     char buf[128];
 
@@ -347,7 +182,7 @@ void SoundStop(void)
         AIL_shutdown(0);
 }
 
-void StopSeq(unsigned slot)
+void StopSeq(uint16_t slot)
 {
     if (seq_handles[slot] != -1) {
         AIL_stop_sequence(midi_handle, seq_handles[slot]);
@@ -357,7 +192,7 @@ void StopSeq(unsigned slot)
     }
 }
 
-void PlaySeq(unsigned slot, int seq)
+void PlaySeq(uint16_t slot, int16_t seq)
 {
     StopSeq(slot);
     if (seq == -1)
@@ -367,9 +202,9 @@ void PlaySeq(unsigned slot, int seq)
     AIL_start_sequence(midi_handle, seq_handles[slot]);
 }
 
-int MusicPlaying(void)
+int16_t MusicPlaying(void)
 {
-    int i;
+    int16_t i;
 
     if (midi_ok == 0)
         return 0;
@@ -384,7 +219,7 @@ void StopVoc(void)
     if (digi_ok) {
         stream_play_pos = stream_fill_pos;
         if (voc_fd != -1) {
-            _dos_close(voc_fd);
+            close(voc_fd);
             voc_fd = -1;
         }
         stream_mixed = 0;
@@ -394,7 +229,7 @@ void StopVoc(void)
 
 void StopAllSound(void)
 {
-    int i;
+    int16_t i;
 
     for (i = 0; i < NUM_SEQ; i++)
         StopSeq(i);
@@ -403,8 +238,8 @@ void StopAllSound(void)
 
 void LoadMusic(char *name)
 {
-    int unused;
-    unsigned size;
+    int16_t unused;
+    uint16_t size;
 
     if (midi_ok == 0)
         return;
@@ -421,9 +256,9 @@ void LoadMusic(char *name)
 }
 
 /* Free everything SoundInit allocated, in reverse. */
-int SoundShutdown(void)
+int16_t SoundShutdown(void)
 {
-    int i;
+    int16_t i;
 
     if (midi_ok == 0)
         return 0;
@@ -448,7 +283,7 @@ int SoundShutdown(void)
 }
 
 /* Play sequence seq; next (-2 keep, -3 same as seq) plays when it ends. */
-void PlayMusic(int seq, int next)
+void PlayMusic(int16_t seq, int16_t next)
 {
     if (midi_ok == 0 || music_on == 0)
         return;
@@ -468,29 +303,27 @@ void PlayMusic(int seq, int next)
 /* Read up to len bytes of sample data from the speech files listed in
  * voc_name ("file,file,..."), following the VOC blocks. Returns the number
  * of bytes read. */
-int ReadVoc(char far *buf, int len)
+int16_t ReadVoc(char *buf, int16_t len)
 {
-    unsigned got;
-    int start;
+    uint16_t got;
+    int16_t start;
     char path[128];
-    int i;
+    int16_t i;
 
     voc_abort = 0;
     start = len;
     while (voc_abort == 0 && len != 0) {
         if (voc_fd == -1 && voc_name[0] != 0) {
             char hdr[26];
-            unsigned n;
+            uint16_t n;
 
             for (i = 0; voc_name[i] != 0 && voc_name[i] != ','; i++)
                 ;
             strcpy(path, voc_path);
             strncat(path, voc_name, i);
             strcat(path, ".voc");
-            if (_dos_open(path, 0x8000, &voc_fd) != 0) {
-                voc_fd = -1;
+            if ((voc_fd = open(path, O_RDONLY | O_BINARY)) == -1)
                 return 0;
-            }
             if (voc_name[i] == ',')
                 strcpy(voc_name, &voc_name[i + 1]);
             else
@@ -502,7 +335,7 @@ int ReadVoc(char far *buf, int len)
         if (voc_fd == -1)
             return start - len;
         if (voc_left) {
-            unsigned n;
+            uint16_t n;
 
             n = len;
             if (n > voc_left)
@@ -510,7 +343,7 @@ int ReadVoc(char far *buf, int len)
             ReadChunk(voc_fd, buf, n, &got);
             n = got;
             if (n == 0) {
-                _dos_close(voc_fd);
+                close(voc_fd);
                 voc_fd = -1;
             }
             buf += n;
@@ -521,14 +354,14 @@ int ReadVoc(char far *buf, int len)
 
             ReadChunk(voc_fd, hdr, 4, &got);
             if (got < 4 && got != 1 && hdr[0] != 0) {
-                _dos_close(voc_fd);
+                close(voc_fd);
                 voc_fd = -1;
                 break;
             }
-            voc_left = ((long)hdr[3] << 16) | ((long)hdr[2] << 8) | hdr[1];
+            voc_left = ((int32_t)hdr[3] << 16) | ((int32_t)hdr[2] << 8) | hdr[1];
             switch (hdr[0]) {
             case 0:
-                _dos_close(voc_fd);
+                close(voc_fd);
                 voc_fd = -1;
                 break;
             case 1:
@@ -559,7 +392,7 @@ int ReadVoc(char far *buf, int len)
 
 void MusicTick(void)
 {
-    int unused;
+    int16_t unused;
 
     if (midi_ok == 0 || music_on == 0)
         return;
@@ -572,7 +405,7 @@ void MusicTick(void)
     StreamTick();
 }
 
-void SetMusicOn(int on)
+void SetMusicOn(int16_t on)
 {
     if (midi_ok == 0 || music_on == on)
         return;
@@ -585,9 +418,9 @@ void SetMusicOn(int on)
 
 /* Play seq in slots 1-7, reusing a slot already holding it or else the
  * least recently used one. */
-void PlaySfxSeq(int seq)
+void PlaySfxSeq(int16_t seq)
 {
-    int i;
+    int16_t i;
 
     if (midi_ok == 0 || music_on == 0)
         return;
@@ -599,15 +432,15 @@ void PlaySfxSeq(int seq)
             return;
         }
     }
-    i = ((SeqNode far *)seq_list.head.prev)->slot;
+    i = ((SeqNode *)seq_list.head.prev)->slot;
     ListRemove(&seq_list, &seq_nodes[i].node);
     ListAdd(&seq_list, &seq_nodes[i].node);
     PlaySeq(i, seq);
 }
 
-void SetSfxOn(int on)
+void SetSfxOn(int16_t on)
 {
-    int i;
+    int16_t i;
 
     if (digi_ok == 0 || sfx_on == on)
         return;
@@ -616,12 +449,12 @@ void SetSfxOn(int on)
         for (i = 1; i < NUM_SEQ; i++)
             StopSeq(i);
     if (sfx_on == 0)
-        FreeAllEMSFiles();
+        FreeAllSfxFiles();
     if (sfx_on == 1 && sfx_name[0])
         PlaySfx(sfx_name);
 }
 
-int GetMusicSeq(void)
+int16_t GetMusicSeq(void)
 {
     return seq_ids[0];
 }
@@ -629,7 +462,7 @@ int GetMusicSeq(void)
 void SaveMusicState(void)
 {
     char name[10];
-    int seq;
+    int16_t seq;
 
     seq = music_next;
     strcpy(name, music_name);
@@ -640,7 +473,7 @@ void SaveMusicState(void)
 void LoadMusicState(void)
 {
     char name[10];
-    int seq;
+    int16_t seq;
 
     SaveRead(name, 9);
     SaveRead(&seq, 2);
@@ -651,12 +484,12 @@ void LoadMusicState(void)
         StopAllSound();
 }
 
-int sub_2A776(int a, int b)
+int16_t sub_2A776(int16_t a, int16_t b)
 {
     return sub_35345(a, b);
 }
 
-void sub_2A791(int a, int b)
+void sub_2A791(int16_t a, int16_t b)
 {
     sub_35373(a, b);
 }
@@ -730,16 +563,16 @@ void DigiStop(void)
         sub_3585E(0);
 }
 
-void DigiPlay(DmaReq far *req)
+void DigiPlay(DmaReq *req)
 {
     if (dma_auto == 0)
         sub_357EB(req);
 }
 
-int DigiStatus(void)
+int16_t DigiStatus(void)
 {
-    int st;
-    int n;
+    int16_t st;
+    int16_t n;
 
     if (dma_auto) {
         dma_state = st = 2;
@@ -767,7 +600,7 @@ void DigiStart(void)
 
 void DigiShutdown(void)
 {
-    int i;
+    int16_t i;
 
     if (digi_ok) {
         sub_357C0();
@@ -776,7 +609,7 @@ void DigiShutdown(void)
         for (i = 0; i < NUM_CHAN; i++)
             snd_chan[i].busy = 0;
         if (voc_fd != -1) {
-            _dos_close(voc_fd);
+            close(voc_fd);
             voc_fd = -1;
         }
         stream_active = 0;
@@ -801,25 +634,25 @@ void PlayVoc(char *name)
 
 /* Start sound effect name.voc on a free channel, mixing straight into the
  * part of the buffer not yet played. */
-int PlaySfx(char *name)
+int16_t PlaySfx(char *name)
 {
-    int n;
-    unsigned pos;
-    int unused1;
-    int unused2;
-    int i;
-    unsigned half;
+    int16_t n;
+    uint16_t pos;
+    int16_t unused1;
+    int16_t unused2;
+    int16_t i;
+    uint16_t half;
     MemHandle h;
 
     if (strcmpi(name + 4, "loop") == 0)
         strcpy(sfx_name, name);
     if (sfx_on == 0 || digi_ok == 0)
-        return;
+        return 0;
     if (digi_running == 0)
         DigiStart();
     for (i = 0; i < NUM_CHAN; i++) {
         if (snd_chan[i].busy == 0) {
-            h = LoadEMSFile(name, "voc");
+            h = LoadSfxFile(name, "voc");
             snd_chan[i].handle = h;
             if (snd_chan[i].handle == 0)
                 return 0;
@@ -835,7 +668,7 @@ int PlaySfx(char *name)
                 if (snd_chan[i].pos == 0) {
                     SfxNop(snd_chan[i].handle);
                     snd_chan[i].busy = 0;
-                    return;
+                    return 0;
                 }
             }
             if (mix_first == 1) {
@@ -844,13 +677,14 @@ int PlaySfx(char *name)
                 if (snd_chan[i].pos == 0) {
                     SfxNop(snd_chan[i].handle);
                     snd_chan[i].busy = 0;
-                    return;
+                    return 0;
                 }
             }
             snd_chan[i].busy = 1;
-            return;
+            return 1;
         }
     }
+    return 0;
 }
 
 void StreamTick(void)
@@ -861,9 +695,9 @@ void StreamTick(void)
 /* Mix the speech stream and the sound effects into the half being filled. */
 void MixFrame(void)
 {
-    int i;
-    int n;
-    long unused;
+    int16_t i;
+    int16_t n;
+    int32_t unused;
 
     mix_first = 1;
     n = HALF;
@@ -891,56 +725,33 @@ void MixFrame(void)
 }
 
 /* Add n signed samples from src to the unsigned samples in dst, clamped. */
-void MixSamples(char far *dst, char far *src, int n)
+void MixSamples(char *dst, char *src, int16_t n)
 {
-    _asm {
-        push ds
-        push si
-        push di
-        cld
-        mov cx, n
-        les di, dst
-        lds si, src
-    l_next:
-        lodsb
-        add al, 80h
-        cbw
-        mov bl, es:[di]
-        xor bh, bh
-        add ax, bx
-        cmp ax, 0
-        jge l_pos
-        xor ax, ax
-        jmp l_store
-    l_pos:
-        cmp ax, 0FFh
-        jle l_store
-        mov ax, 0FFh
-    l_store:
-        stosb
-        dec cx
-        jne l_next
-        pop di
-        pop si
-        pop ds
+    unsigned char *d = (unsigned char *)dst;
+    const unsigned char *s = (const unsigned char *)src;
+    int v;
+
+    for (; n > 0; n--, d++, s++) {
+        v = (int8_t)(*s + 0x80) + *d;
+        *d = v < 0 ? 0 : v > 255 ? 255 : v;
     }
 }
 
 /* Mix up to n bytes of the VOC file playing on ch into dst, following its
  * blocks. Returns the bytes mixed; ch->pos is 0 at the end of the file. */
-int MixVoc(char far *dst, SndChan *ch, unsigned n)
+int16_t MixVoc(char *dst, SndChan *ch, uint16_t n)
 {
-    int unused;
-    int total;
+    int16_t unused;
+    int16_t total;
 
     total = 0;
     while (n) {
         if (ch->len) {
-            char far *src;
-            unsigned cnt;
+            char *src;
+            uint16_t cnt;
 
             cnt = n;
-            if (cnt > (unsigned long)ch->len)
+            if (cnt > (uint32_t)ch->len)
                 cnt = ch->len;
             src = MapMemRef((MemRef *)ch);
             MixSamples(dst, src, cnt);
@@ -951,8 +762,8 @@ int MixVoc(char far *dst, SndChan *ch, unsigned n)
             ch->len -= cnt;
             total += cnt;
         } else {
-            long unused2;
-            unsigned char far *p;
+            int32_t unused2;
+            unsigned char *p;
             char hdr[26];
 
             if (ch->pos == 0) {
@@ -960,7 +771,7 @@ int MixVoc(char far *dst, SndChan *ch, unsigned n)
                 ch->pos += 26;
             }
             p = MapMemRef((MemRef *)ch);
-            ch->len = ((long)p[3] << 16) | ((unsigned)p[2] << 8) | p[1];
+            ch->len = ((int32_t)p[3] << 16) | ((uint16_t)p[2] << 8) | p[1];
             ch->pos += 4;
             switch (p[0]) {
             case 0:
@@ -976,7 +787,7 @@ int MixVoc(char far *dst, SndChan *ch, unsigned n)
                 break;
             case 6:
                 p += 4;
-                ch->loops = ((long)p[1] << 8) | p[0];
+                ch->loops = ((int32_t)p[1] << 8) | p[0];
                 ch->pos += 2;
                 ch->loop_pos = ch->pos;
                 ch->len = 0;

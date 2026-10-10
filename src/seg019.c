@@ -1,9 +1,9 @@
 /* seg019: saving and loading games, and the game menus that go with them */
 
+#include "compat.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <io.h>
 #include "mem.h"
 #include "gfx.h"
 
@@ -12,30 +12,29 @@
 
 /* savegame.dir: the saved games, newest first. */
 typedef struct SaveDir {
-    int count;
-    long used;                      /* savegame.N files in use */
+    int16_t count;
+    int32_t used;                      /* savegame.N files in use */
     unsigned char slot[MAX_SAVES];  /* N for each game */
 } SaveDir;
 
-void MsgBox(char *title, char *msg, int a, int b, int c, int d);    /* seg008: message box */
-int TextBox(char *(far *get)(int, void *, char *), void *data, int a, int b, int c, int d,
-              int e, int f);                                        /* seg008: list box */
+void MsgBox(char *title, char *msg, int16_t a, int16_t b, int16_t c, int16_t d);    /* seg008: message box */
+int32_t TextBox(void *get, void *data, int16_t a, int16_t b, int16_t c, int16_t d,
+              int16_t e, int16_t f);                                        /* seg008: list box */
 void CentreLine(char *out, char *title);                             /* seg008 */
 void SaveGameState(void);               /* seg008: write the game state */
 void LoadGameState(void);               /* seg008: read the game state */
-void Fatal(char *fmt, ...);     /* fatal error */
 char *InputDescription(void);       /* seg002 */
 
 SaveDir save_dir;
 char save_path[80];
 char save_desc[25];
 FILE *save_fp;
-int save_version;
-extern int voc_wait;
+int16_t save_version;
+extern int16_t voc_wait;
 
 /* The bitmap in a ship's .r3s for each yaw and pitch step (seg006
  * SelectView); 0x8000 means draw it mirrored. */
-int view_tab[24][13] = {
+int16_t view_tab[24][13] = {
     { 0x0000, 0x0001, 0x0002, 0x0003, 0x0004, 0x0005, 0x0006, 0x0007, 0x0008, 0x0009, 0x000A, 0x000B, 0x000C },
     { 0x0000, 0x0011, 0x0012, 0x0013, 0x0014, 0x0015, 0x0016, 0x0017, 0x0018, 0x0019, 0x001A, 0x001B, 0x000C },
     { 0x0000, 0x0021, 0x0022, 0x0023, 0x0024, 0x0025, 0x0026, 0x0027, 0x0028, 0x0029, 0x002A, 0x002B, 0x000C },
@@ -62,28 +61,28 @@ int view_tab[24][13] = {
     { 0x0000, 0x8011, 0x8012, 0x8013, 0x8014, 0x8015, 0x8016, 0x8017, 0x8018, 0x8019, 0x801A, 0x801B, 0x000C },
 };
 
-int save_dir_loaded = 0;
+int16_t save_dir_loaded = 0;
 
 void LoadSaveDir(void);
 void SaveSaveDir(void);
-void SavePath(int n);
-void SaveWrite(void *p, unsigned n);
-void SaveRead(void *p, unsigned n);
+void SavePath(int16_t n);
+void SaveWrite(void *p, uint16_t n);
+void SaveRead(void *p, uint16_t n);
 void SaveGame(void);
 void LoadGame(void);
 void SaveClose(void);
-int SaveVersion(void);
+int16_t SaveVersion(void);
 void SaveNew(void);
 void RestoreNew(void);
-char *SlotName(int n, char *title, char *out);
-char *MenuText(int n, char **list, char *out);
+char *SlotName(int16_t n, char *title, char *out);
+char *MenuText(int16_t n, char **list, char *out);
 void SaveMenu(void);
 void LoadGameMenu(void);
-void QuitMenu(int x, int y);
+void QuitMenu(int16_t x, int16_t y);
 void GameOverMenu(void);
-void TextModeMenu(int ask);
-int ReadTextMode(void);
-int WriteTextMode(int mode);
+void TextModeMenu(int16_t ask);
+int16_t ReadTextMode(void);
+int16_t WriteTextMode(int16_t mode);
 
 void LoadSaveDir(void)
 {
@@ -111,17 +110,17 @@ void SaveSaveDir(void)
     fclose(f);
 }
 
-void SavePath(int n)
+void SavePath(int16_t n)
 {
     sprintf(save_path, "savegame.%d", save_dir.slot[n]);
 }
 
-void SaveWrite(void *p, unsigned n)
+void SaveWrite(void *p, uint16_t n)
 {
     fwrite(p, 1, n, save_fp);
 }
 
-void SaveRead(void *p, unsigned n)
+void SaveRead(void *p, uint16_t n)
 {
     fread(p, 1, n, save_fp);
 }
@@ -153,7 +152,7 @@ void SaveClose(void)
     fclose(save_fp);
 }
 
-int SaveVersion(void)
+int16_t SaveVersion(void)
 {
     save_fp = fopen(save_path, "rb");
     SaveRead(save_desc, 25);
@@ -177,7 +176,7 @@ void RestoreNew(void)
 }
 
 /* List box entry n of the saved games: its description, then Cancel. */
-char *SlotName(int n, char *title, char *out)
+char *SlotName(int16_t n, char *title, char *out)
 {
     char *s;
     char *cancel;
@@ -205,7 +204,7 @@ char *SlotName(int n, char *title, char *out)
 
 /* List box entry n of a menu: list[0] is the title, then the entries,
  * ending with an empty one. */
-char *MenuText(int n, char **list, char *out)
+char *MenuText(int16_t n, char **list, char *out)
 {
     char *s;
     char *e;
@@ -230,8 +229,8 @@ char *save_menu[] = {
 
 void SaveMenu(void)
 {
-    int choice;
-    int i;
+    int16_t choice;
+    int16_t i;
 
     LoadSaveDir();
     for (;;) {
@@ -242,7 +241,7 @@ void SaveMenu(void)
                 MsgBox("", "#GENE\\GENER024#Too many games saved.  Replace or delete a previous game.", 20, 20, 0xB0, 0);
                 continue;
             } else {
-                unsigned long bit;
+                uint32_t bit;
                 char *p;
 
                 p = InputDescription();
@@ -274,7 +273,7 @@ void SaveMenu(void)
         case 2:
             i = TextBox(SlotName, "Delete Game", 20, 20, 0xB0, 1, 0, 1);
             if (i != -1 && i != save_dir.count) {
-                int j;
+                int16_t j;
 
                 SavePath(i);
                 unlink(save_path);
@@ -294,7 +293,7 @@ void SaveMenu(void)
 
 void LoadGameMenu(void)
 {
-    int i;
+    int16_t i;
 
     LoadSaveDir();
     i = TextBox(SlotName, "Load Game", 20, 20, 0xB0, 1, 0, 1);
@@ -304,7 +303,7 @@ void LoadGameMenu(void)
     }
 }
 
-int menu_busy = 0;
+int16_t menu_busy = 0;
 
 char *quit_menu[] = {
     "Quit Game",
@@ -313,9 +312,9 @@ char *quit_menu[] = {
     ""
 };
 
-void QuitMenu(int x, int y)
+void QuitMenu(int16_t x, int16_t y)
 {
-    int r;
+    int16_t r;
 
     if (menu_busy)
         return;
@@ -342,7 +341,7 @@ char *gameover_menu[] = {
 
 void GameOverMenu(void)
 {
-    int r;
+    int16_t r;
 
     for (;;) {
         menu_busy = 1;
@@ -374,9 +373,9 @@ char *text_menu[] = {
 };
 
 /* Ask how to show speech text, or use the choice in intrplay.cfg. */
-void TextModeMenu(int ask)
+void TextModeMenu(int16_t ask)
 {
-    int r;
+    int16_t r;
 
     if (ask || (r = ReadTextMode()) == -1) {
         r = TextBox(MenuText, text_menu, 20, 30, 0xB0, 1, 0, 1);
@@ -395,9 +394,9 @@ void TextModeMenu(int ask)
     }
 }
 
-int ReadTextMode(void)
+int16_t ReadTextMode(void)
 {
-    int mode;
+    int16_t mode;
     FILE *f;
 
     f = fopen("intrplay.cfg", "rb");
@@ -413,7 +412,7 @@ int ReadTextMode(void)
     return mode;
 }
 
-int WriteTextMode(int mode)
+int16_t WriteTextMode(int16_t mode)
 {
     FILE *f;
 

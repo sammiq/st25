@@ -3,15 +3,17 @@
 #ifndef SPRITE_H
 #define SPRITE_H
 
+#include "compat.h"
+
 #include "mem.h"
 
 #ifndef RECT_DEFINED
 #define RECT_DEFINED
 typedef struct Rect {
-    int x0;
-    int y0;
-    int x1;
-    int y1;
+    int16_t x0;
+    int16_t y0;
+    int16_t x1;
+    int16_t y1;
 } Rect;
 #endif
 
@@ -24,35 +26,35 @@ typedef struct Rect {
 #define MAX_SPRITES 32
 
 typedef struct Sprite {
-    int x;                  /* 00 */
-    int y;                  /* 02 */
-    int z;                  /* 04 priority, sort key */
-    int layer;              /* 06 second sort key */
+    int16_t x;                  /* 00 */
+    int16_t y;                  /* 02 */
+    int16_t z;                  /* 04 priority, sort key */
+    int16_t layer;              /* 06 second sort key */
     char *name;             /* 08 */
     MemHandle handle;       /* 0A bitmap */
-    int type;               /* 0C */
-    int colour;             /* 0E text colour */
-    int dirty;              /* 10 */
-    int has_union;          /* 12 union is valid */
-    int visible;            /* 14 */
-    int erase;              /* 16 */
+    int16_t type;               /* 0C */
+    int16_t colour;             /* 0E text colour */
+    int16_t dirty;              /* 10 */
+    int16_t has_union;          /* 12 union is valid */
+    int16_t visible;            /* 14 */
+    int16_t erase;              /* 16 */
     Rect old;               /* 18 rect when last drawn */
     Rect rect;              /* 20 clipped screen rect */
     Rect union_rect;        /* 28 old | rect */
-    int ox;                 /* 30 bitmap origin on screen */
-    int oy;                 /* 32 */
+    int16_t ox;                 /* 30 bitmap origin on screen */
+    int16_t oy;                 /* 32 */
 } Sprite;
 
 extern Sprite **sprite_list;
-extern int *sprite_count;
+extern int16_t *sprite_count;
 extern Rect screen_rect;
 extern Sprite mouse_sprite;
 
-int ClipRect(Rect *out, Rect *a, Rect *b);      /* seg007 */
+int16_t ClipRect(Rect *out, Rect *a, Rect *b);      /* seg007 */
 void UnionRect(Rect *out, Rect *a, Rect *b);    /* seg007 */
 
-void GetSpriteList(Sprite **list, int *count);
-void SetSpriteList(Sprite **list, int *count);
+void GetSpriteList(Sprite **list, int16_t *count);
+void SetSpriteList(Sprite **list, int16_t *count);
 void ResetSpriteList(void);
 void MarkAllDirty(void);
 void ClearSprites(void);
@@ -62,20 +64,15 @@ void DelSprite(Sprite *s);
 void SpriteErase(Sprite *s);
 void UpdateSprites(void);
 void SortSprites(void);
-int CompareSprites(Sprite **a, Sprite **b);
+int CompareSprites(const void *a, const void *b);
 void ComputeSpriteRects(void);
 void DrawSprite(Sprite *s, Rect *clip);
 void RestoreBackground(Rect *r);
-void MatchPalette(unsigned char far *pal, int first, int count);
-void LoadRemap(char *name);
-void BlitEGA(Rect *r);
-void DrawTestPattern(void);
-void BlitTandy(Rect *r);
 void BlitToScreen(Rect *r);
-Sprite *SpriteAt(int x, int y);
-void SpriteSetPos(Sprite *s, int x, int y, unsigned z);
+Sprite *SpriteAt(int16_t x, int16_t y);
+void SpriteSetPos(Sprite *s, int16_t x, int16_t y, uint16_t z);
 void SpriteSetBitmap(Sprite *s, MemHandle h);
-void SpriteAddRect(Sprite *s, MemHandle h, int x0, int y0, int x1, int y1);
+void SpriteAddRect(Sprite *s, MemHandle h, Rect r);
 void RedrawSpritesIn(Rect *r);
 
 #endif

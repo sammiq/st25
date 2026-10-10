@@ -1,21 +1,22 @@
 /* seg010: fixed point trigonometry, vectors and 3x3 matrices */
 
+#include "compat.h"
 #include <math.h>
 #include "mem.h"
 #include "fixmath.h"
 
 #define PI 3.141592654
 
-int far sin_table[0x101];
-int far cos_table[0x101];
-int far tan_table[0x81];
-int sin_small[33];
-int cos_small[33];
-long ang_small[33];
+int16_t sin_table[0x101];
+int16_t cos_table[0x101];
+int16_t tan_table[0x81];
+int16_t sin_small[33];
+int16_t cos_small[33];
+int32_t ang_small[33];
 
 void InitTrig(void)
 {
-    int i;
+    int16_t i;
     double x;
 
     for (i = 0, x = 0.0; i != 0x101; ++i, x += PI / 512) {
@@ -32,9 +33,9 @@ void InitTrig(void)
     }
 }
 
-int FixSin(int a)
+int16_t FixSin(int16_t a)
 {
-    int r;
+    int16_t r;
 
     if (a < 0) {
         a %= 0x400;
@@ -58,9 +59,9 @@ int FixSin(int a)
     return r;
 }
 
-int FixCos(int a)
+int16_t FixCos(int16_t a)
 {
-    int r;
+    int16_t r;
 
     a += 0x100;
     if (a < 0) {
@@ -85,17 +86,17 @@ int FixCos(int a)
     return r;
 }
 
-int FixTan(int a)
+int16_t FixTan(int16_t a)
 {
     return tan_table[a];
 }
 
-int FixACos(int v)
+int16_t FixACos(int16_t v)
 {
-    int lo;
-    int mid;
-    int hi;
-    int sign;
+    int16_t lo;
+    int16_t mid;
+    int16_t hi;
+    int16_t sign;
 
     sign = 1;
     if (v < 0) {
@@ -120,14 +121,14 @@ int FixACos(int v)
 }
 
 /* Angle of the vector (a, b). */
-int FixAtan2(long a, long b)
+int16_t FixAtan2(int32_t a, int32_t b)
 {
-    int lo;
-    int mid;
-    int hi;
-    int sb;
-    int sa;
-    int t;
+    int16_t lo;
+    int16_t mid;
+    int16_t hi;
+    int16_t sb;
+    int16_t sa;
+    int16_t t;
 
     if (b == 0 && a == 0)
         return 0;
@@ -172,12 +173,12 @@ int FixAtan2(long a, long b)
     return mid;
 }
 
-int FixASin(int v)
+int16_t FixASin(int16_t v)
 {
-    int lo;
-    int mid;
-    int hi;
-    int sign;
+    int16_t lo;
+    int16_t mid;
+    int16_t hi;
+    int16_t sign;
 
     sign = 1;
     if (v < 0) {
@@ -203,18 +204,18 @@ int FixASin(int v)
 
 void MatIdentity(Matrix *m)
 {
-    int i;
-    int j;
+    int16_t i;
+    int16_t j;
 
     MemSet(m, sizeof(Matrix), 0);
     for (i = 0; i != 3; i++)
         m->e[i][i] = FIX_ONE;
 }
 
-Matrix *MatRotX(int a, Matrix *out)
+Matrix *MatRotX(int16_t a, Matrix *out)
 {
-    long s;
-    long c;
+    int32_t s;
+    int32_t c;
     Matrix m;
     Matrix r;
 
@@ -227,12 +228,13 @@ Matrix *MatRotX(int a, Matrix *out)
     m.e[2][2] = c;
     MatMul(out, &m, &r);
     *out = r;
+    return out;
 }
 
-Matrix *MatRotY(int a, Matrix *out)
+Matrix *MatRotY(int16_t a, Matrix *out)
 {
-    long s;
-    long c;
+    int32_t s;
+    int32_t c;
     Matrix m;
     Matrix r;
 
@@ -245,12 +247,13 @@ Matrix *MatRotY(int a, Matrix *out)
     m.e[2][2] = c;
     MatMul(out, &m, &r);
     *out = r;
+    return out;
 }
 
-Matrix *MatRotZ(int a, Matrix *out)
+Matrix *MatRotZ(int16_t a, Matrix *out)
 {
-    long s;
-    long c;
+    int32_t s;
+    int32_t c;
     Matrix m;
     Matrix r;
 
@@ -263,12 +266,13 @@ Matrix *MatRotZ(int a, Matrix *out)
     m.e[1][1] = c;
     MatMul(out, &m, &r);
     *out = r;
+    return out;
 }
 
-Matrix *MatRotXPre(int a, Matrix *out)
+Matrix *MatRotXPre(int16_t a, Matrix *out)
 {
-    long s;
-    long c;
+    int32_t s;
+    int32_t c;
     Matrix m;
     Matrix r;
 
@@ -281,12 +285,13 @@ Matrix *MatRotXPre(int a, Matrix *out)
     m.e[2][2] = c;
     MatMul(&m, out, &r);
     *out = r;
+    return out;
 }
 
-Matrix *MatRotYPre(int a, Matrix *out)
+Matrix *MatRotYPre(int16_t a, Matrix *out)
 {
-    long s;
-    long c;
+    int32_t s;
+    int32_t c;
     Matrix m;
     Matrix r;
 
@@ -299,12 +304,13 @@ Matrix *MatRotYPre(int a, Matrix *out)
     m.e[2][2] = c;
     MatMul(&m, out, &r);
     *out = r;
+    return out;
 }
 
-Matrix *MatRotZPre(int a, Matrix *out)
+Matrix *MatRotZPre(int16_t a, Matrix *out)
 {
-    long s;
-    long c;
+    int32_t s;
+    int32_t c;
     Matrix m;
     Matrix r;
 
@@ -317,13 +323,14 @@ Matrix *MatRotZPre(int a, Matrix *out)
     m.e[1][1] = c;
     MatMul(&m, out, &r);
     *out = r;
+    return out;
 }
 
 void MatTranspose(Matrix *src, Matrix *dst)
 {
-    int i;
-    int j;
-    int t;
+    int16_t i;
+    int16_t j;
+    int16_t t;
 
     for (i = 0; i != 3; i++)
         for (j = 0; j != 3; j++) {
@@ -333,7 +340,7 @@ void MatTranspose(Matrix *src, Matrix *dst)
 }
 
 /* out = a x b; returns 1 if the result is zero. */
-int VecCross(register int *a, register int *b, int *out)
+int16_t VecCross(register int16_t *a, register int16_t *b, int16_t *out)
 {
     out[0] = FixMul2(a[1], b[2], a[2], -b[1]);
     out[1] = FixMul2(a[2], b[0], a[0], -b[2]);
@@ -341,14 +348,14 @@ int VecCross(register int *a, register int *b, int *out)
     return out[0] == 0 && out[1] == 0 && out[2] == 0;
 }
 
-int VecLen32(register long *v)
+int16_t VecLen32(register int32_t *v)
 {
     return FixLength(v[0], v[1], v[2]);
 }
 
-int VecNorm32(register long *v, register int *out)
+int16_t VecNorm32(register int32_t *v, register int16_t *out)
 {
-    unsigned len;
+    uint16_t len;
 
     len = VecLen32(v);
     if (len != 0) {
@@ -364,14 +371,14 @@ int VecNorm32(register long *v, register int *out)
     }
 }
 
-int VecLen(register int *v)
+int16_t VecLen(register int16_t *v)
 {
     return FixLength(v[0], v[1], v[2]);
 }
 
-int VecNorm(register int *v, register int *out)
+int16_t VecNorm(register int16_t *v, register int16_t *out)
 {
-    unsigned len;
+    uint16_t len;
 
     len = VecLen(v);
     if (len != 0) {
@@ -389,7 +396,7 @@ int VecNorm(register int *v, register int *out)
 
 /* Build an orthonormal basis looking along dir, with up (or alt if up is
  * parallel to dir). */
-int MatFromVecs(long *dir, int *up, int *alt, Matrix *m)
+int16_t MatFromVecs(int32_t *dir, int16_t *up, int16_t *alt, Matrix *m)
 {
     if (VecNorm32(dir, m->e[2]))
         return 0;
@@ -406,16 +413,16 @@ int MatFromVecs(long *dir, int *up, int *alt, Matrix *m)
     return 1;
 }
 
-void MatFromDir(int *v, Matrix *m)
+void MatFromDir(int16_t *v, Matrix *m)
 {
-    int len;
-    int x;
-    int y;
-    int z;
-    int w;
-    int xx;
-    int xy;
-    int yy;
+    int16_t len;
+    int16_t x;
+    int16_t y;
+    int16_t z;
+    int16_t w;
+    int16_t xx;
+    int16_t xy;
+    int16_t yy;
 
     if (v[0] == 0 && v[1] == 0) {
         MatIdentity(m);
@@ -425,7 +432,7 @@ void MatFromDir(int *v, Matrix *m)
     x = FixDiv(v[1], len);
     y = FixDiv(-v[0], len);
     z = v[2];
-    w = FixSqrt(0x10000000L - (long)z * z);
+    w = FixSqrt(0x10000000L - (int32_t)z * z);
     xx = FixMul(x, x);
     xy = FixMul(x, y);
     yy = FixMul(y, y);
@@ -441,7 +448,7 @@ void MatFromDir(int *v, Matrix *m)
     return;
 }
 
-Matrix *MatRotXSC(int s, int c, Matrix *out)
+Matrix *MatRotXSC(int16_t s, int16_t c, Matrix *out)
 {
     Matrix m;
     Matrix r;
@@ -453,9 +460,10 @@ Matrix *MatRotXSC(int s, int c, Matrix *out)
     m.e[2][2] = c;
     MatMul(&m, out, &r);
     *out = r;
+    return out;
 }
 
-Matrix *MatRotYSC(int s, int c, Matrix *out)
+Matrix *MatRotYSC(int16_t s, int16_t c, Matrix *out)
 {
     Matrix m;
     Matrix r;
@@ -467,9 +475,10 @@ Matrix *MatRotYSC(int s, int c, Matrix *out)
     m.e[2][2] = c;
     MatMul(&m, out, &r);
     *out = r;
+    return out;
 }
 
-Matrix *MatRotZSC(int s, int c, Matrix *out)
+Matrix *MatRotZSC(int16_t s, int16_t c, Matrix *out)
 {
     Matrix m;
     Matrix r;
@@ -481,6 +490,7 @@ Matrix *MatRotZSC(int s, int c, Matrix *out)
     m.e[1][1] = c;
     MatMul(&m, out, &r);
     *out = r;
+    return out;
 }
 
 /* Re-orthonormalise a rotation matrix. */
@@ -498,7 +508,7 @@ void MatOrtho(Matrix *m)
     *(Vec *)m->e[2] = v;
 }
 
-void VecSub(int *a, int *b)
+void VecSub(int16_t *a, int16_t *b)
 {
     a[0] -= b[0];
     a[1] -= b[1];

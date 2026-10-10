@@ -1,6 +1,7 @@
 /* seg034: the bridge script for the fifth mission's second part, the trial
  * on Quetzecoatl's world */
 
+#include "compat.h"
 #include <string.h>
 #include "mem.h"
 #include "sound.h"
@@ -15,25 +16,25 @@ typedef struct Msg {
 } Msg;
 
 /* seg001 */
-void BridgeSfx(int n);
+void BridgeSfx(int16_t n);
 void BridgeMsg(void);
 Msg *PeekMsg(void);
-char *GetText(int n);
+char *GetText(int16_t n);
 void SetTextFile(char *name);
-void SetSteering(int on);
+void SetSteering(int16_t on);
 void HailShow(char *name);
 void HailEnd(void);
 void HailSay(char *name, char *title, char *text);
-void Orbit(int arrive, int say);
+void Orbit(int16_t arrive, int16_t say);
 void ViewFull(void);
 void ViewBridge(void);
-void Debrief(int n, int msg, int score, int max);
-char *GetChoice(int n, int *list, int x);
+void Debrief(int16_t n, int16_t msg, int16_t score, int16_t max);
+char *GetChoice(int16_t n, int16_t *list, char *x);
 /* seg008: not prototyped here, as one call passes an extra argument */
 void MsgBox();
 void PostRoomMsg(unsigned char a, unsigned char b, unsigned char c, unsigned char d);
-long TextBox(char *(far *fn)(), int *arg, int x, int y, int color, int choice, int maxl,
-             int flag);
+int32_t TextBox(void *fn, void *arg, int16_t x, int16_t y, int16_t color, int16_t choice, int16_t maxl,
+             int16_t flag);
 /* seg020 */
 void InitShips(char *name);
 /* seg025 */
@@ -50,21 +51,21 @@ void TrialFight(void);
 void TrialEnd(void);
 
 extern char *crew_names[8];
-extern int word_45AA2;
-extern int kbd_mouse;
-extern int under_attack;
-extern void (far *bridge_tick)(void);
-extern int word_45AB2;
-extern int word_45AB4;
-extern int msg_head;
-extern int word_50CA6;
-extern int word_51156;
-extern unsigned long bridge_ticks;
-extern int mission_vars[6];
-extern int word_52C1E;
+extern int16_t word_45AA2;
+extern int16_t kbd_mouse;
+extern int16_t under_attack;
+extern void (*bridge_tick)(void);
+extern int16_t word_45AB2;
+extern int16_t word_45AB4;
+extern int16_t msg_head;
+extern int16_t word_50CA6;
+extern int16_t word_51156;
+extern uint32_t bridge_ticks;
+extern int16_t mission_vars[6];
+extern int16_t word_52C1E;
 extern char mission[16];
 
-int kallarax_choices[] = { 0x0E, 0x0F, 0x10, -1 };
+int16_t kallarax_choices[] = { 0x0E, 0x0F, 0x10, -1 };
 
 /* In orbit for the trial; after it, the bridge scene for how it went. */
 void TrialArrive(void)
@@ -197,7 +198,7 @@ void TrialSulu(void)
 void TrialKallarax(void)
 {
     Msg m;
-    int r;
+    int16_t r;
 
     m = *PeekMsg();
     if (m.type == 0) {
@@ -268,7 +269,7 @@ void TrialFight(void)
  * next mission. */
 void TrialEnd(void)
 {
-    int unused;
+    int16_t unused;
 
     ViewFull();
     kbd_mouse = 0;

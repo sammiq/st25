@@ -1,5 +1,6 @@
 /* seg029: the bridge script for the first mission, "Demon World" */
 
+#include "compat.h"
 #include <string.h>
 #include "mem.h"
 #include "sound.h"
@@ -9,31 +10,31 @@
 typedef struct Msg {
     unsigned char type;
     unsigned char arg;
-    int unk;
+    int16_t unk;
 } Msg;
 
 /* seg001 */
-void BridgeSfx(int n);
+void BridgeSfx(int16_t n);
 void BridgeMsg(void);
 Msg *PeekMsg(void);
-char *GetText(int n);
+char *GetText(int16_t n);
 void SetTextFile(char *name);
 void CutScene(char *name, char *voc);
-void SetSteering(int on);
+void SetSteering(int16_t on);
 void HailSay(char *name, char *title, char *text);
-void Orbit(int arrive, int say);
-void Debrief(int n, int msg, int score, int max);
+void Orbit(int16_t arrive, int16_t say);
+void Debrief(int16_t n, int16_t msg, int16_t score, int16_t max);
 void ClearMsgs(void);
 /* seg008 */
-void MsgBox(char *title, char *text, int x, int y, int color, int msg);
+void MsgBox(char *title, char *text, int16_t x, int16_t y, int16_t color, int16_t msg);
 /* seg000 */
-int StartAnim(int n, char *name, int x, int y, int scale);
-void EndAnim(int n);
+int16_t StartAnim(int16_t n, char *name, int16_t x, int16_t y, int16_t scale);
+void EndAnim(int16_t n);
 /* seg020 */
 void BoostEnd(void);
 void InitShips(char *name);
 void ClearShots(void);
-void SetPower(int shields, int weapons);
+void SetPower(int16_t shields, int16_t weapons);
 /* seg017 */
 void DelR3(Obj3D *o);
 /* seg030 */
@@ -46,19 +47,19 @@ void DemonTravel(void);
 void DemonReturn(void);
 
 extern char *crew_names[8];
-extern int word_45AA2;
-extern int in_orbit;
-extern int under_attack;
-extern void (far *bridge_tick)(void);
-extern int word_45AB2;
-extern int word_45AB4;
-extern int msg_head;
-extern int word_50CA6;
+extern int16_t word_45AA2;
+extern int16_t in_orbit;
+extern int16_t under_attack;
+extern void (*bridge_tick)(void);
+extern int16_t word_45AB2;
+extern int16_t word_45AB4;
+extern int16_t msg_head;
+extern int16_t word_50CA6;
 extern Obj3D ships[4];
-extern unsigned long bridge_ticks;
-extern int mission_vars[6];
-extern void (far *saved_tick)(void);
-extern int word_52C1E;
+extern uint32_t bridge_ticks;
+extern int16_t mission_vars[6];
+extern void (*saved_tick)(void);
+extern int16_t word_52C1E;
 extern Obj3D player_ship;
 extern char mission[16];
 
@@ -102,7 +103,7 @@ void DemonFight(void)
 {
     Msg m;
     ShipPart *p;
-    int i;
+    int16_t i;
 
     if (ships[0].systems[SYS_HULL].cur < ships[0].systems[SYS_HULL].max >> 1) {
         PlayMusic(3, -1);
@@ -149,7 +150,7 @@ void DemonFight(void)
 void DemonHail(void)
 {
     Msg m;
-    int unused;
+    int16_t unused;
 
     m = *PeekMsg();
     switch (m.type) {
@@ -193,7 +194,7 @@ void DemonHail(void)
 void DemonTravel(void)
 {
     Msg m;
-    int was_there;
+    int16_t was_there;
 
     m = *PeekMsg();
     switch (m.type) {

@@ -1,59 +1,60 @@
 /* seg023: starfield */
 
+#include "compat.h"
 #include <stdlib.h>
 #include "mem.h"
 #include "bitmap.h"
 #include "cache.h"
 
 typedef struct Vec32 {
-    long x;
-    long y;
-    long z;
+    int32_t x;
+    int32_t y;
+    int32_t z;
 } Vec32;
 
 typedef struct Rect {
-    int x0;
-    int y0;
-    int x1;
-    int y1;
+    int16_t x0;
+    int16_t y0;
+    int16_t x1;
+    int16_t y1;
 } Rect;
 
 typedef struct Star {
-    int active;             /* 00 */
+    int16_t active;             /* 00 */
     Vec32 pos;              /* 02 world position */
 } Star;
 
 #define NUM_STARS 16
 
 extern float star_near;
-extern int view_w;
-extern int view_h;
-extern long proj_dist;
-extern int cam_matrix[3][3];
+extern int16_t view_w;
+extern int16_t view_h;
+extern int32_t proj_dist;
+extern struct { int16_t e[3][3]; } cam_matrix;
 extern Vec32 cam_pos;
-extern int view_cx;
-extern int view_cy;
+extern int16_t view_cx;
+extern int16_t view_cy;
 extern Rect clip_rect;
-extern Bitmap far *screen;
+extern Bitmap *screen;
 
 /* seg027 */
-void Vec32FromScreen(Vec32 *out, int x, int y, int z);
-void MatVecMul32(int *m, Vec32 *v, Vec32 *out);
+void Vec32FromScreen(Vec32 *out, int16_t x, int16_t y, int16_t z);
+void MatVecMul32(void *m, Vec32 *v, Vec32 *out);
 void Vec32Add(Vec32 *a, Vec32 *b);
 void Vec32Sub(Vec32 *a, Vec32 *b);
-void MatTVecMul32(Vec32 *v, int *m, Vec32 *out);
-int Project(long a, long z);
+void MatTVecMul32(Vec32 *v, void *m, Vec32 *out);
+int16_t Project(int16_t a, int16_t z);
 
-int ClipRect(Rect *out, Rect *a, Rect *b);      /* seg007: clip a to b */
+int16_t ClipRect(Rect *out, Rect *a, Rect *b);      /* seg007: clip a to b */
 
 MemHandle star_bmp = 0;
 Star stars[NUM_STARS];
 
-void BlitClipped(Bitmap far *bmp, Rect *r, Rect *clip);
+void BlitClipped(Bitmap *bmp, Rect *r, Rect *clip);
 
 void StarsReset(void)
 {
-    long unused;
+    int32_t unused;
 
     if (star_bmp)
         CacheRelease(star_bmp);
@@ -64,24 +65,24 @@ void StarsReset(void)
  * the star frames back to back. */
 void DrawStars(void)
 {
-    int i;
-    int x;
-    int y;
-    int z;
+    int16_t i;
+    int16_t x;
+    int16_t y;
+    int16_t z;
     Vec32 v2;
     Vec32 v;
-    long unused1;
+    int32_t unused1;
     Star *s;
-    int wr;
-    int hr;
-    int wr2;
-    int hr2;
+    int16_t wr;
+    int16_t hr;
+    int16_t wr2;
+    int16_t hr2;
     Rect r;
     Rect rc;
     char unused2[16];
-    Bitmap far *bmp;
-    char far *cur;
-    char far *base;
+    Bitmap *bmp;
+    char *cur;
+    char *base;
 
     wr = (view_w * 3) >> 1;
     wr2 = wr / 2;
@@ -93,19 +94,19 @@ void DrawStars(void)
     for (s = stars, i = 0; i != NUM_STARS; ++i, ++s) {
         if ((i & 0xF) == 0)
             cur = base;
-        bmp = (Bitmap far *)cur;
-        cur = cur + (((Bitmap far *)cur)->w * ((Bitmap far *)cur)->h + 8);
+        bmp = (Bitmap *)cur;
+        cur = cur + (((Bitmap *)cur)->w * ((Bitmap *)cur)->h + 8);
         if (s->active == 0) {
             x = rand() % wr - wr2;
             y = rand() % hr - hr2;
             Vec32FromScreen(&v, x, y, z);
-            MatVecMul32((int *)cam_matrix, &v, &s->pos);
+            MatVecMul32(&cam_matrix, &v, &s->pos);
             Vec32Add(&s->pos, &cam_pos);
             s->active = 1;
         }
         v = s->pos;
         Vec32Sub(&v, &cam_pos);
-        MatTVecMul32(&v, (int *)cam_matrix, &v2);
+        MatTVecMul32(&v, &cam_matrix, &v2);
         if (v2.z > star_near && v2.z < 0x3FFF
                 && (v2.x > 0 ? v2.x : -v2.x) < v2.z
                 && (v2.y > 0 ? v2.y : -v2.y) < v2.z) {
@@ -124,17 +125,17 @@ void DrawStars(void)
 }
 
 /* Draw the part clip of bmp placed at r into the screen, skipping 0. */
-void BlitClipped(Bitmap far *bmp, Rect *r, Rect *clip)
+void BlitClipped(Bitmap *bmp, Rect *r, Rect *clip)
 {
-    int w;
-    int h;
-    int x0;
-    int y0;
-    char far *src;
-    char far *dst;
-    int srcskip;
-    int dstskip;
-    int unused;
+    int16_t w;
+    int16_t h;
+    int16_t x0;
+    int16_t y0;
+    char *src;
+    char *dst;
+    int16_t srcskip;
+    int16_t dstskip;
+    int16_t unused;
 
     x0 = r->x0;
     y0 = r->y0;
@@ -146,33 +147,9 @@ void BlitClipped(Bitmap far *bmp, Rect *r, Rect *clip)
     srcskip = bmp->w - w;
     dst = screen->data + r->x0 + r->y0 * 320;
     dstskip = 320 - w;
-    _asm {
-        push si
-        push di
-        push ds
-        lds si, src
-        les di, dst
-    l_row:
-        dec h
-        js l_done
-        mov cx, w
-    l_pix:
-        lodsb
-        or al, al
-        je l_skip
-        stosb
-        loop l_pix
-        jmp short l_next
-    l_skip:
-        inc di
-        loop l_pix
-    l_next:
-        add si, srcskip
-        add di, dstskip
-        jmp l_row
-    l_done:
-        pop ds
-        pop di
-        pop si
+    for (; h > 0; h--, src += srcskip, dst += dstskip) {
+        for (x0 = w; x0 > 0; x0--, src++, dst++)
+            if (*src)
+                *dst = *src;
     }
 }

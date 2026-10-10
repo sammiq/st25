@@ -1,5 +1,6 @@
 /* seg021: sprites */
 
+#include "compat.h"
 #include <stdlib.h>
 #include "mem.h"
 #include "bitmap.h"
@@ -7,43 +8,27 @@
 #include "resource.h"
 #include "sprite.h"
 
-void Fatal(char *fmt, ...);     /* fatal error */
-
 Sprite *sprite_array[MAX_SPRITES];
 Rect dirty_rects[64];
-int dirty_count;
-extern int video_mode;              /* 0 VGA, 1 EGA, 2 Tandy */
-extern Bitmap far *backbuf;         /* sprites are composed here */
-extern Bitmap far *screen;          /* the background without sprites */
-extern unsigned char far *mask_buf; /* EGA priority mask, 2 pixels a byte */
-unsigned char palette[256][3];
-unsigned char pal_remap[256];
+int16_t dirty_count;
+extern int16_t video_mode;              /* 0 VGA, 1 EGA, 2 Tandy */
+extern Bitmap *backbuf;         /* sprites are composed here */
+extern Bitmap *screen;          /* the background without sprites */
+extern unsigned char *mask_buf; /* EGA priority mask, 2 pixels a byte */
 unsigned char shade_table[256];
 
-int sprite_count0 = 0;
+int16_t sprite_count0 = 0;
 Sprite **sprite_list = sprite_array;
-int *sprite_count = &sprite_count0;
+int16_t *sprite_count = &sprite_count0;
 Rect screen_rect = { 0, 0, 319, 199 };
-unsigned char ega_expand[16] = {
-    0x00, 0x02, 0x08, 0x0A, 0x20, 0x22, 0x28, 0x2A,
-    0x80, 0x82, 0x88, 0x8A, 0xA0, 0xA2, 0xA8, 0xAA
-};
-int pal_matched = 0;
-unsigned char ega_palette[16][3] = {
-    { 0x00, 0x00, 0x00 }, { 0x00, 0x00, 0x2A }, { 0x00, 0x2A, 0x00 }, { 0x00, 0x2A, 0x2A },
-    { 0x2A, 0x00, 0x00 }, { 0x2A, 0x00, 0x2A }, { 0x2A, 0x15, 0x00 }, { 0x2A, 0x2A, 0x2A },
-    { 0x15, 0x15, 0x15 }, { 0x15, 0x15, 0x3F }, { 0x15, 0x3F, 0x15 }, { 0x15, 0x3F, 0x3F },
-    { 0x3F, 0x15, 0x15 }, { 0x3F, 0x15, 0x3F }, { 0x3F, 0x3F, 0x15 }, { 0x3F, 0x3F, 0x3F }
-};
-
 /* Assigns the parameters, not what they point to, so does nothing. */
-void GetSpriteList(Sprite **list, int *count)
+void GetSpriteList(Sprite **list, int16_t *count)
 {
     list = sprite_list;
     count = sprite_count;
 }
 
-void SetSpriteList(Sprite **list, int *count)
+void SetSpriteList(Sprite **list, int16_t *count)
 {
     sprite_list = list;
     sprite_count = count;
@@ -57,7 +42,7 @@ void ResetSpriteList(void)
 
 void MarkAllDirty(void)
 {
-    int i;
+    int16_t i;
     Sprite *s;
 
     if (*sprite_count == 0)
@@ -93,7 +78,7 @@ void AddSprite(Sprite *s)
 
 void DelSprite(Sprite *s)
 {
-    int i;
+    int16_t i;
 
     for (i = 0; i != *sprite_count; i++) {
         if (sprite_list[i] == s) {
@@ -114,7 +99,7 @@ void SpriteErase(Sprite *s)
  * touching those areas and copy them to the screen. */
 void UpdateSprites(void)
 {
-    int i;
+    int16_t i;
     Sprite *s;
     Rect *r;
 
@@ -135,27 +120,15 @@ void UpdateSprites(void)
         } else if (s->dirty)
             dirty_rects[dirty_count++] = s->old;
     }
-    switch (video_mode) {
-    case 0:
-    case 2:
-        for (r = dirty_rects, i = 0; i != dirty_count; ++i, ++r)
-            RestoreBackground(r);
-        break;
-    case 1:
-        for (r = dirty_rects, i = 0; i != dirty_count; ++i, ++r) {
-            r->x0 &= ~3;
-            r->x1 |= 3;
-            RestoreBackground(r);
-        }
-        break;
-    }
+    for (r = dirty_rects, i = 0; i != dirty_count; ++i, ++r)
+        RestoreBackground(r);
     for (i = 0; i != *sprite_count; i++) {
         s = sprite_list[i];
         if (s->erase == 0 && s->visible) {
             Rect clip;
             Rect area;
-            int j;
-            int found;
+            int16_t j;
+            int16_t found;
 
             found = 0;
             for (r = dirty_rects, j = 0; j != dirty_count; ++j, ++r) {
@@ -184,9 +157,11 @@ void SortSprites(void)
     qsort(sprite_list, *sprite_count, sizeof(Sprite *), CompareSprites);
 }
 
-int CompareSprites(Sprite **a, Sprite **b)
+int CompareSprites(const void *pa, const void *pb)
 {
-    register int d;
+    Sprite *const *a = pa;
+    Sprite *const *b = pb;
+    register int16_t d;
 
     if ((d = (*a)->z - (*b)->z) == 0)
         if ((d = (*a)->layer - (*b)->layer) == 0)
@@ -199,8 +174,8 @@ void ComputeSpriteRects(void)
 {
     Rect r;
     Sprite *s;
-    int i;
-    Bitmap far *bmp;
+    int16_t i;
+    Bitmap *bmp;
 
     for (i = 0; i != *sprite_count; i++) {
         s = sprite_list[i];
@@ -232,21 +207,21 @@ void ComputeSpriteRects(void)
 /* Draw the part clip of a sprite into the back buffer. */
 void DrawSprite(Sprite *s, Rect *clip)
 {
-    unsigned char far *mask;
-    int unused1;
-    unsigned char far *src;
-    unsigned char far *dst;
-    unsigned w;
-    unsigned h;
-    int maskskip;
-    int unused2;
-    int srcskip;
-    int dstskip;
-    int unused3;
-    int unused4;
-    int prio;
-    unsigned n;
-    Bitmap far *bmp;
+    unsigned char *mask;
+    int16_t unused1;
+    unsigned char *src;
+    unsigned char *dst;
+    uint16_t w;
+    uint16_t h;
+    int16_t maskskip;
+    int16_t unused2;
+    int16_t srcskip;
+    int16_t dstskip;
+    int16_t unused3;
+    int16_t unused4;
+    int16_t prio;
+    uint16_t n;
+    Bitmap *bmp;
 
     w = clip->x1 - clip->x0 + 1;
     h = clip->y1 - clip->y0 + 1;
@@ -257,7 +232,7 @@ void DrawSprite(Sprite *s, Rect *clip)
     dstskip = 320 - w;
     if (s->type == SPRITE_TEXT) {
         MemHandle font_h;
-        char far *font;
+        char *font;
         Rect r;
 
         font_h = CacheLoad("font", "fnt");
@@ -278,9 +253,9 @@ void DrawSprite(Sprite *s, Rect *clip)
         while (h--) {
             n = w;
             while (n--) {
-                char far *glyph;
-                int gy;
-                int gx;
+                char *glyph;
+                int16_t gy;
+                int16_t gx;
                 char colour;
 
                 colour = (*src >= 0x10 && *src <= 0x1A) ? 0xB3 : s->colour;
@@ -333,108 +308,17 @@ void DrawSprite(Sprite *s, Rect *clip)
         srcskip = bmp->w - w;
         mask = mask_buf + clip->y0 * 160 + (clip->x0 >> 1);
         maskskip = 160 - (((clip->x1 + 1) >> 1) - (clip->x0 >> 1));
-        /* The mask is reached through ss so ds can address the bitmap;
-         * locals are then reached with ds: overrides. A mask nibble at
-         * or below the sprite's priority hides the pixel. */
-        _asm {
-            push bp
-            push si
-            push di
-            mov cx, ss
-            mov dx, sp
-            mov bx, word ptr mask
-            mov ax, word ptr mask+2
-            mov ss, ax
-            mov sp, 7E00h
-            push ds:w
-            push ds:h
-            push ds:srcskip
-            push ds:dstskip
-            push ds:maskskip
-            push cx
-            push dx
-            les di, ds:dst
-            mov dl, byte ptr ds:prio
-            mov dh, dl
-            shl dh, 4
-            or dh, 0Fh
-            lds si, ds:src
-            mov bp, sp
-        l_row:
-            mov cx, [bp+0Ch]
-            test di, 1
-            je l_even
-            mov ah, ss:[bx]
-            inc bx
-            inc cx
-            shr cx, 1
-            pushf
-            jmp l_odd
-        l_even:
-            shr cx, 1
-            je l_last
-            pushf
-        l_pair:
-            mov ah, ss:[bx]
-            inc bx
-            stc
-            sbb ah, dh
-            jae l_skip2
-            lodsb
-            or al, al
-            je l_skip2b
-            stosb
-        l_odd:
-            and ah, 0Fh
-            cmp ah, dl
-            ja l_skip1
-            lodsb
-            or al, al
-            je l_skip1b
-            stosb
-            loop l_pair
-        l_popf:
-            popf
-        l_last:
-            jae l_next
-            mov ah, ss:[bx]
-            stc
-            sbb ah, dh
-            jae l_skip3
-            lodsb
-            or al, al
-            je l_skip3b
-            stosb
-            jmp l_next
-        l_skip2:
-            inc si
-        l_skip2b:
-            inc di
-            jmp l_odd
-        l_skip1:
-            inc si
-        l_skip1b:
-            inc di
-            loop l_pair
-            jmp l_popf
-        l_skip3:
-            inc si
-        l_skip3b:
-            inc di
-        l_next:
-            add si, [bp+8]
-            add di, [bp+6]
-            add bx, [bp+4]
-            dec byte ptr [bp+0Ah]
-            jne l_row
-            pop dx
-            pop cx
-            mov ss, cx
-            mov sp, dx
-            mov ds, cx
-            pop di
-            pop si
-            pop bp
+        /* A mask nibble above the sprite's priority hides the pixel. */
+        for (; h != 0; h--, src += srcskip, dst += dstskip, mask += 160) {
+            uint16_t x = clip->x0;
+
+            for (n = w; n != 0; n--, x++, src++, dst++) {
+                unsigned char m = mask[(x >> 1) - (clip->x0 >> 1)];
+
+                m = (x & 1) ? m & 0x0F : m >> 4;
+                if (m <= prio && *src)
+                    *dst = *src;
+            }
         }
         UnlockMem(s->handle);
     }
@@ -443,11 +327,11 @@ void DrawSprite(Sprite *s, Rect *clip)
 /* Copy r of the background into the back buffer. */
 void RestoreBackground(Rect *r)
 {
-    unsigned w;
-    unsigned h;
-    int unused;
-    unsigned char far *dst;
-    unsigned char far *src;
+    uint16_t w;
+    uint16_t h;
+    int16_t unused;
+    unsigned char *dst;
+    unsigned char *src;
 
     dst = backbuf->data + r->y0 * 320 + r->x0;
     src = screen->data + r->y0 * 320 + r->x0;
@@ -460,292 +344,14 @@ void RestoreBackground(Rect *r)
     }
 }
 
-/* Build pal_remap, mapping colours first..first+count-1 of pal to the
- * nearest of the 256 EGA colour pairs (dithered as two pixels). */
-void MatchPalette(unsigned char far *pal, int first, int count)
-{
-    int i;
-    int j;
-
-    if (pal_matched == 0) {
-        pal_matched = 1;
-        for (i = 0; i < 256; i++)
-            for (j = 0; j < 3; j++)
-                palette[i][j] = (ega_palette[i >> 4][j] >> 1) + (ega_palette[i & 15][j] >> 1);
-    }
-    for (i = first; i < first + count; i++) {
-        int r;
-        int g;
-        int b;
-        int best;
-        int best_i;
-
-        r = pal[i * 3];
-        g = pal[i * 3 + 1];
-        b = pal[i * 3 + 2];
-        best = 0x7FFF;
-        best_i = 0;
-        for (j = 0; j < 256; j++) {
-            int dr;
-            int dg;
-            int db;
-            int d;
-
-            dr = palette[j][0] - r;
-            dg = palette[j][1] - g;
-            db = palette[j][2] - b;
-            d = dr * dr + dg * dg + db * db;
-            if (d < best) {
-                best_i = j;
-                best = d;
-            }
-        }
-        if (video_mode == 1)
-            pal_remap[i] = ega_expand[best_i >> 4] | (ega_expand[best_i & 15] >> 1);
-        else
-            pal_remap[i] = best_i;
-    }
-}
-
-void LoadRemap(char *name)
-{
-    int i;
-    int c;
-
-    switch (video_mode) {
-    case 0:
-        break;
-    case 1:
-        LoadFilePacked(name, "ega", pal_remap);
-        for (i = 0; i < 256; i++) {
-            c = pal_remap[i];
-            pal_remap[i] = ega_expand[c >> 4] | (ega_expand[c & 15] >> 1);
-        }
-        break;
-    case 2:
-        LoadFilePacked(name, "ega", pal_remap);
-        break;
-    }
-}
-
-/* Copy r of the back buffer to EGA memory. Each pixel pair is remapped to
- * a byte of two 4 bit pixels, and every 8 pixels are converted to planar
- * form; runs of black are filled with write mode 2. */
-void BlitEGA(Rect *r)
-{
-    unsigned x0;
-    unsigned x1;
-    unsigned n;
-    int h;
-    int srcskip;
-    int dstskip;
-    unsigned char far *src;
-    unsigned char far *dst;
-
-    x0 = r->x0 & ~3;
-    x1 = r->x1 | 3;
-    dst = (unsigned char far *)0xA0000000L + ((r->y0 * 320 + x0) >> 2);
-    src = backbuf->data + r->y0 * 320 + x0;
-    n = (x1 + 1 - x0) >> 2;
-    h = r->y1 - r->y0 + 1;
-    srcskip = 320 - (n << 2);
-    dstskip = 80 - n;
-    _asm {
-        push si
-        push di
-        mov dx, 3CEh
-        mov ax, 0FF08h
-        out dx, ax
-        mov dx, 3C4h
-        mov al, 2
-        out dx, al
-        mov dx, 3C5h
-        mov cx, h
-        lea bx, pal_remap
-        les di, dst
-        lds si, src
-        jmp l_row
-    l_next:
-        add si, srcskip
-        add di, dstskip
-    l_row:
-        push cx
-        mov cx, n
-        jmp l_pix
-    l_zero:
-        or ax, [si]
-        je l_run
-        xor cx, cx
-        jmp l_out
-    l_pix:
-        push cx
-        lodsw
-        or ax, ax
-        je l_zero
-        _emit 36h
-        xlat [bx]
-        xchg al, ah
-        _emit 36h
-        xlat [bx]
-        mov cx, ax
-    l_out:
-        mov al, 1
-        out dx, al
-        lodsw
-        _emit 36h
-        xlat [bx]
-        xchg al, ah
-        _emit 36h
-        xlat [bx]
-        xchg cl, ah
-        ror cx, 4
-        rol cl, 4
-        rol cx, 4
-        ror ax, 4
-        rol al, 4
-        rol ax, 2
-        mov dx, cx
-        xor dx, ax
-        and dx, 3333h
-        xor cx, dx
-        xor ax, dx
-        rol ax, 2
-        mov dx, 3C5h
-        mov es:[di], al
-        mov al, 2
-        out dx, al
-        mov es:[di], cl
-        mov al, 4
-        out dx, al
-        mov es:[di], ah
-        mov al, 8
-        out dx, al
-        mov es:[di], ch
-        inc di
-        pop cx
-        loop l_pix
-    l_rowend:
-        pop cx
-        loop l_next
-        jmp l_done
-    l_run:
-        pop cx
-        mov al, 0Fh
-        out dx, al
-        mov dx, 1
-        dec cx
-        je l_runend
-    l_scan:
-        add si, 2
-        inc dx
-        lodsw
-        or ax, [si]
-        loope l_scan
-        je l_runend
-        sub si, 4
-        dec dx
-        inc cx
-    l_runend:
-        add si, 2
-        push cx
-        mov cx, dx
-        mov dx, 3CEh
-        mov ax, 205h
-        out dx, ax
-        xor al, al
-        rep stosb
-        mov ax, 5
-        out dx, ax
-        mov dx, 3C5h
-        pop cx
-        jcxz l_rowend
-        jmp l_pix
-    l_done:
-        mov ax, ss
-        mov ds, ax
-        pop di
-        pop si
-    }
-}
-
-/* Unused: colour bars for checking the palette. */
-void DrawTestPattern(void)
-{
-    Rect r;
-    int x;
-    int y;
-
-    for (x = 0; x < 320; x++)
-        for (y = 0; y < 160; y++)
-            backbuf->data[(y + 10) * 320 + x] = x / 20 + y / 10 * 16;
-    r.x0 = 0;
-    r.y0 = 10;
-    r.x1 = 319;
-    r.y1 = 169;
-    BlitToScreen(&r);
-}
-
-/* Copy r of the back buffer to Tandy video memory through pal_remap. */
-void BlitTandy(Rect *r)
-{
-    int w;
-    int h;
-    int skip;
-    unsigned char far *dst;
-    unsigned char far *src;
-
-    dst = (unsigned char far *)0xA0000000L + r->y0 * 320 + r->x0;
-    src = backbuf->data + r->y0 * 320 + r->x0;
-    w = r->x1 - r->x0 + 1;
-    h = r->y1 - r->y0 + 1;
-    skip = 320 - w;
-    _asm {
-        push si
-        push di
-        mov dx, skip
-        mov cx, h
-        lea bx, pal_remap
-        les di, dst
-        lds si, src
-    l_row:
-        push cx
-        mov cx, w
-    l_pix:
-        lodsb
-        _emit 36h
-        xlat [bx]
-        stosb
-        loop l_pix
-        add si, dx
-        add di, dx
-        pop cx
-        loop l_row
-        mov ax, ss
-        mov ds, ax
-        pop di
-        pop si
-    }
-}
-
 void BlitToScreen(Rect *r)
 {
-    unsigned w;
-    unsigned h;
-    int unused;
-    unsigned char far *dst;
-    unsigned char far *src;
+    uint16_t w;
+    uint16_t h;
+    unsigned char *dst;
+    unsigned char *src;
 
-    switch (video_mode) {
-    case 1:
-        BlitEGA(r);
-        return;
-    case 2:
-        BlitTandy(r);
-        return;
-    default:
-        break;
-    }
-    dst = (unsigned char far *)0xA0000000L + r->y0 * 320 + r->x0;
+    dst = plat_vram() + r->y0 * 320 + r->x0;
     src = backbuf->data + r->y0 * 320 + r->x0;
     w = r->x1 - r->x0 + 1;
     h = r->y1 - r->y0 + 1;
@@ -758,13 +364,13 @@ void BlitToScreen(Rect *r)
 
 /* The topmost sprite with a non-zero pixel at (x, y), ignoring the mouse
  * pointer. */
-Sprite *SpriteAt(int x, int y)
+Sprite *SpriteAt(int16_t x, int16_t y)
 {
     Sprite *s;
-    int i;
-    int dx;
-    int dy;
-    Bitmap far *bmp;
+    int16_t i;
+    int16_t dx;
+    int16_t dy;
+    Bitmap *bmp;
 
     for (i = *sprite_count - 1; i >= 0; i--) {
         s = sprite_list[i];
@@ -775,7 +381,7 @@ Sprite *SpriteAt(int x, int y)
             dx = x - s->ox;
             dy = y - s->oy;
             if (s->type == SPRITE_SHADOW || s->type == SPRITE_TEXT
-                    || ((unsigned char far *)bmp->data)[dy * bmp->w + dx]) {
+                    || ((unsigned char *)bmp->data)[dy * bmp->w + dx]) {
                 UnlockMem(s->handle);
                 return s;
             }
@@ -785,7 +391,7 @@ Sprite *SpriteAt(int x, int y)
     return 0;
 }
 
-void SpriteSetPos(Sprite *s, int x, int y, unsigned z)
+void SpriteSetPos(Sprite *s, int16_t x, int16_t y, uint16_t z)
 {
     s->x = x;
     s->y = y;
@@ -800,9 +406,10 @@ void SpriteSetBitmap(Sprite *s, MemHandle h)
 }
 
 /* Add s as an invisible rectangle, using h as an empty bitmap header. */
-void SpriteAddRect(Sprite *s, MemHandle h, int x0, int y0, int x1, int y1)
+void SpriteAddRect(Sprite *s, MemHandle h, Rect r)
 {
-    Bitmap far *bmp;
+    Bitmap *bmp;
+    int16_t x0 = r.x0, y0 = r.y0, x1 = r.x1, y1 = r.y1;
 
     SpriteSetPos(s, x0, y0, 0);
     SpriteSetBitmap(s, h);
@@ -818,7 +425,7 @@ void SpriteAddRect(Sprite *s, MemHandle h, int x0, int y0, int x1, int y1)
 
 void RedrawSpritesIn(Rect *r)
 {
-    int i;
+    int16_t i;
     Sprite *s;
     Rect clip;
 

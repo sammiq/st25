@@ -1,6 +1,7 @@
 /* seg036: the bridge script for the last mission, "Vengeance" (the
  * Enterprise's sister ship Republic), the final rating and the credits */
 
+#include "compat.h"
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -21,37 +22,37 @@ typedef struct Msg {
 } Msg;
 
 /* seg001 */
-void BridgeSfx(int n);
+void BridgeSfx(int16_t n);
 void BridgeMsg(void);
 Msg *PeekMsg(void);
-char *GetText(int n);
+char *GetText(int16_t n);
 void SetTextFile(char *name);
 void CutScene(char *name, char *voc);
-void SetSteering(int on);
+void SetSteering(int16_t on);
 void ClearScreen(void);
 void HailShow(char *name);
 void HailEnd(void);
 void ViewFull(void);
 void ViewBridge(void);
-void Debrief(int n, int msg, int score, int max);
-void SayNumber(char *out, int n);
-void ShuttleFlyby(int kind);
+void Debrief(int16_t n, int16_t msg, int16_t score, int16_t max);
+void SayNumber(char *out, int16_t n);
+void ShuttleFlyby(int16_t kind);
 void ShuttleEnd(void);
 void ClearMsgs(void);
-char *GetChoice(int n, int *list, int x);
+char *GetChoice(int16_t n, int16_t *list, char *x);
 /* seg008 */
-void MsgBox(char *title, char *text, int x, int y, int color, int msg);
+void MsgBox(char *title, char *text, int16_t x, int16_t y, int16_t color, int16_t msg);
 void PostRoomMsg(unsigned char a, unsigned char b, unsigned char c, unsigned char d);
-long TextBox(char *(far *fn)(), int *arg, int x, int y, int color, int choice, int maxl,
-             int flag);
+int32_t TextBox(void *fn, void *arg, int16_t x, int16_t y, int16_t color, int16_t choice, int16_t maxl,
+             int16_t flag);
 /* seg000 */
-int StartAnim(int n, char *name, int x, int y, int scale);
+int16_t StartAnim(int16_t n, char *name, int16_t x, int16_t y, int16_t scale);
 /* seg017 */
 void AddR3(Obj3D *o);
 void DelR3(Obj3D *o);
-void RenderR3(int statics);
+void RenderR3(int16_t statics);
 /* seg016 */
-void PlaceObj(Obj3D *o, int a0, int r0, int a1, int r1, int frames);
+void PlaceObj(Obj3D *o, int16_t a0, int16_t r0, int16_t a1, int16_t r1, int16_t frames);
 /* seg015 */
 void RandomPlanet(Obj3D *o);
 /* seg020 */
@@ -71,41 +72,41 @@ void EndKirk(void);
 void EndSpock(void);
 void EndMcCoy(void);
 void Credits(void);
-int CreditsFly(Obj3D *o, int n);
+int16_t CreditsFly(Obj3D *o, int16_t n);
 
 extern char *crew_names[8];
-extern int word_45AA2;
-extern int kbd_mouse;
-extern int in_orbit;
-extern int under_attack;
-extern void (far *bridge_tick)(void);
-extern int word_45AB2;
-extern int word_45AB4;
+extern int16_t word_45AA2;
+extern int16_t kbd_mouse;
+extern int16_t in_orbit;
+extern int16_t under_attack;
+extern void (*bridge_tick)(void);
+extern int16_t word_45AB2;
+extern int16_t word_45AB4;
 extern Matrix cam_orient;
-extern int msg_head;
-extern int word_50CA6;
-extern unsigned long bridge_ticks;
-extern int mission_vars[6];
+extern int16_t msg_head;
+extern int16_t word_50CA6;
+extern uint32_t bridge_ticks;
+extern int16_t mission_vars[6];
 extern Obj3D dummy_planet;
-extern void (far *saved_tick)(void);
-extern int word_52C1E;
-extern int mission_ranks[7];
+extern void (*saved_tick)(void);
+extern int16_t word_52C1E;
+extern int16_t mission_ranks[7];
 extern Obj3D player_ship;
 extern Vec32 cam_pos;
-extern long proj_dist;
+extern int32_t proj_dist;
 extern char mission[16];
 
 char bredell[] = "Bredell";
-int bredell_choices1[] = { 0, 1, -1 };
-int bredell_choices2[] = { 2, 3, -1 };
-int bredell_choices3[] = { 4, 5, 6, -1 };
-int bredell_choices4[] = { 7, 8, 9, -1 };
+int16_t bredell_choices1[] = { 0, 1, -1 };
+int16_t bredell_choices2[] = { 2, 3, -1 };
+int16_t bredell_choices3[] = { 4, 5, 6, -1 };
+int16_t bredell_choices4[] = { 7, 8, 9, -1 };
 
 /* Arriving: the fly-by, the Republic's crew, then Bredell's Elasi ship. */
 void VengArrive(void)
 {
     Msg m;
-    int r;
+    int16_t r;
 
     m = *PeekMsg();
     if (m.type == 0) {
@@ -204,9 +205,9 @@ void VengArrive(void)
 void VengFinale(void)
 {
     Msg m;
-    int i;
-    int sum;
-    int pct;
+    int16_t i;
+    int16_t sum;
+    int16_t pct;
     char *text;
     char num[128];
 
@@ -337,7 +338,7 @@ void EndMcCoy(void)
 void Credits(void)
 {
     Obj3D o;
-    int r;
+    int16_t r;
 
     DigiShutdown();
     LoadMusic("title");
@@ -386,11 +387,11 @@ done:
 }
 
 /* Fly o towards the camera for n frames. Returns 1 if a key was pressed. */
-int CreditsFly(Obj3D *o, int n)
+int16_t CreditsFly(Obj3D *o, int16_t n)
 {
-    long t;
-    long now;
-    int i;
+    int32_t t;
+    int32_t now;
+    int16_t i;
     Event ev;
 
     t = GetTicks();

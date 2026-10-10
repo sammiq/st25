@@ -1,5 +1,6 @@
 /* seg011: doubly linked lists */
 
+#include "compat.h"
 #include "list.h"
 
 void ListInit(List *l)
@@ -38,11 +39,11 @@ void ListRemove(List *l, Node *n)
 }
 
 /* Not called anywhere in the game. */
-int ListCount(List *l)
+int16_t ListCount(List *l)
 {
     Node *n;
     Node *tail;
-    int count;
+    int16_t count;
 
     tail = &l->tail;
     count = 0;

@@ -1,93 +1,39 @@
-/* seg003: CD-ROM detection, resource files (DATA.DIR/RUN/001) and patches */
+/* seg003: data file location, resource files (DATA.DIR/RUN/001) and patches */
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+#include "compat.h"
 #include <fcntl.h>
-#include <io.h>
-#include <dos.h>
-#include "ems.h"
+#include <unistd.h>
 #include "mem.h"
 #include "resource.h"
 
 /* Globals this file owns (declared in the headers). */
 char voc_path[32];
 MemHandle dir_handle;
-int data_fd;
-unsigned dir_size;
+int16_t data_fd;
+uint16_t dir_size;
 MemHandle run_handle;
-struct find_t patch_find;
-unsigned dir_count;
+uint16_t dir_count;
 
-void Fatal(char *fmt, ...);     /* fatal error */
-
-char far file_buf[0x800];       /* ReadChunk reads through this (in FAR_BSS) */
-int voc_on_cd = 0;
-int word_45D18 = 0;             /* never used */
+char file_buf[0x800];           /* ReadChunk reads through this (in FAR_BSS) */
+int16_t voc_on_cd = 0;
+int16_t word_45D18 = 0;             /* never used */
 char *exit_msg = 0;
-int data_not_open = -1;
-int dir_last = 0;
+int16_t data_not_open = -1;
+int16_t dir_last = 0;
 
-/* Locate the speech directory: ./voc if installed, else on the CD. */
+/* Locate the speech directory.  The original looked for ./voc/speech.mrk
+ * (installed) and then for the CD; the data directory (see plat_init)
+ * holds the voc directory next to DATA.001 now. */
 void FindCD(void)
 {
-    int unused;
-    int inst;
-    int i;
-    int first;
-    int count;
-    char letters[256];
-    char far *lpletters;
-    int fd;
-
-    lpletters = letters;
-    _asm {
-        mov ax, 1500h
-        mov bx, 0
-        int 2Fh
-        mov inst, ax
-        mov count, bx
-        mov first, cx
-        mov ax, 150Dh
-        les bx, lpletters
-        int 2Fh
-        mov ax, 150Ch
-        int 2Fh
-    }
-    strcpy(voc_path, ".\\voc\\speech.mrk");
-    if ((fd = open(voc_path, O_RDONLY)) != -1) {
-        strcpy(voc_path, ".\\voc\\");
-        close(fd);
-        voc_on_cd = 0;
-        return;
-    }
-    if (count == 0) {
-        SetExitMsg("No CD-ROM drive detected.\nMake sure that you have run MSCDEX.EXE and that the correct CD-ROM device\ndriver is present in your CONFIG.SYS file.");
-        exit(0);
-    }
-    for (i = first; i < first + count; i++) {
-        voc_path[0] = i + 'A';
-        voc_path[1] = ':';
-        voc_path[2] = 0;
-        strcat(voc_path, "\\trekcd\\voc\\speech.mrk");
-        if ((fd = open(voc_path, O_RDONLY)) != -1) {
-            close(fd);
-            voc_path[0] = i + 'A';
-            voc_path[1] = ':';
-            voc_path[2] = 0;
-            strcat(voc_path, "\\trekcd\\voc\\");
-            voc_on_cd = 1;
-            return;
-        }
-    }
-    SetExitMsg("Couldn't find the Star Trek: 25th Anniversary Enhanced CD-ROM disc.\nMake sure you've inserted the disc into your CD-ROM drive.");
-    exit(1);
+    strcpy(voc_path, "voc/");
+    voc_on_cd = 0;
 }
 
 void PrintExitMsg(void)
 {
     if (exit_msg)
-        printf(exit_msg);
+        printf("%s", exit_msg);
 }
 
 void SetExitMsg(char *msg)
@@ -95,412 +41,117 @@ void SetExitMsg(char *msg)
     exit_msg = msg;
 }
 
-/* Unpack from src while at least 16 bytes of input remain; returns the
- * number of bytes consumed and advances *pdst. */
-int UnpackChunk(unsigned char far *src, unsigned char far **pdst, unsigned len)
+/* The game's compression: flag bytes, each covering eight items from the
+ * low bit up.  A set bit is a literal byte, a clear bit a 16 bit back
+ * reference (12 bit distance, length - 3 in the low 4 bits).  Distance
+ * 0 or 1 repeats the last byte.  A flag byte of FF is eight literals. */
+static void UnpackItem(int literal, const unsigned char **ps, unsigned char **pd)
 {
-    unsigned char far *dst;
-    unsigned char far *end;
+    const unsigned char *src = *ps;
+    unsigned char *dst = *pd;
 
-    dst = *pdst;
-    end = src + len - 16;
+    if (literal)
+        *dst++ = *src++;
+    else {
+        unsigned code = src[0] | (src[1] << 8);
+        unsigned count = (code & 0x0F) + 3;
+        unsigned dist = code >> 4;
+
+        src += 2;
+        if (dist < 2)
+            memset(dst, dst[-1], count), dst += count;
+        else
+            for (; count != 0; count--, dst++)
+                *dst = dst[-(int)dist];
+    }
+    *ps = src;
+    *pd = dst;
+}
+
+/* Unpack from src while at least 16 bytes of input remain; returns the
+ * number of bytes consumed and advances *pdst.  Only whole flag groups are
+ * taken, so the rest is unpacked once more data has arrived. */
+int16_t UnpackChunk(unsigned char *src, unsigned char **pdst, uint16_t len)
+{
+    const unsigned char *s = src;
+    const unsigned char *end;
+    unsigned char *dst = *pdst;
+    unsigned flags;
+    int i;
+
     if (len <= 16)
         return 0;
-    len -= 16;
-    end = src + len;
-    _asm {
-        push si
-        push di
-        lds si, src
-        les di, dst
-    l_next:
-        lodsb
-        cmp al, 0FFh
-        jne l_bits
-        test di, 1
-        je l_even8
-        movsb
-        mov cx, 3
-        rep movsw
-        movsb
-        cmp si, word ptr end
-        jb l_next
-        jmp l_done
-    l_even8:
-        mov cx, 4
-        rep movsw
-        cmp si, word ptr end
-        jb l_next
-        jmp l_done
-    l_bits:
-        mov dl, al
-        mov dh, 1
-        shr dx, 1
-        jae l_match
-        movsb
-        shr dx, 1
-        jae l_match
-        movsb
-        shr dx, 1
-        jae l_match
-        movsb
-        shr dx, 1
-        jae l_match
-        movsb
-        shr dx, 1
-        jae l_match
-        movsb
-        shr dx, 1
-        jae l_match
-        movsb
-        shr dx, 1
-        jae l_match
-        movsb
-        shr dx, 1
-        jae l_match
-        movsb
-        cmp si, word ptr end
-        jb l_next
-        jmp l_done
-    l_cont:
-        shr dx, 1
-        je l_check
-        jae l_match
-        movsb
-        shr dx, 1
-        je l_check
-        jae l_match
-        movsb
-        shr dx, 1
-        je l_check
-        jae l_match
-        movsb
-        shr dx, 1
-        je l_check
-        jae l_match
-        movsb
-        shr dx, 1
-        je l_check
-        jae l_match
-        movsb
-        shr dx, 1
-        je l_check
-        jae l_match
-        movsb
-        shr dx, 1
-        je l_check
-        jae l_match
-        movsb
-    l_check:
-        cmp si, word ptr end
-        jae l_done
-        jmp l_next
-    l_match:
-        lodsw
-        mov cx, ax
-        and cx, 0Fh
-        add cx, 3
-        cmp ax, 20h
-        jb l_fill
-        shr ax, 4
-        mov bx, si
-        mov si, di
-        sub si, ax
-        mov ax, es
-        mov ds, ax
-        test di, 1
-        je l_copyw
-        movsb
-        dec cx
-    l_copyw:
-        shr cx, 1
-        rep movsw
-        jae l_copied
-        movsb
-    l_copied:
-        mov si, bx
-        mov ds, word ptr src+2
-        jmp l_cont
-    l_fill:
-        mov al, es:[di-1]
-        mov ah, al
-        test di, 1
-        je l_fillw
-        stosb
-        dec cx
-    l_fillw:
-        shr cx, 1
-        rep stosw
-        jae l_cont
-        stosb
-        jmp l_cont
-    l_done:
-        mov word ptr src, si
-        mov word ptr dst, di
-        mov ax, ss
-        mov ds, ax
-        pop di
-        pop si
-    }
+    end = src + len - 16;
+    do {
+        flags = *s++;
+        for (i = 0; i < 8; i++)
+            UnpackItem(flags & (1 << i), &s, &dst);
+    } while (s < end);
     *pdst = dst;
-    return src + len - end;
+    return (int16_t)(s - src);
 }
 
-/* Unpack the rest of the input. Each flag byte covers eight items: a set
- * bit is a literal byte, a clear bit a 12:4 bit (distance, length - 3)
- * back reference. */
-void Unpack(unsigned char far *src, unsigned char far *dst, unsigned len)
+/* Unpack the rest of the input. */
+void Unpack(unsigned char *src, unsigned char *dst, uint16_t len)
 {
-    unsigned char far *end;
+    const unsigned char *s = src;
+    const unsigned char *end = src + len;
     unsigned flags;
-    unsigned code;
-    unsigned count;
+    int i;
 
-    for (end = src + len; src < end; ) {
-        flags = *src++;
-        if (flags & 0x01)
-            *dst++ = *src++;
-        else {
-            code = *(unsigned far *)src;
-            count = (code & 0x0F) + 3;
-            src += 2;
-            _asm {
-                push si
-                push di
-                push ds
-                les di, dst
-                lds si, dst
-                mov ax, code
-                shr ax, 4
-                sub si, ax
-                mov cx, count
-                rep movsb
-                pop ds
-                pop di
-                pop si
-            }
-            dst += count;
-        }
-        if (src >= end)
-            break;
-        if (flags & 0x02)
-            *dst++ = *src++;
-        else {
-            code = *(unsigned far *)src;
-            count = (code & 0x0F) + 3;
-            src += 2;
-            _asm {
-                push si
-                push di
-                push ds
-                les di, dst
-                lds si, dst
-                mov ax, code
-                shr ax, 4
-                sub si, ax
-                mov cx, count
-                rep movsb
-                pop ds
-                pop di
-                pop si
-            }
-            dst += count;
-        }
-        if (src >= end)
-            break;
-        if (flags & 0x04)
-            *dst++ = *src++;
-        else {
-            code = *(unsigned far *)src;
-            count = (code & 0x0F) + 3;
-            src += 2;
-            _asm {
-                push si
-                push di
-                push ds
-                les di, dst
-                lds si, dst
-                mov ax, code
-                shr ax, 4
-                sub si, ax
-                mov cx, count
-                rep movsb
-                pop ds
-                pop di
-                pop si
-            }
-            dst += count;
-        }
-        if (src >= end)
-            break;
-        if (flags & 0x08)
-            *dst++ = *src++;
-        else {
-            code = *(unsigned far *)src;
-            count = (code & 0x0F) + 3;
-            src += 2;
-            _asm {
-                push si
-                push di
-                push ds
-                les di, dst
-                lds si, dst
-                mov ax, code
-                shr ax, 4
-                sub si, ax
-                mov cx, count
-                rep movsb
-                pop ds
-                pop di
-                pop si
-            }
-            dst += count;
-        }
-        if (src >= end)
-            break;
-        if (flags & 0x10)
-            *dst++ = *src++;
-        else {
-            code = *(unsigned far *)src;
-            count = (code & 0x0F) + 3;
-            src += 2;
-            _asm {
-                push si
-                push di
-                push ds
-                les di, dst
-                lds si, dst
-                mov ax, code
-                shr ax, 4
-                sub si, ax
-                mov cx, count
-                rep movsb
-                pop ds
-                pop di
-                pop si
-            }
-            dst += count;
-        }
-        if (src >= end)
-            break;
-        if (flags & 0x20)
-            *dst++ = *src++;
-        else {
-            code = *(unsigned far *)src;
-            count = (code & 0x0F) + 3;
-            src += 2;
-            _asm {
-                push si
-                push di
-                push ds
-                les di, dst
-                lds si, dst
-                mov ax, code
-                shr ax, 4
-                sub si, ax
-                mov cx, count
-                rep movsb
-                pop ds
-                pop di
-                pop si
-            }
-            dst += count;
-        }
-        if (src >= end)
-            break;
-        if (flags & 0x40)
-            *dst++ = *src++;
-        else {
-            code = *(unsigned far *)src;
-            count = (code & 0x0F) + 3;
-            src += 2;
-            _asm {
-                push si
-                push di
-                push ds
-                les di, dst
-                lds si, dst
-                mov ax, code
-                shr ax, 4
-                sub si, ax
-                mov cx, count
-                rep movsb
-                pop ds
-                pop di
-                pop si
-            }
-            dst += count;
-        }
-        if (src >= end)
-            break;
-        if (flags & 0x80)
-            *dst++ = *src++;
-        else {
-            code = *(unsigned far *)src;
-            count = (code & 0x0F) + 3;
-            src += 2;
-            _asm {
-                push si
-                push di
-                push ds
-                les di, dst
-                lds si, dst
-                mov ax, code
-                shr ax, 4
-                sub si, ax
-                mov cx, count
-                rep movsb
-                pop ds
-                pop di
-                pop si
-            }
-            dst += count;
+    while (s < end) {
+        flags = *s++;
+        for (i = 0; i < 8; i++) {
+            UnpackItem(flags & (1 << i), &s, &dst);
+            if (s >= end)
+                break;
         }
     }
 }
 
-void UnpackAll(unsigned char far *src, unsigned char far *dst, unsigned len)
+void UnpackAll(unsigned char *src, unsigned char *dst, uint16_t len)
 {
-    unsigned n;
+    uint16_t n;
 
     n = UnpackChunk(src, &dst, len);
     Unpack(src + n, dst, len - n);
 }
 
-void ReadFile(int fd, void far *buf, unsigned len)
+void ReadFile(int16_t fd, void *buf, uint16_t len)
 {
-    unsigned got;
+    uint16_t got;
 
     if (ReadChunk(fd, buf, len, &got))
         Fatal("error reading in _lread");
 }
 
-/* Read through the far buffer in 2K pieces. */
-unsigned ReadChunk(int fd, char far *buf, unsigned len, unsigned *pread)
+/* Read len bytes; *pread is the number read.  Returns 0, or non zero on
+ * a read error. */
+uint16_t ReadChunk(int16_t fd, void *vbuf, uint16_t len, uint16_t *pread)
 {
-    unsigned err;
-    unsigned chunk;
-    unsigned got;
+    char *buf = vbuf;
+    ssize_t got;
 
     *pread = 0;
     while (len != 0) {
-        chunk = min(len, 0x800);
-        if ((err = _dos_read(fd, file_buf, chunk, &got)) != 0)
-            Fatal("error reading in _lread");
-        _fmemcpy(buf, file_buf, got);
-        len -= chunk;
-        buf += chunk;
+        got = read(fd, buf, len);
+        if (got < 0)
+            return 1;
+        if (got == 0)
+            break;
+        len -= got;
+        buf += got;
         *pread += got;
     }
-    return err;
+    return 0;
 }
 
 void OpenDataFiles(void)
 {
-    int fd;
-    char far *dir;
-    char far *run;
-    unsigned len;
+    int16_t fd;
+    char *dir;
+    char *run;
+    uint16_t len;
 
     if (data_not_open == -1) {
         if ((fd = open("data.dir", O_RDONLY | O_BINARY)) == -1)
@@ -530,25 +181,27 @@ void OpenDataFiles(void)
 /* Binary search DATA.DIR. Numbered files (NAME0, NAME1, ...) share one
  * entry that points into DATA.RUN. With mark == 0 the file is flagged as
  * replaced by a patch instead. */
-FileInfo FindFile(char *name, char *ext, int mark)
+FileInfo FindFile(char *name, char *ext, int16_t mark)
 {
     char fname[10];
-    int mid;
-    int r;
-    int lo;
-    int hi;
-    int len;
-    DirEntry far *dir;
+    char fext[4];
+    int16_t mid;
+    int16_t r;
+    int16_t lo;
+    int16_t hi;
+    int16_t len;
+    DirEntry *dir;
     FileInfo fi;
-    unsigned char far *run;
-    void far *saved;
-    int i;
+    unsigned char *run;
+    int16_t i;
 
-    saved = EMSUnlock();
     dir = LockMem(dir_handle);
     CopyName(fname, name);
     strupr(fname);
-    strupr(ext);
+    strncpy(fext, ext, 3);
+    fext[3] = 0;
+    strupr(fext);
+    ext = fext;
     len = strlen(fname);
     len = min(len, 8);
     lo = 0;
@@ -556,18 +209,18 @@ FileInfo FindFile(char *name, char *ext, int mark)
     mid = dir_last;
     while (lo <= hi) {
         if ((r = _fstrncmp(ext, dir[mid].ext, 3)) == 0) {
-            int n;
-            int idx;
+            int16_t n;
+            int16_t idx;
 
             n = _fstrlen(dir[mid].name);
             n = min(n, 8);
             idx = fname[n - 1] - dir[mid].name[n - 1];
             if (n == len && _fstrncmp(fname, dir[mid].name, n - 1) == 0
                     && (dir[mid].hi & 0x80) && idx < (dir[mid].hi & 0x7F) && idx >= 0) {
-                unsigned long pos;
-                unsigned long far *p;
-                unsigned far *q;
-                int flag;
+                uint32_t pos;
+                uint32_t *p;
+                uint16_t *q;
+                int16_t flag;
 
                 dir_last = mid;
                 MemCpy(&fi, &dir[mid], 11);
@@ -576,10 +229,10 @@ FileInfo FindFile(char *name, char *ext, int mark)
                 UnlockMem(dir_handle);
                 run = LockMem(run_handle);
                 run = run + (fi.offset & 0xFFFF);
-                p = (unsigned long far *)run;
+                p = (uint32_t *)run;
                 pos = *p & 0x7FFFFE;
                 flag = *p & 1;
-                q = (unsigned far *)(run + 3);
+                q = (uint16_t *)(run + 3);
                 for (i = 0; i < idx; i++) {
                     flag = *q & 1;
                     pos += *q++ & 0xFFFE;
@@ -595,15 +248,14 @@ FileInfo FindFile(char *name, char *ext, int mark)
                     break;
                 fi.offset = pos + 4;
                 lseek(data_fd, pos, SEEK_SET);
-                ReadChunk(data_fd, (char far *)&fi.size, 4, &i);
+                ReadChunk(data_fd, (char *)&fi.size, 4, &i);
                 UnlockMem(run_handle);
-                EMSRestore(saved);
                 return fi;
             }
             r = _fstrncmp(fname, dir[mid].name, 8);
         }
         if (r == 0) {
-            long b;
+            int32_t b;
 
             dir_last = mid;
             if (!mark)
@@ -611,12 +263,11 @@ FileInfo FindFile(char *name, char *ext, int mark)
             if (dir[mid].offset & 1)
                 break;
             MemCpy(&fi, &dir[mid], 11);
-            b = fi.offset = ((unsigned long)dir[mid].hi << 16) + dir[mid].offset + 4;
+            b = fi.offset = ((uint32_t)dir[mid].hi << 16) + dir[mid].offset + 4;
             b = (b - 4) & 0x7FFFFFFEL;
             lseek(data_fd, b, SEEK_SET);
-            ReadChunk(data_fd, (char far *)&fi.size, 4, &i);
+            ReadChunk(data_fd, (char *)&fi.size, 4, &i);
             UnlockMem(dir_handle);
-            EMSRestore(saved);
             return fi;
         } else if (r < 0)
             hi = mid - 1;
@@ -625,49 +276,49 @@ FileInfo FindFile(char *name, char *ext, int mark)
         mid = (lo + hi) >> 1;
     }
     UnlockMem(dir_handle);
-    EMSRestore(saved);
     fi.offset = -1L;
     return fi;
 }
 
-int LoadPatch(char *name, char *ext, char far *buf)
+int16_t LoadPatch(char *name, char *ext, void *buf)
 {
     char fname[10];
     char path[64];
-    int fd;
-    unsigned size;
-    unsigned got;
-    int unused;
+    int16_t fd;
+    uint16_t size;
+    uint16_t got;
+    int16_t unused;
 
     CopyName(fname, name);
     sprintf(path, "patches/%s.%s", fname, ext);
     if ((fd = open(path, O_RDONLY | O_BINARY)) == -1)
         Fatal("Not found patches/%s.%s", fname, ext);
-    if (ReadChunk(fd, (char far *)&size, 2, &got))
+    if (ReadChunk(fd, (char *)&size, 2, &got))
         Fatal("error reading patches/%s.%s", fname, ext);
-    if (ReadChunk(fd, buf, (unsigned)filelength(fd) - 2, &got))
+    if (ReadChunk(fd, buf, (uint16_t)filelength(fd) - 2, &got))
         Fatal("error reading patches/%s.%s", fname, ext);
     close(fd);
     return 1;
 }
 
-int LoadPatchPacked(char *name, char *ext, unsigned char far *dst)
+int16_t LoadPatchPacked(char *name, char *ext, void *vdst)
 {
+    unsigned char *dst = vdst;
     char fname[10];
     char path[64];
-    int fd;
-    unsigned size;
-    unsigned left;
-    unsigned have;
-    unsigned got;
+    int16_t fd;
+    uint16_t size;
+    uint16_t left;
+    uint16_t have;
+    uint16_t got;
     unsigned char buf[512];
-    unsigned n;
+    uint16_t n;
 
     CopyName(fname, name);
     sprintf(path, "patches/%s.%s", fname, ext);
     if ((fd = open(path, O_RDONLY | O_BINARY)) == -1)
         Fatal("Not found patches/%s.%s", fname, ext);
-    if (ReadChunk(fd, (char far *)&size, 2, &got))
+    if (ReadChunk(fd, (char *)&size, 2, &got))
         Fatal("error reading patches/%s.%s", fname, ext);
     left = filelength(fd) - 2;
     have = 0;
@@ -684,29 +335,29 @@ int LoadPatchPacked(char *name, char *ext, unsigned char far *dst)
     return 1;
 }
 
-long GetPatchSize(char *name, char *ext)
+int32_t GetPatchSize(char *name, char *ext)
 {
     char fname[10];
     char path[64];
-    int fd;
-    unsigned size;
-    unsigned got;
+    int16_t fd;
+    uint16_t size;
+    uint16_t got;
 
     CopyName(fname, name);
     sprintf(path, "patches/%s.%s", fname, ext);
     if ((fd = open(path, O_RDONLY | O_BINARY)) == -1)
         Fatal("Not found patches/%s.%s", fname, ext);
-    ReadChunk(fd, (char far *)&size, 2, &got);
+    ReadChunk(fd, (char *)&size, 2, &got);
     close(fd);
     return size;
 }
 
-int GetPatchSizes(char *name, char *ext, unsigned *psize, unsigned *ppacked)
+int16_t GetPatchSizes(char *name, char *ext, uint16_t *psize, uint16_t *ppacked)
 {
     char fname[10];
     char path[64];
-    int fd;
-    unsigned got;
+    int16_t fd;
+    uint16_t got;
 
     CopyName(fname, name);
     sprintf(path, "patches/%s.%s", fname, ext);
@@ -718,12 +369,12 @@ int GetPatchSizes(char *name, char *ext, unsigned *psize, unsigned *ppacked)
     return 1;
 }
 
-void LoadFile(char *name, char *ext, char far *buf)
+void LoadFile(char *name, char *ext, void *buf)
 {
     char fname[10];
     FileInfo fi;
-    unsigned got;
-    int unused;
+    uint16_t got;
+    int16_t unused;
 
     CopyName(fname, name);
     fi = FindFile(fname, ext, 1);
@@ -738,15 +389,16 @@ void LoadFile(char *name, char *ext, char far *buf)
         Fatal("error reading %s.%s", fname, ext);
 }
 
-void LoadFilePacked(char *name, char *ext, unsigned char far *dst)
+void LoadFilePacked(char *name, char *ext, void *vdst)
 {
+    unsigned char *dst = vdst;
     char fname[10];
     FileInfo fi;
-    unsigned left;
-    unsigned have;
-    unsigned got;
+    uint16_t left;
+    uint16_t have;
+    uint16_t got;
     unsigned char buf[512];
-    unsigned n;
+    uint16_t n;
 
     CopyName(fname, name);
     fi = FindFile(fname, ext, 1);
@@ -770,9 +422,9 @@ void LoadFilePacked(char *name, char *ext, unsigned char far *dst)
     Unpack(buf, dst, have);
 }
 
-long GetFileSize(char *name, char *ext)
+int32_t GetFileSize(char *name, char *ext)
 {
-    long size;
+    int32_t size;
     FileInfo fi;
     char fname[10];
 
@@ -783,7 +435,7 @@ long GetFileSize(char *name, char *ext)
     return fi.size;
 }
 
-void GetFileSizes(char *name, char *ext, unsigned *psize, unsigned *ppacked)
+void GetFileSizes(char *name, char *ext, uint16_t *psize, uint16_t *ppacked)
 {
     char fname[10];
     FileInfo fi;
@@ -808,45 +460,29 @@ void CopyName(char *dst, char *src)
     *dst = 0;
 }
 
+static void MarkPatch(const char *file)
+{
+    char name[10];
+    char ext[4];
+    const char *p = file;
+    char *q;
+
+    q = name;
+    while (*p != 0 && *p != '.' && q < name + 9)
+        *q++ = *p++;
+    *q = 0;
+    q = ext;
+    if (*p != 0) {
+        p++;
+        while (*p != 0 && q < ext + 3)
+            *q++ = *p++;
+    }
+    *q = 0;
+    FindFile(name, ext, 0);
+}
+
 /* Flag every file in patches/ as replaced. */
 void ScanPatches(void)
 {
-    char *p;
-    char name[10];
-    char ext[4];
-    int unused;
-    char *q;
-
-    if ((p = FindFirstPatch()) != 0) {
-        do {
-            q = name;
-            while (*p != 0 && *p != '.')
-                *q++ = *p++;
-            *q = 0;
-            q = ext;
-            if (*p != 0) {
-                p++;
-                while (*p != 0)
-                    *q++ = *p++;
-            }
-            *q = 0;
-            FindFile(name, ext, 0);
-        } while ((p = FindNextPatch()) != 0);
-    }
-}
-
-char *FindFirstPatch(void)
-{
-    if (_dos_findfirst("patches/*.*", _A_RDONLY, &patch_find) == 0)
-        return patch_find.name;
-    else
-        return 0;
-}
-
-char *FindNextPatch(void)
-{
-    if (_dos_findnext(&patch_find) == 0)
-        return patch_find.name;
-    else
-        return 0;
+    plat_scan_dir("patches", MarkPatch);
 }
