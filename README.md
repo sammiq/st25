@@ -68,6 +68,7 @@ config/ida_export.txt   IDA database export (tools/ida/export.idc)
 config/symbols.txt      every function/data symbol: address, kind, size, name
 config/units.txt        units (translation units) and their address ranges
 src/<unit>.c            decompiled source, one file per unit
+src/rdf/<room>.asm      room scripts, one file per .RDF (config/rdf.txt lists them)
 include/                shared headers
 tools/                  build tooling (below)
 build/target/           target objects split from the EXE (generated)
@@ -220,6 +221,34 @@ Uninitialized far arrays (`int far sin_table[0x101];`) are different: MSC emits 
 
 The near `.bss` (`data/d49E78`) works the same way. Every uninitialized global needs a definition (`int game_mode;`, `Obj3D ships[4];`) in the file that owns it, usually the one that uses it most. A plain `extern` everywhere still matches unit by unit, but leaves the program unlinkable. `tools/linkcheck.py` lists anything left undefined.
 
+## Room scripts (.RDF)
+
+Each away-mission room has a `.RDF` file in `DATA.001` (53 rooms: `DEMON0`–`VENG8`). Besides the room's header (`Rdf` in `include/room.h`: depth scaling, exits, entry positions), polygons and strings, it holds the room's scripts, which are 16-bit x86 code. `LoadRoom` loads the file whole and `CallScript` calls into it with `SI` = `&room` (the `RoomState`), and the scripts call back through the far pointer at offset 0 (`ScriptService` in `src/seg008.c`). The scripts were written in assembly, not C: strings sit inline with `jmp` over them, arguments are pushed in two different styles, the helpers take arguments in registers, and some bodies run into the next script's header.
+
+`src/rdf/<room>.asm` is each room as MASM 5.0 source, one segment assembled at offset 0. `include/rdf.inc` names the service commands (`RC_`), message types (`MSG_`), objects and items (`OBJ_`, `IT_`), the `RoomState` fields (`RS_`), and has the macros: `SCRIPT type, a, b, c, next` (a script's key and link), `SERVICE` (the call through offset 0), `JMPN` (a 16-bit `jmp`, which MASM 5.0 would otherwise shorten) and `AX8` (`op ax, imm8` in the `83h` form, which MASM 5.0 doesn't choose).
+
+```sh
+ninja rdf                           # assemble every room and compare it with the original
+ninja rdf-progress                  # script bodies named, per room
+.venv/bin/python tools/rdf.py check DEMON0
+.venv/bin/python tools/resource.py extract build/res -e rdf   # the original files
+```
+
+`ninja` checks the rooms too, so it needs `orig/CD/TREKCD/DATA.DIR`, `DATA.RUN` and `DATA.001` (from the CD). The rooms aren't put back into `DATA.001`. Instead, `tools/rdf.py patch ROOM` assembles a room into `build/rdf/patches/<room>.rdf` in the game's patch format (the unpacked size, then LZSS). Copied to a `patches` directory next to the game, it replaces the room in `DATA.001` (`ScanPatches` and `LoadPatchPacked` in `src/seg003.c`). A game saved before a room changed warns "Code for current room patched after game saved" when loaded in that room.
+
+### Decompiling a room
+
+`tools/rdf.py gen ROOM` wrote the sources. It follows the code from every script (and through the run-time jump tables of the TRIAL rooms' conversations), recognises the `Talk`/`Say` helpers, and tracks values through registers, pushes and variables so that each pointer into the file becomes a label (`OFFSET T_DEM0_016`, `DW OFFSET N_Capt_Kirk, ...`). The source therefore still assembles correctly after an edit moves things. It notes the quirks it finds at the top of the file. `gen` won't overwrite a source without `--force`, so don't regenerate a room that has been worked on.
+
+The rest is by hand:
+
+1. Rename each script's entry label (`E_XXXX`) after what it does, and the room's variables: `vNN` (`RoomState.vars`, shared by the rooms of a mission and cleared when it starts) and `D_XXXX` (variables in the room file, which start again each time the room loads). Rename conversations (`C_XXXX`) and branch labels where it helps.
+2. Comment the room (what its actors and objects are) and each script.
+3. Run `ninja rdf` after each change; the room must still match.
+4. When everything in the room is named, add `complete` to its line in `config/rdf.txt`.
+
+`src/rdf/demon0.asm` is the worked example. `ninja rdf-progress` counts the script bodies whose entry label has been renamed (a script that only jumps to another one's body has no label of its own). Unreachable code isn't found by following the scripts; give its address as `code=ADDR` in `config/rdf.txt` so that `gen` disassembles it (TRIAL2 and SINS1 have some).
+
 ## How it works
 
 | Tool | Purpose |
@@ -234,6 +263,8 @@ The near `.bss` (`data/d49E78`) works the same way. Every uninitialized global n
 | `tools/fdiff.py`, `tools/disasm.py`, `tools/progress.py` | command-line diff, disassembly, progress summary |
 | `tools/rename.py` | renames symbols in `symbols.txt`, `relocs.txt` and every source and header (`tools/rename.py _sub_3AEFF _AIL_startup …`) |
 | `tools/linkcheck.py` | lists externals that no object or C library defines, as LINK would report them; exits non-zero if any (run `ninja` first) |
+| `tools/resource.py` | reads `DATA.DIR`/`DATA.RUN`/`DATA.001`: lists and unpacks the game's files |
+| `tools/rdf.py` | room scripts: generates, checks, patches and counts `src/rdf/<room>.asm` |
 | `tools/strrel.py` | gives each string in a unit's `.rodata` a symbol and adds `relocs.txt` entries for `push` operands IDA left as numbers (`tools/strrel.py seg030 [--dry-run]`) |
 
 ### Object conventions

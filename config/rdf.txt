@@ -1,0 +1,60 @@
+# Room scripts: the .RDF files in DATA.001, as source in src/rdf/<room>.asm.
+# tools/rdf.py check assembles each one and compares it with the original;
+# tools/rdf.py progress counts named scripts. Flag a room `complete` once
+# every script and variable in it is named and commented. code=ADDR (hex)
+# marks unreachable code for tools/rdf.py gen to disassemble.
+#
+# room      flags
+DEMON0      complete    # the worked example (see README)
+DEMON1
+DEMON2
+DEMON3
+DEMON4
+DEMON5
+DEMON6
+TUG0
+TUG1
+TUG2
+TUG3
+LOVE0
+LOVE1
+LOVE2
+LOVE3
+LOVE4
+LOVE5
+MUDD0
+MUDD1
+MUDD2
+MUDD3
+MUDD4
+MUDD5
+FEATHER0
+FEATHER1
+FEATHER2
+FEATHER3
+FEATHER4
+FEATHER5
+FEATHER6
+FEATHER7
+TRIAL0
+TRIAL1
+TRIAL2      code=13E3   # bypassed by the jmp before it
+TRIAL3
+TRIAL4
+TRIAL5
+TRIAL9
+SINS0
+SINS1       code=0A0E   # after a retf
+SINS2
+SINS3
+SINS4
+SINS5
+VENG0
+VENG1
+VENG2
+VENG3
+VENG4
+VENG5
+VENG6
+VENG7
+VENG8

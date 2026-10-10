@@ -124,7 +124,22 @@ def main() -> None:
     n.build("build/report.json", "report", ["build/target/.stamp", *bases, "objdiff.json"],
             implicit=[OBJDIFF_CLI])
     n.build("progress", "progress", "build/report.json")
-    n.default(["build/target/.stamp", "base"])
+    n.newline()
+
+    # Room scripts: each src/rdf/<room>.asm must assemble to the room's .RDF
+    n.rule("rdfcheck", "$python tools/rdf.py check $room --stamp $out", description="RDF $room")
+    n.rule("rdfprogress", "$python tools/rdf.py progress", description="RDF PROGRESS")
+    data = [f"orig/CD/TREKCD/DATA.{ext}" for ext in ("DIR", "RUN", "001")]
+    stamps = []
+    for src in sorted((ROOT / "src/rdf").glob("*.asm")):
+        stamp = f"build/rdf/{src.stem}.ok"
+        n.build(stamp, "rdfcheck", str(src.relative_to(ROOT)),
+                implicit=["include/rdf.inc", "tools/rdf.py", "tools/resource.py", "tools/omf.py", *data],
+                variables={"room": src.stem.upper()})
+        stamps.append(stamp)
+    n.build("rdf", "phony", stamps)
+    n.build("rdf-progress", "rdfprogress", implicit=["config/rdf.txt", *stamps])
+    n.default(["build/target/.stamp", "base", "rdf"])
     n.close()
 
     objdiff = {
