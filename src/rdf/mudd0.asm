@@ -184,7 +184,7 @@ E_028F:
 H_0299:
 	SCRIPT	MSG_USE, IT_COMM, ANY, 0, H_0307
 E_029F:
-	mov	ax, OFFSET talk_buf+6
+	mov	ax, OFFSET N_Capt_Kirk
 	mov	bx, OFFSET T_MUD0_001
 	call	Say
 	mov	ax, OFFSET N_Lt_Uhura
@@ -660,19 +660,19 @@ H_078C:
 E_0792:
 	cmp	byte ptr [si+v00], 2
 	je	L07B4
-	mov	ax, OFFSET talk_buf+6
+	mov	ax, OFFSET N_Capt_Kirk
 	mov	bx, OFFSET T_MUD0_010
 	call	Say
 	mov	ax, OFFSET N_Harry_Mudd
 	mov	bx, OFFSET T_MUD0_031
 	call	Say
-	mov	ax, OFFSET talk_buf+6
+	mov	ax, OFFSET N_Capt_Kirk
 	mov	bx, OFFSET T_MUD0_007
 	call	Say
 	retf
 
 L07B4:
-	mov	ax, OFFSET talk_buf+6
+	mov	ax, OFFSET N_Capt_Kirk
 	mov	bx, OFFSET T_MUD0_010
 	call	Say
 	retf
@@ -713,7 +713,7 @@ E_0808:
 	mov	ax, OFFSET N_Dr_McCoy
 	mov	bx, OFFSET T_MUD0_016
 	call	Say
-	mov	ax, OFFSET talk_buf+6
+	mov	ax, OFFSET N_Capt_Kirk
 	mov	bx, OFFSET T_MUD0_003
 	call	Say
 	mov	ax, OFFSET N_Harry_Mudd
@@ -753,7 +753,7 @@ L086E:
 	mov	ax, OFFSET N_Lt_Buchert
 	mov	bx, OFFSET T_MUD0_039
 	call	Say
-	mov	ax, OFFSET talk_buf+6
+	mov	ax, OFFSET N_Capt_Kirk
 	mov	bx, OFFSET T_MUD0_008
 	call	Say
 	retf
@@ -770,7 +770,7 @@ E_0887:
 	mov	ax, OFFSET N_Harry_Mudd
 	mov	bx, OFFSET T_MUD0_035
 	call	Say
-	mov	ax, OFFSET talk_buf+6
+	mov	ax, OFFSET N_Capt_Kirk
 	mov	bx, OFFSET T_MUD0_004
 	call	Say
 	retf
@@ -1026,7 +1026,7 @@ C_1255	LABEL	BYTE
 	DW	0, OFFSET T_MUD0N016, 0	; speaker, choices, 0
 	DB	0, 0, 85h, 22h, 0, 0
 C_1261	LABEL	BYTE
-	DW	OFFSET talk_buf+6, OFFSET T_MUD0_002, 0	; speaker, choices, 0
+	DW	OFFSET N_Capt_Kirk, OFFSET T_MUD0_002, 0	; speaker, choices, 0
 T_MUD0N012	LABEL	BYTE
 	DB	'#MUD0\MUD0N012#This container holds bricks of what might have be'
 	DB	'en preprocessed food -- a long time ago.',0

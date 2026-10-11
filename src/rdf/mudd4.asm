@@ -222,7 +222,7 @@ L0263:
 	cmp	byte ptr [si+v0C], 0
 	jne	L02CE
 	mov	ax, OFFSET N_Mr_Spock
-	mov	bx, OFFSET talk_buf+6
+	mov	bx, OFFSET T_MUD4_061
 	call	Say
 	mov	ax, OFFSET N_Capt_Kirk
 	mov	bx, OFFSET T_MUD4_013

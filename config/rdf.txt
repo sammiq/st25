@@ -6,12 +6,12 @@
 #
 # room      flags
 DEMON0      complete    # the worked example (see README)
-DEMON1
-DEMON2
-DEMON3
-DEMON4
-DEMON5
-DEMON6
+DEMON1      complete
+DEMON2      complete
+DEMON3      complete
+DEMON4      complete
+DEMON5      complete
+DEMON6      complete
 TUG0
 TUG1
 TUG2

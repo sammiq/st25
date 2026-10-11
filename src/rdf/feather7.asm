@@ -224,7 +224,7 @@ E_0242:
 H_025A:
 	SCRIPT	MSG_ANIM_DONE, 1, 0, 0, H_0388
 E_0260:
-	mov	ax, OFFSET talk_buf+6
+	mov	ax, OFFSET C_1340
 	call	Talk
 	AX8	cmp, 0
 	jne	L0273

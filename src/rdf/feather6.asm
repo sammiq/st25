@@ -552,7 +552,7 @@ E_0550:
 	mov	ax, OFFSET N_Mr_Spock
 	mov	bx, OFFSET T_FEA6_033
 	call	Say
-	mov	ax, OFFSET talk_buf+6
+	mov	ax, OFFSET C_1CFB
 	call	Talk
 	AX8	cmp, 0
 	jne	L0581

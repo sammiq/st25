@@ -621,7 +621,7 @@ E_0694:
 	mov	ax, OFFSET N_Harry_Mudd
 	mov	bx, OFFSET T_MUD3_065
 	call	Say
-	mov	ax, OFFSET talk_buf+6
+	mov	ax, OFFSET C_3440
 	call	Talk
 	AX8	cmp, 0
 	jne	L06BA

@@ -448,7 +448,7 @@ L0486:
 	jne	L0486
 	add	word ptr [si+v31], 1
 	mov	ax, OFFSET S_0C64
-	mov	bx, OFFSET talk_buf+6
+	mov	bx, OFFSET T_MUD1N013
 	call	Say
 	retf
 

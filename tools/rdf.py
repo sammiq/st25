@@ -740,8 +740,10 @@ class Writer:
                 and r.is_room(a, ins.memory_base) and ins.memory_displacement < ROOM_SIZE)
 
     def in_array(self, v: int) -> tuple[str, int] | None:
+        """(array, offset) for an address inside an array; an array ends at
+        the next label."""
         for start, (name, size) in self.arrays.items():
-            if start <= v < start + size:
+            if start <= v < start + size and not any(start < x <= v for x in self.names):
                 return name, v - start
         return None
 
@@ -1306,7 +1308,7 @@ def progress() -> None:
             if line.split()[:1] != ["SCRIPT"]:
                 continue
             scripts += 1
-            nxt = lines[i + 1] if i + 1 < len(lines) else ""
+            nxt = next((ln for ln in lines[i + 1:] if ln), "")    # comments are stripped
             if nxt.endswith(":"):
                 bodies += 1
                 if not re.fullmatch(r"E_[0-9A-F]{4}:", nxt):

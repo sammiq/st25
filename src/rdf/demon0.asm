@@ -23,7 +23,7 @@ met_prelate	EQU	RS_VARS+0Ah	; talked to the Prelate
 prelate_greeted	EQU	RS_VARS+0Ch	; he has said hello
 asked_witnesses	EQU	RS_VARS+0Dh	; asked to see the witnesses
 flora_said	EQU	RS_VARS+0Fh	; McCoy has remarked on the plants
-left_room	EQU	RS_VARS+11h	; set on leaving by the exit
+came_from	EQU	RS_VARS+11h	; 1: from the colony, 2: from the mine; which way the crew face
 score	EQU	RS_VARS+2Fh	; word: the mission's score
 
 RDF	SEGMENT BYTE PUBLIC 'RDF'
@@ -206,7 +206,7 @@ L0259:
 H_025A:
 	SCRIPT	MSG_EXIT, 0, 0, 0, H_0269
 LeaveRoom:
-	mov	byte ptr [si+left_room], 1
+	mov	byte ptr [si+came_from], 1
 	mov	byte ptr [si+RS_MORE], 1
 	retf
 

@@ -781,7 +781,7 @@ L07D5:
 
 L07DC:
 	mov	byte ptr [si+v15], 1
-	mov	ax, OFFSET talk_buf+6
+	mov	ax, OFFSET C_1862
 	call	Talk
 	AX8	cmp, 0
 	jne	L07ED

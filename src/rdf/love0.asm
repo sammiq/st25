@@ -654,7 +654,7 @@ L07F9:
 	mov	ax, OFFSET N_Computer
 	mov	bx, OFFSET T_COMPU192
 	call	Say
-	mov	ax, OFFSET talk_buf+6
+	mov	ax, OFFSET C_310B
 	call	Talk
 	AX8	cmp, 0
 	jne	L080F

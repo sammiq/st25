@@ -111,9 +111,9 @@ E_013C:
 H_0149:
 	SCRIPT	MSG_TALK, 8, 0, 0, H_0256
 E_014F:
-	mov	ax, OFFSET talk_buf+6
+	mov	ax, OFFSET C_1861
 	call	Talk
-	mov	ax, OFFSET talk_buf+12
+	mov	ax, OFFSET C_1867
 	call	Talk
 	AX8	cmp, 0
 	jne	L0162

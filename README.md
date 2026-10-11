@@ -2,6 +2,8 @@
 
 Matching decompilation of `STARTREK.EXE`, the DOS executable from the CD release. The aim is C source that compiles to the original machine code with the original compiler. Progress is measured, and functions are compared, with [objdiff](https://github.com/encounter/objdiff).
 
+The away-mission rooms' scripts are machine code too, but they live in the game's data files rather than the EXE. They are decompiled to assembly source separately: see [Room scripts](#room-scripts-rdf).
+
 ## The original build
 
 | | |
@@ -225,6 +227,79 @@ The near `.bss` (`data/d49E78`) works the same way. Every uninitialized global n
 
 Each away-mission room has a `.RDF` file in `DATA.001` (53 rooms: `DEMON0`–`VENG8`). Besides the room's header (`Rdf` in `include/room.h`: depth scaling, exits, entry positions), polygons and strings, it holds the room's scripts, which are 16-bit x86 code. `LoadRoom` loads the file whole and `CallScript` calls into it with `SI` = `&room` (the `RoomState`), and the scripts call back through the far pointer at offset 0 (`ScriptService` in `src/seg008.c`). The scripts were written in assembly, not C: strings sit inline with `jmp` over them, arguments are pushed in two different styles, the helpers take arguments in registers, and some bodies run into the next script's header.
 
+#### Status
+
+All 53 rooms are source that assembles to the original files byte for byte (`ninja rdf`). Naming them is in progress: `ninja rdf-progress` shows how far each room has got, and the rooms flagged `complete` in `config/rdf.txt` are fully named and commented.
+
+#### The file
+
+Everything in a room file is addressed from its start: the code, its strings and its variables.
+
+| Offset | Contents |
+|---|---|
+| `00` | `rdf_service`: far pointer to `ScriptService`, filled in by `LoadRoom` |
+| `04` | `rdf_state`: near pointer to `room` (the `RoomState`), filled in by `LoadRoom` |
+| `06` | depth scaling: `y_max`, `y_min`, `scale_min`, `scale_max` |
+| `0E` | start and end of the scripts, objects, exits, regions and `.ban` names |
+| `22` | the room each of the four exits leads to |
+| `2A` | where each crew member walks from and to, for each of the four entrances |
+| `AA`, `BA` | where the crew stand when beamed in, and standing |
+| `CA` | the room's data and code, in no fixed order. Some rooms start their data inside the header |
+
+A script is a key of four bytes, the offset of the next script, then its code, which ends with `retf`. The engine searches the chain from `scripts` while it stays below `scripts_end`. For each room message it runs the scripts whose key matches (`RunScripts`); `RunWildScripts` lets an `FFh` in a key match anything. A script that sets `RS_MORE` lets the search go on to the next match, and in the end to the engine's default action. The first byte of the key is the message type:
+
+| Type | Message | Key bytes 2–4 |
+|---|---|---|
+| 0 | `MSG_TICK` | room tick count, low and high byte |
+| 1 | `MSG_WALK` | object clicked with the walk cursor |
+| 2 | `MSG_USE` | object used, object it is used on |
+| 3, 4, 5 | `MSG_GET`, `MSG_LOOK`, `MSG_TALK` | object |
+| 6 | `MSG_EXIT` | exit polygon Kirk walked into |
+| 7 | `MSG_REGION` | region polygon Kirk walked into |
+| 8 | `MSG_TIMER` | room timer 0–7 (`RS_TIMERS`) that ran out |
+| 10, 12 | `MSG_ANIM_DONE`, `MSG_WALK_DONE` | the number given when the animation or walk was started |
+
+Objects are 0–3 for the crew (Kirk, Spock, McCoy, the security officer), 8–1Fh for the room's other actors, 20h–3Fh for its polygons and 40h–88h for items (`IT_` in `include/rdf.inc`, from `items[]` in `src/seg008.c`).
+
+Scripts call `ScriptService(cmd, ...)` with the C calling convention. The result comes back in `DX:AX`.
+
+| Cmd | | Arguments |
+|---|---|---|
+| 0, 2 | `RC_ANIM0`, `RC_ANIM2` | actor, `.anm` name, x, y, message when done. Actors 0–7 are scaled for depth; x or y -1 means "where the actor is" |
+| 1 | `RC_STOPANIM` | actor |
+| 3 | `RC_TALK` | conversation: speaker, choices, 0. Returns the choice |
+| 4, 7, 11 | `RC_GIVEITEM`, `RC_TAKEITEM`, `RC_HAVEITEM` | item |
+| 5 | `RC_LEVERS` | the lever puzzle |
+| 6 | `RC_GOTOROOM` | room, entrance. Doesn't return |
+| 8 | `RC_WALK` | crew member, x, y, message when there |
+| 9, 10, 21 | `RC_LOADMAP`, `RC_FLASHBMP`, `RC_SFX` | name |
+| 12 | `RC_ITEMCASE` | mask |
+| 13 | `RC_ACTORPOS` | actor. Returns x, and y in `DX` |
+| 14 | `RC_RANDOM` | lowest, highest |
+| 15, 16 | `RC_BRIDGESFX`, `RC_MUSIC` | sound number; music |
+| 17 | `RC_BEAMUP` | ends the mission |
+| 18 | `RC_GAMEOVER` | (then runs on into 19) |
+| 19 | `RC_INPUTCODE` | the accepted codes, separated by NULs. Returns the number of the one typed, or 0 |
+| 20 | `RC_TURBOLIFT` | unused, deck |
+| 23 | `RC_DIGIOFF` | shuts digital sound down |
+
+Nearly every room has the same two helpers, which the scripts `call` with arguments in registers. `Talk` runs the conversation at `AX`. `Say` writes one line into `talk_buf` (`AX` the speaker, 0 for none; `BX` the line) and runs that. Spoken lines start with their speech file, `#DEM0\DEM0_016#`, and the sources name each line after it (`T_DEM0_016`).
+
+`room.vars` (`vNN` in the sources) is the scripts' memory. It is cleared when an away mission starts (`StartAway`), shared by the mission's rooms, and saved with the game. Variables inside the room file (`D_XXXX`) start again each time the room loads, and a saved game keeps them as a list of the bytes that differ from the original file.
+
+#### Quirks of the original
+
+`tools/rdf.py gen` lists what it finds at the top of each source:
+
+- In most rooms the last script's `next` is the helpers' code, which the engine then reads as one more script. Its "key" and "next" are instruction bytes, and the bogus `next` is past `scripts_end`, so the search stops. VENG2 is larger than that bogus `next`, so its search carries on through the middle of its code and reads two more fake scripts. One of them has the key `FF 1E 00 00`, which `RunWildScripts` matches against any message about object 1Eh.
+- FEATHER3, FEATHER5 and VENG3 have scripts that run on into the next script's header, or jump to it, and execute its six bytes as code.
+- DEMON1 pushes the three arguments that four `Anim` calls share before choosing between them; the fourth case pops them (`pop ax` three times) and pushes its own. One script there pushes a call's arguments and drops them again, a call that was taken out.
+- The TRIAL rooms, SINS3 and VENG2 build some conversations at run time in `talk_buf` and go on through a jump table (`choice_jumps`) that the script fills in with the code for each choice.
+- TRIAL2 skips a block with a `jmp`, and SINS1 has code after a `retf`. Both are dead code (`code=` in `config/rdf.txt`).
+- DEMON4's conversation with the Nauian tests a flag that nothing sets, so its own "join the Federation" ending is never reached; the same lines play when the Nauian turns the key.
+
+#### The source
+
 `src/rdf/<room>.asm` is each room as MASM 5.0 source, one segment assembled at offset 0. `include/rdf.inc` names the service commands (`RC_`), message types (`MSG_`), objects and items (`OBJ_`, `IT_`), the `RoomState` fields (`RS_`), and has the macros: `SCRIPT type, a, b, c, next` (a script's key and link), `SERVICE` (the call through offset 0), `JMPN` (a 16-bit `jmp`, which MASM 5.0 would otherwise shorten) and `AX8` (`op ax, imm8` in the `83h` form, which MASM 5.0 doesn't choose).
 
 ```sh
@@ -247,7 +322,7 @@ The rest is by hand:
 3. Run `ninja rdf` after each change; the room must still match.
 4. When everything in the room is named, add `complete` to its line in `config/rdf.txt`.
 
-`src/rdf/demon0.asm` is the worked example. `ninja rdf-progress` counts the script bodies whose entry label has been renamed (a script that only jumps to another one's body has no label of its own). Unreachable code isn't found by following the scripts; give its address as `code=ADDR` in `config/rdf.txt` so that `gen` disassembles it (TRIAL2 and SINS1 have some).
+The DEMON rooms (`src/rdf/demon0.asm` to `demon6.asm`) are done and serve as examples. `ninja rdf-progress` counts the script bodies whose entry label has been renamed (a script that only jumps to another one's body has no label of its own). Unreachable code isn't found by following the scripts; give its address as `code=ADDR` in `config/rdf.txt` so that `gen` disassembles it (TRIAL2 and SINS1 have some).
 
 ## How it works
 

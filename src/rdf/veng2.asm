@@ -587,7 +587,7 @@ T_VEN2_112	LABEL	BYTE
 	DB	' data just as your Enterprise would. I give you one minute to co'
 	DB	'mply.',0
 L090A:
-	mov	ax, OFFSET talk_buf+6
+	mov	ax, OFFSET C_5C16
 	call	Talk
 	AX8	cmp, 0
 	jne	L0917
@@ -2436,7 +2436,7 @@ T_VEN2_069	LABEL	BYTE
 	DB	'#VEN2\VEN2_069#With impulse power online and the tricorders perf'
 	DB	'orming computer control, I can divert power to...',0
 L3617:
-	mov	ax, OFFSET talk_buf+14
+	mov	ax, OFFSET C_5C1E
 	call	Talk
 	AX8	cmp, 0
 	jne	L3624

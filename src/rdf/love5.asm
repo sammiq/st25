@@ -424,9 +424,9 @@ L05A6:
 	retf
 
 L05A7:
-	mov	ax, OFFSET talk_buf+6
+	mov	ax, OFFSET C_2EAA
 	call	Talk
-	mov	ax, OFFSET talk_buf+12
+	mov	ax, OFFSET C_2EB0
 	call	Talk
 	AX8	cmp, 0
 	jne	L05BA

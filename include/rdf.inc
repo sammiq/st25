@@ -49,8 +49,8 @@ MSG_USE		EQU	2	; object, used on
 MSG_GET		EQU	3	; object
 MSG_LOOK	EQU	4	; object
 MSG_TALK	EQU	5	; object
-MSG_EXIT	EQU	6	; exit polygon id
-MSG_REGION	EQU	7	; region polygon id
+MSG_EXIT	EQU	6	; exit polygon Kirk walked into
+MSG_REGION	EQU	7	; region polygon Kirk walked into
 MSG_TIMER	EQU	8	; room timer 0-7
 MSG_ANIM_DONE	EQU	10	; the animation's msg
 MSG_WALK_DONE	EQU	12	; the walk's msg

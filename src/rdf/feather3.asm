@@ -631,7 +631,7 @@ L060A:
 	retf
 
 L061A:
-	mov	ax, OFFSET talk_buf+6
+	mov	ax, OFFSET C_1B83
 	call	Talk
 	AX8	cmp, 0
 	jne	L0627
