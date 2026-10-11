@@ -22,12 +22,12 @@ LOVE2       complete
 LOVE3       complete
 LOVE4       complete
 LOVE5       complete
-MUDD0
-MUDD1
-MUDD2
-MUDD3
-MUDD4
-MUDD5
+MUDD0       complete
+MUDD1       complete
+MUDD2       complete
+MUDD3       complete
+MUDD4       complete
+MUDD5       complete
 FEATHER0
 FEATHER1
 FEATHER2

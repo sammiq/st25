@@ -299,6 +299,7 @@ Nearly every room has the same two helpers, which the scripts `call` with argume
 - DEMON4's conversation with the Nauian tests a flag that nothing sets, so its own "join the Federation" ending is never reached; the same lines play when the Nauian turns the key.
 - In LOVE0, the script for getting door 8 has no body: its entry is the next script's header, whose six bytes run as code before its `jmp`. The doors' own answer is left unreachable behind it.
 - The LOVE rooms' communicator scripts have four cases, all playing the same placeholder lines recorded for other missions. LOVE3 tests a flag nothing sets (so the insulation can always be taken). LOVE4 awards the water's point every time, because it sets the flag to 2 but tests it against 1. In LOVE5, two scripts share the key for phasers on Preax, so the second never runs.
+- Two MUDD scripts have mangled keys that can never match. MUDD2's McCoy-tricorder-on-Mudd script is keyed `45h, 8, 0, 0` instead of `MSG_USE, IT_MTRICOR, 8, 0`. MUDD3's use-the-screen script has its two objects swapped. Also in MUDD2, using a bed once McCoy is ready walks Kirk with a message nothing handles. In MUDD5, firing the alien device marks it used without the +5 that every other MUDD room gives.
 
 #### The source
 
@@ -315,7 +316,7 @@ ninja rdf-progress                  # script bodies named, per room
 
 ### Decompiling a room
 
-`tools/rdf.py gen ROOM` wrote the sources. It follows the code from every script (and through the run-time jump tables of the TRIAL rooms' conversations), recognises the `Talk`/`Say` helpers, and tracks values through registers, pushes and variables so that each pointer into the file becomes a label (`OFFSET T_DEM0_016`, `DW OFFSET N_Capt_Kirk, ...`). The source therefore still assembles correctly after an edit moves things. It notes the quirks it finds at the top of the file. `gen` won't overwrite a source without `--force`, so don't regenerate a room that has been worked on.
+`tools/rdf.py gen ROOM` wrote the sources. It follows the code from every script (and through the run-time jump tables of the TRIAL rooms' conversations), recognises the `Talk`/`Say` helpers and the loops some rooms use to make several service calls from arguments pushed in advance, and tracks values through registers, pushes and variables so that each pointer into the file becomes a label (`OFFSET T_DEM0_016`, `DW OFFSET N_Capt_Kirk, ...`). The source therefore still assembles correctly after an edit moves things. It notes the quirks it finds at the top of the file. `gen` won't overwrite a source without `--force`, so don't regenerate a room that has been worked on.
 
 The rest is by hand:
 

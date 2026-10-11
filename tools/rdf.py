@@ -191,6 +191,7 @@ class Room:
         self.dropped: dict[int, list] = {}                # add sp dropping a call's pushes
         self.jump_table: dict[int, int] = {}              # table -> the jmp using it
         self.code_ptrs: dict[int, int] = {}               # mov storing a code address
+        self.loop_calls: dict[int, list] = {}             # SERVICE in a loop -> each call's args
         self.mem_refs: set[int] = set()                   # cs: displacements
         self.room_disp: set[int] = set()                  # [si+d] room fields
         self.labels: dict[int, list[str]] = {}
@@ -546,6 +547,7 @@ class Room:
                     and not self.is_room(a, ins.memory_base):
                 self.mark(self.reg(a, ins.memory_base), "data")
         self.table_bases()
+        self.service_loops()
         # variables that hold pointers: every constant stored in them is one
         for _ in range(3):
             for a, ins in self.code.items():
@@ -558,6 +560,34 @@ class Room:
                     self.mark(frozenset([(a, ins.immediate16)]), kind)
                 elif ins.op1_kind == ix.OpKind.REGISTER:
                     self.mark(self.reg(a, ins.op1_register), kind)
+
+    def service_loops(self) -> None:
+        """mov di, N then a loop [push cmd] SERVICE / add sp, 4 / dec di /
+        jne: N calls, each taking its arguments from what was pushed before
+        the loop (MUDD rooms)."""
+        for a, ins in self.code.items():
+            if not (ins.mnemonic == ix.Mnemonic.MOV and ins.op0_kind == ix.OpKind.REGISTER
+                    and ins.op0_register == ix.Register.DI and ins.op1_kind == ix.OpKind.IMMEDIATE16):
+                continue
+            body = self.seq(a + ins.len, 5)
+            cmd_push = None
+            if body and body[0].mnemonic == ix.Mnemonic.PUSH and body[0].op0_kind != ix.OpKind.REGISTER:
+                cmd_push = body[0]
+                body = body[1:]
+            if len(body) < 4 or not self.is_service(body[0]) or body[2].mnemonic != ix.Mnemonic.DEC \
+                    or body[3].mnemonic != ix.Mnemonic.JNE:
+                continue
+            stack = list(self.state_in.get(a, ({}, None))[1] or ())
+            calls = []
+            for _ in range(ins.immediate16):
+                if cmd_push is not None:
+                    v = cmd_push.immediate8to16 & 0xFFFF if cmd_push.op0_kind == ix.OpKind.IMMEDIATE8TO16 \
+                        else cmd_push.immediate16
+                    args = [frozenset([(cmd_push.ip, v)])] + ([stack.pop()] if stack else [])
+                else:
+                    args = [stack.pop() if stack else frozenset() for _ in range(2)]
+                calls.append(self.service_args(tuple(reversed(args)), 2))
+            self.loop_calls[body[0].ip] = calls
 
     def service_args(self, stack: tuple | None, n: int) -> list:
         """A ScriptService call's arguments from the stack, command first,
@@ -1056,6 +1086,8 @@ class Writer:
                 else:
                     line = "\t" + self.ins_text(pos)
                     c = self.svc_comment(r.svc.get(pos)) if r.is_service(ins) else ""
+                    if pos in r.loop_calls:
+                        c = "; ".join(self.svc_comment(x) for x in r.loop_calls[pos])
                     if pos in r.dropped:
                         c = f"NOTE: drops the arguments of {self.svc_comment(r.dropped[pos])}: " \
                             "the call was taken out"
@@ -1239,7 +1271,7 @@ def resolve_semantics(room: Room) -> None:
     """Command pushes and item arguments, for naming."""
     room.svc_cmd_at = {}
     room.item_imm = {}
-    for args in room.svc.values():
+    for args in [*room.svc.values(), *(c for cs in room.loop_calls.values() for c in cs)]:
         cmd = single(args[0][2]) if args else None
         if cmd is None:
             continue
