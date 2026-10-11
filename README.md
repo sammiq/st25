@@ -300,6 +300,7 @@ Nearly every room has the same two helpers, which the scripts `call` with argume
 - In LOVE0, the script for getting door 8 has no body: its entry is the next script's header, whose six bytes run as code before its `jmp`. The doors' own answer is left unreachable behind it.
 - The LOVE rooms' communicator scripts have four cases, all playing the same placeholder lines recorded for other missions. LOVE3 tests a flag nothing sets (so the insulation can always be taken). LOVE4 awards the water's point every time, because it sets the flag to 2 but tests it against 1. In LOVE5, two scripts share the key for phasers on Preax, so the second never runs.
 - Two MUDD scripts have mangled keys that can never match. MUDD2's McCoy-tricorder-on-Mudd script is keyed `45h, 8, 0, 0` instead of `MSG_USE, IT_MTRICOR, 8, 0`. MUDD3's use-the-screen script has its two objects swapped. Also in MUDD2, using a bed once McCoy is ready walks Kirk with a message nothing handles. In MUDD5, firing the alien device marks it used without the +5 that every other MUDD room gives.
+- FEATHER6 has two scripts keyed `MSG_USE, IT_ROCK, ANY`, so the second never runs. FEATHER5 gives Kirk McCoy's line "Jim! Are you out of your mind?".
 
 #### The source
 
