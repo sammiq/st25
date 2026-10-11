@@ -36,13 +36,13 @@ FEATHER4    complete
 FEATHER5    complete
 FEATHER6    complete
 FEATHER7    complete
-TRIAL0
-TRIAL1
-TRIAL2      code=13E3   # bypassed by the jmp before it
-TRIAL3
-TRIAL4
-TRIAL5
-TRIAL9
+TRIAL0      complete
+TRIAL1      complete
+TRIAL2      complete code=13E3   # bypassed by the jmp before it
+TRIAL3      complete
+TRIAL4      complete
+TRIAL5      complete
+TRIAL9      complete
 SINS0
 SINS1       code=0A0E   # after a retf
 SINS2
