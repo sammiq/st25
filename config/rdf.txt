@@ -43,12 +43,12 @@ TRIAL3      complete
 TRIAL4      complete
 TRIAL5      complete
 TRIAL9      complete
-SINS0
-SINS1       code=0A0E   # after a retf
-SINS2
-SINS3
-SINS4
-SINS5
+SINS0       complete
+SINS1       complete code=0A0E   # after a retf
+SINS2       complete
+SINS3       complete
+SINS4       complete
+SINS5       complete
 VENG0
 VENG1
 VENG2
