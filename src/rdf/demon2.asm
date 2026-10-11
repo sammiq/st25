@@ -14,7 +14,7 @@
 came_from	EQU	RS_VARS+11h	; 1: from the colony, 2: from the mine; which way the crew face
 cured_chub	EQU	RS_VARS+14h	; Brother Chub has had the Hypo-Dytoxin
 need_berries	EQU	RS_VARS+16h	; McCoy knows the cure needs the berries
-got_berries	EQU	RS_VARS+27h	; 
+got_berries	EQU	RS_VARS+27h
 made_hypo	EQU	RS_VARS+28h	; McCoy has made the Hypo-Dytoxin
 score	EQU	RS_VARS+2Fh	; word: the mission's score
 

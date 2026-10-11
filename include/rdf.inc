@@ -32,7 +32,9 @@ RC_ACTORPOS	EQU	13	; (actor) returns x | y << 16
 RC_RANDOM	EQU	14	; (lo, hi) returns lo..hi
 RC_BRIDGESFX	EQU	15	; (n)
 RC_MUSIC	EQU	16	; (a, b)
-RC_BEAMUP	EQU	17	; (a, b, c) end the mission
+RC_BEAMUP	EQU	17	; (score, max score, outcome) end the mission; the
+				;   outcome picks the bridge's ending (0 usual, 1 and
+				;   2 failures: seg030)
 RC_GAMEOVER	EQU	18	; () then falls into RC_INPUTCODE
 RC_INPUTCODE	EQU	19	; (codes) NUL separated, "" ends; returns 1-based match or 0
 RC_TURBOLIFT	EQU	20	; (unused, deck)

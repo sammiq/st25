@@ -29,16 +29,16 @@
 ; RoomState.vars, shared by the mission's rooms (cleared by StartAway)
 boulders_down	EQU	RS_VARS+10h	; how many of the four boulders have been cleared
 hand_repaired	EQU	RS_VARS+12h	; set in room 6
-healed_miner	EQU	RS_VARS+13h	; 
+healed_miner	EQU	RS_VARS+13h
 miner_dead	EQU	RS_VARS+17h	; he died: the party left without treating him (room 4)
 panel_tries	EQU	RS_VARS+18h	; word: Everts' tries at the panel
 rubble_cleared	EQU	RS_VARS+1Ah	; word: the last boulder is down
 everts_shocked	EQU	RS_VARS+1Ch	; word: the panel killed Everts
-boulder1_down	EQU	RS_VARS+20h	; 
-boulder2_down	EQU	RS_VARS+21h	; 
-boulder3_down	EQU	RS_VARS+22h	; 
-boulder4_down	EQU	RS_VARS+23h	; 
-door_open	EQU	RS_VARS+24h	; 
+boulder1_down	EQU	RS_VARS+20h
+boulder2_down	EQU	RS_VARS+21h
+boulder3_down	EQU	RS_VARS+22h
+boulder4_down	EQU	RS_VARS+23h
+door_open	EQU	RS_VARS+24h
 cave_music	EQU	RS_VARS+2Dh	; the cave music has started
 score	EQU	RS_VARS+2Fh	; word: the mission's score
 
@@ -96,15 +96,15 @@ boulder	LABEL	BYTE	; the boulder being shot, 1-4
 	DB	0
 kirk_in_place	LABEL	BYTE	; in cover, ready to shoot
 	DB	0
-everts_in_place	LABEL	BYTE	; 
+everts_in_place	LABEL	BYTE
 	DB	0
-spock_in_place	LABEL	BYTE	; 
+spock_in_place	LABEL	BYTE
 	DB	0
-mccoy_in_place	LABEL	BYTE	; 
+mccoy_in_place	LABEL	BYTE
 	DB	0
 in_cover	LABEL	BYTE	; the crew are already where they shelter
 	DB	0, 0
-kirk_fired	LABEL	BYTE	; 
+kirk_fired	LABEL	BYTE
 	DB	0
 rubble_anim	LABEL	BYTE	; the breaking boulder's animation
 	DB	0, 0

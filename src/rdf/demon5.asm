@@ -24,9 +24,9 @@
 saw_klingons	EQU	RS_VARS+0Eh	; the Klingons have appeared (room 1)
 hand_repaired	EQU	RS_VARS+12h	; set in room 6
 cured_chub	EQU	RS_VARS+14h	; Brother Chub has had the Hypo-Dytoxin
-examined_chub	EQU	RS_VARS+15h	; 
+examined_chub	EQU	RS_VARS+15h
 need_berries	EQU	RS_VARS+16h	; McCoy knows the cure needs the berries
-got_berries	EQU	RS_VARS+27h	; 
+got_berries	EQU	RS_VARS+27h
 made_hypo	EQU	RS_VARS+28h	; McCoy has made the Hypo-Dytoxin
 score	EQU	RS_VARS+2Fh	; word: the mission's score
 
@@ -78,23 +78,23 @@ rdf_stand_pos	LABEL	BYTE
 ; In the room file, so these start again each time the room loads
 scanned_roberts	LABEL	BYTE	; McCoy has examined each brother
 	DB	0
-scanned_chub	LABEL	BYTE	; 
+scanned_chub	LABEL	BYTE
 	DB	0
-scanned_grisnash	LABEL	BYTE	; 
+scanned_grisnash	LABEL	BYTE
 	DB	0
-scanned_stephen	LABEL	BYTE	; 
+scanned_stephen	LABEL	BYTE
 	DB	0
 scans	LABEL	BYTE	; how many brothers McCoy has examined
 	DB	0
 talks	LABEL	BYTE	; how many brothers Kirk has talked to; 5: McCoy has given his verdict
 	DB	0
-talked_roberts	LABEL	BYTE	; 
+talked_roberts	LABEL	BYTE
 	DB	0
-talked_chub	LABEL	BYTE	; 
+talked_chub	LABEL	BYTE
 	DB	0
-talked_grisnash	LABEL	BYTE	; 
+talked_grisnash	LABEL	BYTE
 	DB	0
-talked_stephen	LABEL	BYTE	; 
+talked_stephen	LABEL	BYTE
 	DB	0
 door_steps	LABEL	BYTE	; the walk and the door have both finished at 2
 	DB	0

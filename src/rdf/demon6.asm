@@ -25,13 +25,13 @@
 
 ; RoomState.vars, shared by the mission's rooms (cleared by StartAway)
 insulted_stephen	EQU	RS_VARS+2	; word: Kirk called his collection junk
-stephen_welcomed	EQU	RS_VARS+0Bh	; 
+stephen_welcomed	EQU	RS_VARS+0Bh
 saw_klingons	EQU	RS_VARS+0Eh	; the Klingons have appeared (room 1)
-hand_repaired	EQU	RS_VARS+12h	; 
-examined_chub	EQU	RS_VARS+15h	; 
+hand_repaired	EQU	RS_VARS+12h
+examined_chub	EQU	RS_VARS+15h
 need_berries	EQU	RS_VARS+16h	; McCoy knows the cure needs the berries
 taken_items	EQU	RS_VARS+26h	; bits: items taken from the case; see case_items
-got_berries	EQU	RS_VARS+27h	; 
+got_berries	EQU	RS_VARS+27h
 made_hypo	EQU	RS_VARS+28h	; McCoy has made the Hypo-Dytoxin
 hypo_scored	EQU	RS_VARS+2Bh	; the Hypo-Dytoxin's point has been given
 saw_simulation	EQU	RS_VARS+2Ch	; the computer's point has been given
@@ -85,7 +85,7 @@ rdf_stand_pos	LABEL	BYTE
 ; In the room file, so these start again each time the room loads
 stephen_offended	LABEL	BYTE	; no more talk of the case this visit
 	DB	0
-stephen_here	LABEL	BYTE	; 
+stephen_here	LABEL	BYTE
 	DB	0, 0
 case_open	LABEL	BYTE	; Stephen has unlocked the case
 	DB	0

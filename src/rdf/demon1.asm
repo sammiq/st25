@@ -78,9 +78,9 @@ rdf_stand_pos	LABEL	BYTE
 ; In the room file, so these start again each time the room loads
 klingon1_hit	LABEL	BYTE	; Kirk has shot Klingon 1 (actor 8)
 	DB	0
-klingon2_hit	LABEL	BYTE	; 
+klingon2_hit	LABEL	BYTE
 	DB	0
-klingon3_hit	LABEL	BYTE	; 
+klingon3_hit	LABEL	BYTE
 	DB	0
 klingons_down	LABEL	BYTE	; 3: the fight is over
 	DB	0, 0
@@ -88,7 +88,7 @@ scanned_klingon	LABEL	BYTE	; Spock has explained the Klingon
 	DB	0
 crew_shot	LABEL	BYTE	; how many of the crew the Klingons have stunned
 	DB	0
-kirk_firing	LABEL	BYTE	; 
+kirk_firing	LABEL	BYTE
 	DB	0
 shooter	LABEL	BYTE	; the Klingon firing
 	DB	0, 0

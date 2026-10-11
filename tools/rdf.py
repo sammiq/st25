@@ -224,6 +224,9 @@ class Room:
             self.hdr_bytes.update(range(a, a + 6))
             self.entries.add(a + 6)
         for e in sorted(self.entries):
+            if e in self.hdr_bytes:
+                self.quirks.append(f"The script at {e - 6:04X} has no body: its entry is the next "
+                                   "script's header, whose six bytes run as code.")
             self.decode(e)
         for e in self.dead:
             self.decode(e)

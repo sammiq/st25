@@ -277,7 +277,7 @@ Scripts call `ScriptService(cmd, ...)` with the C calling convention. The result
 | 13 | `RC_ACTORPOS` | actor. Returns x, and y in `DX` |
 | 14 | `RC_RANDOM` | lowest, highest |
 | 15, 16 | `RC_BRIDGESFX`, `RC_MUSIC` | sound number; music |
-| 17 | `RC_BEAMUP` | ends the mission |
+| 17 | `RC_BEAMUP` | score, maximum score, outcome: ends the mission. The outcome picks the bridge's ending (0 the usual one) |
 | 18 | `RC_GAMEOVER` | (then runs on into 19) |
 | 19 | `RC_INPUTCODE` | the accepted codes, separated by NULs. Returns the number of the one typed, or 0 |
 | 20 | `RC_TURBOLIFT` | unused, deck |
@@ -297,6 +297,8 @@ Nearly every room has the same two helpers, which the scripts `call` with argume
 - The TRIAL rooms, SINS3 and VENG2 build some conversations at run time in `talk_buf` and go on through a jump table (`choice_jumps`) that the script fills in with the code for each choice.
 - TRIAL2 skips a block with a `jmp`, and SINS1 has code after a `retf`. Both are dead code (`code=` in `config/rdf.txt`).
 - DEMON4's conversation with the Nauian tests a flag that nothing sets, so its own "join the Federation" ending is never reached; the same lines play when the Nauian turns the key.
+- In LOVE0, the script for getting door 8 has no body: its entry is the next script's header, whose six bytes run as code before its `jmp`. The doors' own answer is left unreachable behind it.
+- The LOVE rooms' communicator scripts have four cases, all playing the same placeholder lines recorded for other missions. LOVE3 tests a flag nothing sets (so the insulation can always be taken). LOVE4 awards the water's point every time, because it sets the flag to 2 but tests it against 1. In LOVE5, two scripts share the key for phasers on Preax, so the second never runs.
 
 #### The source
 

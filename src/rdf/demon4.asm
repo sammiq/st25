@@ -28,12 +28,12 @@
 ; RoomState.vars, shared by the mission's rooms (cleared by StartAway)
 insulted_stephen	EQU	RS_VARS+2	; word: Kirk called his collection junk (room 6)
 rude_to_nauian	EQU	RS_VARS+4	; word
-healed_miner	EQU	RS_VARS+13h	; 
+healed_miner	EQU	RS_VARS+13h
 miner_dead	EQU	RS_VARS+17h	; he died: the party left without treating him
-gave_skull	EQU	RS_VARS+1Eh	; 
+gave_skull	EQU	RS_VARS+1Eh
 nauian_awake	EQU	RS_VARS+25h	; the levers have opened the chamber
 taken_items	EQU	RS_VARS+26h	; bits: items taken from Stephen's case (room 6): 0 the key, 4 the skull
-talked_to_nauian	EQU	RS_VARS+2Ah	; 
+talked_to_nauian	EQU	RS_VARS+2Ah
 chamber_music	EQU	RS_VARS+2Eh	; the music has started
 score	EQU	RS_VARS+2Fh	; word: the mission's score
 

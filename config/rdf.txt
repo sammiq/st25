@@ -12,16 +12,16 @@ DEMON3      complete
 DEMON4      complete
 DEMON5      complete
 DEMON6      complete
-TUG0
-TUG1
-TUG2
-TUG3
-LOVE0
-LOVE1
-LOVE2
-LOVE3
-LOVE4
-LOVE5
+TUG0        complete
+TUG1        complete
+TUG2        complete
+TUG3        complete
+LOVE0       complete
+LOVE1       complete
+LOVE2       complete
+LOVE3       complete
+LOVE4       complete
+LOVE5       complete
 MUDD0
 MUDD1
 MUDD2
