@@ -229,7 +229,7 @@ Each away-mission room has a `.RDF` file in `DATA.001` (53 rooms: `DEMON0`–`VE
 
 #### Status
 
-All 53 rooms are source that assembles to the original files byte for byte (`ninja rdf`). Naming them is in progress: `ninja rdf-progress` shows how far each room has got, and the rooms flagged `complete` in `config/rdf.txt` are fully named and commented.
+All 53 rooms are source that assembles to the original files byte for byte (`ninja rdf`). All of them are named and commented, and flagged `complete` in `config/rdf.txt`. `ninja rdf-progress` shows each room's count of named script bodies.
 
 #### The file
 
@@ -302,6 +302,7 @@ Nearly every room has the same two helpers, which the scripts `call` with argume
 - Two MUDD scripts have mangled keys that can never match. MUDD2's McCoy-tricorder-on-Mudd script is keyed `45h, 8, 0, 0` instead of `MSG_USE, IT_MTRICOR, 8, 0`. MUDD3's use-the-screen script has its two objects swapped. Also in MUDD2, using a bed once McCoy is ready walks Kirk with a message nothing handles. In MUDD5, firing the alien device marks it used without the +5 that every other MUDD room gives.
 - FEATHER6 has two scripts keyed `MSG_USE, IT_ROCK, ANY`, so the second never runs. FEATHER5 gives Kirk McCoy's line "Jim! Are you out of your mind?".
 - SINS0, SINS1 and SINS4 each have a second script with the same key as an earlier one (talking to Mosher, talking to Spock, Spock on the lock), which never runs. SINS3 has a script keyed on using object 20h, which is no item. SINS5 tests five point-once flags it never sets, so those points come every time.
+- Both of VENG2's conversation menus end in a debug line from a speaker "wes" ("kirk dialog error.", "power allocation error.") for a choice that can't happen. VENG8's script for Kije reaching the transporter pad also answers a walk that is never started, and counts arrivals as if two crewmen were walking there.
 
 #### The source
 
@@ -327,7 +328,7 @@ The rest is by hand:
 3. Run `ninja rdf` after each change; the room must still match.
 4. When everything in the room is named, add `complete` to its line in `config/rdf.txt`.
 
-The DEMON rooms (`src/rdf/demon0.asm` to `demon6.asm`) are done and serve as examples. `ninja rdf-progress` counts the script bodies whose entry label has been renamed (a script that only jumps to another one's body has no label of its own). Unreachable code isn't found by following the scripts; give its address as `code=ADDR` in `config/rdf.txt` so that `gen` disassembles it (TRIAL2 and SINS1 have some).
+Every room has been done this way. The DEMON rooms (`src/rdf/demon0.asm` to `demon6.asm`) make good examples. `ninja rdf-progress` counts the script bodies whose entry label has been renamed (a script that only jumps to another one's body has no label of its own). Unreachable code isn't found by following the scripts; give its address as `code=ADDR` in `config/rdf.txt` so that `gen` disassembles it (TRIAL2 and SINS1 have some).
 
 ## How it works
 
