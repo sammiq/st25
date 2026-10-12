@@ -262,4 +262,3 @@ On the compiled side, the 8087 emulator fixups (`FIDRQQ` and friends) and other 
 - **One name per address:** `symbols.txt` holds a single name per address, so aliased library publics (`__chkstk` / `__aFchkstk`) can mismatch.
 - **Segment-only fixups** (`mov ax, seg func`) on the target side are named after a nearby offset reference, if there is one.
 - **The runtime isn't quite 100%:** a few library functions stay just short (e.g. the emulator, which mixes code and data). Those units are still marked complete.
-- **No relinking yet:** the project doesn't rebuild a full EXE. Every unit now has an assembler or compiler, so what's missing is a link step with the original segment order.
