@@ -9,18 +9,9 @@
 #include "audio.h"
 
 /* music driver: nothing to load, detect or set up */
-int16_t AIL_register_driver(void *driver) { return 0; }
-drvr_desc *AIL_describe_driver(int16_t h) { static drvr_desc d; return &d; }
-int16_t AIL_detect_device(int16_t h, uint16_t IO, uint16_t IRQ, uint16_t DMA, uint16_t DRQ) { return 1; }
-void AIL_init_driver(int16_t h, uint16_t IO, uint16_t IRQ, uint16_t DMA, uint16_t DRQ) {}
 uint16_t AIL_state_table_size(int16_t h) { return 16; }
-uint16_t AIL_default_timbre_cache_size(int16_t h) { return 0; }
-void AIL_define_timbre_cache(int16_t h, void *cache, uint16_t size) {}
-void sub_3B584(int16_t h, char *s) {}
 
 /* the digital driver */
-int16_t sub_35345(int16_t a, int16_t b) { return 0; }
-void sub_35373(int16_t a, int16_t b) {}
 void sub_35388(char *msg) {}
 void sub_3571B(DmaReq *req) { sb_play(req->buf, req->len, req->rate); }    /* start a block */
 uint16_t sub_3577A(void) { return sb_caps(); }

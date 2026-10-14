@@ -31,7 +31,6 @@ extern int16_t fade_level;                  /* 0 black .. 100 full */
 
 void InitVideo(void);
 void TextMode(void);
-void SetPalette(unsigned char *pal);
 void SetPaletteRange(unsigned char *pal, int16_t first, int16_t count);
 void LoadPalette(char *name);
 void CopyRect(Bitmap *dst, int16_t x, int16_t y, Bitmap *src, int16_t sx, int16_t sy, int16_t w, int16_t h);
@@ -48,7 +47,6 @@ int16_t DrawString(char *s, int16_t x, int16_t y, Bitmap *bmp);
 void DrawText(char *s, int16_t len, int16_t x, int16_t y, Bitmap *bmp);
 void LoadFont(void);
 void FreeFont(void);
-void VideoNop(void);
 void FadeIn(void);
 void FadeOut(void);
 void SetFade(unsigned char *pal, int16_t level);

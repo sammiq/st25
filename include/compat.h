@@ -62,7 +62,6 @@ void ms_qsort(void *base, size_t num, size_t width, int (*cmp)(const void *, con
 
 /* Case-insensitive/in-place string helpers that are not in ISO C. */
 char *strupr(char *s);
-char *strlwr(char *s);
 #define stricmp     strcasecmp
 #define strnicmp    strncasecmp
 

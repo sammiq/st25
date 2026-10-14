@@ -57,8 +57,6 @@ void ClearShots(void);
 void UpdateShips(void);
 void ShipAI(Obj3D *o);
 int16_t ShotHit(Shot *s, Obj3D *t);
-int16_t PixelHit(Shot *s, Obj3D *t);
-void SetVec32(Vec32 *v, int32_t x, int32_t y, int32_t z);
 void SetSpeed(Obj3D *o, int32_t speed);
 void InitShips(char *name);
 void ShotExplode(Shot *s, Obj3D *t);
@@ -66,12 +64,10 @@ void UpdatePower(Obj3D *o);
 void HitShip(Obj3D *t, Shot *s);
 int16_t FindSide(Vec32 *v);
 int16_t DamageShip(Obj3D *t, DmgEntry *tab, int16_t n, int16_t dmg);
-int16_t WeakestSide(ShipPart *p);
 void SetRepair(int16_t sys);
 void Repair(Obj3D *o);
 void MoveShip(Obj3D *o);
 void Bearing(Obj3D *o, Vec32 *to, int16_t *pitch, int16_t *yaw);
-void AiWander(Obj3D *o);
 void AiTurn(Obj3D *o);
 void AiLoop(Obj3D *o);
 void AiStrafe(Obj3D *o);
@@ -109,7 +105,6 @@ DmgEntry dmg_t5[9] = {
 };
 DmgEntry *dmg_tables[6] = { dmg_t0, dmg_t1, dmg_t2, dmg_t3, dmg_t4, dmg_t5 };
 int16_t dmg_counts[6] = { 10, 4, 10, 9, 7, 9 };
-int16_t dmg_unused[2] = { 0, 0 };
 
 /* Fire weapon w of o, along dir or straight ahead, using system p.
  * Returns 1 if a shot went. */
@@ -344,54 +339,6 @@ int16_t ShotHit(Shot *s, Obj3D *t)
     return 1;
 }
 
-/* Does shot s cover a set pixel of t's hit mask (the .sml bitmap)? */
-int16_t PixelHit(Shot *s, Obj3D *t)
-{
-    MemHandle h;
-    Bitmap *bmp;
-    int16_t dx;
-    int16_t dy;
-    int16_t u;
-    int16_t v;
-    int16_t bpr;
-    int16_t w8;
-    unsigned char *p;
-    int16_t r;
-    char name[16];
-
-    sprintf(name, "%s%02x", t->shape, t->view_idx & 0xFF);
-    h = CacheLoad(name, "sml");
-    bmp = LockMem(h);
-    w8 = (bmp->w + 7) & 0xFFF8;
-    bpr = w8 >> 3;
-    dx = s->sx - t->sx;
-    dy = s->sy - t->sy;
-    u = dx * t->inv[0] + dy * t->inv[2];
-    v = dx * t->inv[1] + dy * t->inv[3];
-    if (u + bmp->x > bmp->w || u + bmp->x < 0)
-        return 0;
-    if (v + bmp->y > bmp->h || v + bmp->y < 0)
-        return 0;
-    if (t->view_idx & 0x8000) {
-        dx = u + bmp->x;
-        dx = w8 - dx - 1 - (w8 - bmp->w);
-    } else
-        dx = u + bmp->x;
-    p = bmp->data;
-    p += (v + bmp->y) * bpr + (dx >> 3);
-    r = (*p & (0x80 >> (dx & 7))) ? 1 : 0;
-    UnlockMem(h);
-    CacheRelease(h);
-    return r;
-}
-
-void SetVec32(Vec32 *v, int32_t x, int32_t y, int32_t z)
-{
-    v->x = x;
-    v->y = y;
-    v->z = z;
-}
-
 /* Accelerate a ship towards speed (16.16) and set its velocity. */
 void SetSpeed(Obj3D *o, int32_t speed)
 {
@@ -446,8 +393,6 @@ void InitShips(char *name)
             break;
         }
 }
-
-char *side_names[6] = { "starboard", "aft", "port", "forward", "upper", "lower" };
 
 /* Turn shot s into a small explosion moving with t. */
 void ShotExplode(Shot *s, Obj3D *t)
@@ -580,19 +525,6 @@ int16_t FindSide(Vec32 *v)
     Fatal("this is in FindSide and is impossible.");
 }
 
-char *system_names[10] = {
-    "Hull",
-    "Bridge",
-    "port torpedoes",
-    "starboard torpedoes",
-    "port phasers",
-    "starboard phasers",
-    "sensors",
-    "impulse engines",
-    "port warp engine",
-    "starboard warp engine"
-};
-
 /* Damage a system picked from tab; returns 1 if the hull gives out. */
 int16_t DamageShip(Obj3D *t, DmgEntry *tab, int16_t n, int16_t dmg)
 {
@@ -616,25 +548,6 @@ int16_t DamageShip(Obj3D *t, DmgEntry *tab, int16_t n, int16_t dmg)
         }
     }
     return 0;
-}
-
-/* The weakest of the starboard, port, upper and lower shields. */
-int16_t WeakestSide(ShipPart *p)
-{
-    int16_t i;
-    int16_t best;
-    int16_t least;
-
-    least = 0x7FFF;
-    for (i = 0; i != 6; ++i, ++p) {
-        if (i == 1 || i == 3)
-            continue;
-        if (p->cur < least) {
-            best = i;
-            least = p->cur;
-        }
-    }
-    return best;
 }
 
 int16_t repair_sys = -1;                /* what the player's crew repairs first */
@@ -782,44 +695,6 @@ void Bearing(Obj3D *o, Vec32 *to, int16_t *pitch, int16_t *yaw)
         len = 1;
     *pitch = -FixASin(FixDiv(d.y, len));
     *yaw = FixAtan2(d.x, d.z);
-}
-
-/* Turn at random until 30 degrees off, then pick a manoeuvre. */
-void AiWander(Obj3D *o)
-{
-    int16_t r;
-
-    switch (o->ai_state) {
-    case 0:
-        while ((r = rand() & 7) == 0)
-            ;
-        if (r & 1)
-            o->mo.turn_target[0] = o->mo.turn_max * (rand() & 1 ? -1 : 1);
-        else
-            o->mo.turn_target[0] = 0;
-        if (r & 2)
-            o->mo.turn_target[1] = o->mo.turn_max * (rand() & 1 ? -1 : 1);
-        else
-            o->mo.turn_target[1] = 0;
-        if (r & 4)
-            o->mo.turn_target[2] = o->mo.turn_max * (rand() & 1 ? -1 : 1);
-        else
-            o->mo.turn_target[2] = 0;
-        o->mo.target_speed = o->mo.max_speed >> 2;
-        o->mo.turn_sum[0] = 0;
-        o->mo.turn_sum[1] = 0;
-        o->mo.turn_sum[2] = 0;
-        o->ai_state++;
-        break;
-    case 1:
-        if (o->mo.turn_sum[0] >= 0x550000L || o->mo.turn_sum[1] >= 0x550000L
-            || o->mo.turn_sum[2] >= 0x550000L) {
-            o->ai = ai_moves[rand() % 3];
-            o->ai_state = 0;
-        }
-        break;
-    }
-    MoveShip(o);
 }
 
 /* Pitch round at full speed. */

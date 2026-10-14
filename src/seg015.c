@@ -19,8 +19,6 @@ SndChan snd_chan[4];
 
 
 /* seg 2505: the digital sound driver interface (asm/t35052) */
-int16_t sub_35345(int16_t a, int16_t b);
-void sub_35373(int16_t a, int16_t b);
 void sub_35388(char *msg);
 void sub_3571B(DmaReq *req);
 uint16_t sub_3577A(void);
@@ -38,20 +36,12 @@ int16_t sub_358B3(void);
 void SaveWrite(void *p, int16_t n);
 void SaveRead(void *p, int16_t n);
 
-int16_t timer_busy;
-void (*old_timer)(void);
 int16_t *digi_status;
-int32_t rom_sum1;
-int32_t rom_sum2;
-int16_t rom_errors;
-int16_t ems_save_err;
-int16_t ems_restore_err;
 int16_t digi_handle;
 int16_t midi_handle;
 extern int16_t sb_port;
 extern int16_t sb_irq;
 char *dma_buf;
-int16_t dma_buf_moved;
 void *seq_state[NUM_SEQ];
 int16_t seq_handles[NUM_SEQ];
 int16_t seq_ids[NUM_SEQ];
@@ -60,8 +50,6 @@ uint16_t timbre_cache_size;
 char music_name[10];
 List seq_list;
 SeqNode seq_nodes[NUM_SEQ];
-drvr_desc blaster_desc;
-int16_t blaster_type;
 int16_t music_next;
 int16_t music_cur;
 int16_t stream_mixed;
@@ -91,20 +79,6 @@ int16_t midi_ok = 0;
 int16_t digi_ok = 0;
 int16_t voc_fd = -1;
 char *music_data = 0;
-char *midi_drivers[13] = {
-    0, "PCSPKR", "ADLIB", 0, "SBFM", "SBPFM", "SBPFM", "PASFM", "PASFM",
-    "MT32MPU", "MT32MPU", 0, 0
-};
-char *digi_drivers[13] = {
-    0, 0, 0, 0, "SBLASTER", "SBPRO", "SBPRO", "PAUDIO", "PAS16", 0, 0, 0, "SBCLONE"
-};
-/* BLASTER=A220 I5 D1 T4: the fields read and where they go */
-char blaster_keys[] = "AIDT";
-int16_t blaster_radix[4] = { 16, 10, 10, 10 };
-int16_t *blaster_vals[4] = {
-    &blaster_desc.default_IO, &blaster_desc.default_IRQ, &blaster_desc.default_DMA,
-    &blaster_type
-};
 int16_t sound_closed = 0;
 
 /* The original's timer interrupt ran the digital sound tick (DigiTick) 18
@@ -167,56 +141,6 @@ void SoundInit(void)
     }
     music_on = 1;
     sfx_on = 1;
-}
-
-/* Read the BLASTER environment variable into desc (A port, I irq, D dma,
- * T card type). Returns the card type, 0 if not set. */
-int16_t ParseBlaster(drvr_desc *desc, char *a, char *b)
-{
-    int16_t k;
-    int16_t j;
-    int16_t key;
-    int16_t i;
-    int16_t c;
-    int16_t val;
-    int16_t pos;
-    char *env;
-    char buf[128];
-
-    env = getenv("BLASTER");
-    if (env == 0)
-        return 0;
-    strncpy(buf, env, 127);
-    if (strlen(buf) == 0)
-        return 0;
-    strupr(buf);
-    blaster_desc = *desc;
-    for (i = 0; i < strlen(buf); i++) {
-        if (i != 0 && buf[i] != ' ')
-            continue;
-        i += buf[i] == ' ';
-        key = buf[i];
-        for (k = 0; k < 4; k++) {
-            if (key == blaster_keys[k]) {
-                pos = i + 1;
-                val = 0;
-                do {
-                    c = buf[pos++];
-                    for (j = 0; j < blaster_radix[k]; j++)
-                        if (toupper(c) == "0123456789ABCDEF"[j])
-                            val = val * blaster_radix[k] + j;
-                } while (isalnum(c));
-                *blaster_vals[k] = val;
-                break;
-            }
-        }
-    }
-    *desc = blaster_desc;
-    if (blaster_type == 0)
-        return 0;
-    if (blaster_type > 4)
-        blaster_type = 4;
-    return blaster_type;
 }
 
 void SoundStop(void)
@@ -301,27 +225,6 @@ void LoadMusic(char *name)
     size = GetFileSize(name, midi_suffix);
     music_data = PushMem(size);
     LoadFilePacked(name, midi_suffix, music_data);
-}
-
-/* Free everything SoundInit allocated, in reverse. */
-int16_t SoundShutdown(void)
-{
-    int16_t i;
-
-    if (midi_ok == 0)
-        return 0;
-    SoundStop();
-    if (music_data)
-        PopMem();
-    no_midi = 1;
-    midi_ok = 0;
-    for (i = 0; i < NUM_SEQ; i++)
-        PopMem();
-    if (digi_ok)
-        PopMem();
-    digi_ok = 0;
-    sound_closed = 1;
-    return 1;
 }
 
 /* Play sequence seq; next (-2 keep, -3 same as seq) plays when it ends. */
@@ -526,16 +429,6 @@ void LoadMusicState(void)
         StopAllSound();
 }
 
-int16_t sub_2A776(int16_t a, int16_t b)
-{
-    return sub_35345(a, b);
-}
-
-void sub_2A791(int16_t a, int16_t b)
-{
-    sub_35373(a, b);
-}
-
 /* Start digital output: auto-init DMA over the whole buffer when the
  * driver supports it, else one half at a time. */
 void DigiInit(void)
@@ -597,12 +490,6 @@ void DigiTick(void)
             DigiPlay(&dma_req);
         }
     }
-}
-
-void DigiStop(void)
-{
-    if (dma_auto)
-        sub_3585E(0);
 }
 
 void DigiPlay(DmaReq *req)

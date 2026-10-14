@@ -106,7 +106,6 @@ void ClearScreen(void);
 void KeyStation(int16_t dx, int16_t dy);
 void SetSteering(int16_t on);
 void BridgeLoop(void);
-void WaitButtonUp(void);
 void FullView(void);
 void FullViewEnd(void);
 void BridgeScreen(void);
@@ -114,7 +113,6 @@ void BridgeScreenEnd(void);
 void BridgeEnter(int16_t reset);
 void BridgeLeave(void);
 void StartCrew(void);
-void UpdateCrew(void);
 void DrawRadar(void);
 void FreeRadar(void);
 void DrawShipStatus(Obj3D *o);
@@ -124,7 +122,6 @@ void CyclePalette(void);
 void CycleRange(int16_t first, int16_t count);
 void InitBlip(void);
 void MoveBlip(void);
-void FaceEnemy(void);
 void FireWeapons(int16_t torps, int16_t phasers);
 void ClickCrew(int16_t x, int16_t y);
 void BridgeKey(Event e);
@@ -572,24 +569,6 @@ void BridgeLoop(void)
     }
 }
 
-/* Wait for the left button to be released. */
-void WaitButtonUp(void)
-{
-    int16_t going;
-    Event *e;
-
-    going = 1;
-    while (going) {
-        if ((e = PeekEvent()) != 0) {
-            if (e->type == EV_UP1)
-                going = 0;
-            else if (e->type == EV_TICK)
-                UpdateSprites();
-            PopEvent();
-        }
-    }
-}
-
 /* The view filling the screen. */
 void FullView(void)
 {
@@ -703,12 +682,6 @@ struct {
     { "helm", 60, 70 }, { "nav", 60, 70 }, { "comm", 30, 30 }, { "eng", 30, 30 }
 };
 int16_t view_key = 0;
-
-void UpdateCrew(void)
-{
-    if (full_view == 0)
-        UpdateActors();
-}
 
 /* The radar: a dot for each distant ship. */
 void DrawRadar(void)
@@ -907,18 +880,6 @@ void MoveBlip(void)
     x = word_537AE++ * 8 + 0x49;
     word_537AE %= 22;
     SpriteSetPos(&bspr6, x, 0x6B, 2);
-}
-
-/* Turn the ship towards the first enemy. */
-void FaceEnemy(void)
-{
-    int16_t yaw;
-    int16_t pitch;
-
-    if (ships[0].visible) {
-        Bearing(&player_ship, &ships[0].pos, &pitch, &yaw);
-        player_ship.mo.turn_target[1] = yaw >> 1;
-    }
 }
 
 /* Fire torpedoes and/or phasers at the pointer. */
@@ -1760,7 +1721,6 @@ char *mission_names[7] = {
 char *text_buf = 0;               /* text from GetText */
 Point weapon_pos[4] = { { 0xC4, 0x10 }, { 0xC2, 0x14 }, { 0x5A, 0x10 }, { 0x5C, 0x14 } };
 Point engine_pos[2] = { { 0x8C, 0x0D }, { 0x8C, 0x10 } };
-int16_t word_45C86[4] = { 0 };
 
 /* The captain's log: points for the recent missions. */
 void CaptainsLog(void)
@@ -1978,15 +1938,6 @@ void ShuttleEnd(void)
 {
     if (shot_obj.visible)
         DelR3((Obj3D *)&shot_obj);
-}
-
-/* Play n lines of conversation. */
-void SayLines(Line *p, int16_t n)
-{
-    while (n--) {
-        MsgBox(crew_names[p->who], p->text, p->x, p->y, p->c, p->d);
-        ++p;
-    }
 }
 
 /* Show the planet cut-scene picture name.bmp (and say voc). */

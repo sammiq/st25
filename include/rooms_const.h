@@ -1,4 +1,4 @@
-/* rooms_const.h - names the room scripts use: items, objects, messages (from include/rdf.inc) */
+/* rooms_const.h - names the room scripts use: items, objects, messages */
 
 #ifndef ROOMS_CONST_H
 #define ROOMS_CONST_H

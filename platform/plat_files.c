@@ -22,11 +22,6 @@ void plat_set_data_dir(const char *dir)
     snprintf(data_dir, sizeof(data_dir), "%s", dir);
 }
 
-const char *plat_data_dir(void)
-{
-    return data_dir;
-}
-
 /* Find an entry of dir called name in any case.  Returns 1 and the real
  * name in out if there is one. */
 static int find_entry(const char *dir, const char *name, char *out, size_t outsize)
@@ -147,14 +142,5 @@ char *strupr(char *s)
 
     for (p = s; *p; p++)
         *p = toupper((unsigned char)*p);
-    return s;
-}
-
-char *strlwr(char *s)
-{
-    char *p;
-
-    for (p = s; *p; p++)
-        *p = tolower((unsigned char)*p);
     return s;
 }

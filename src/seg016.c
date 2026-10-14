@@ -452,12 +452,6 @@ MemHandle LoadSfxFile(char *name, char *ext)
     return h;
 }
 
-/* The address of a handle's block. */
-void *MapHandle(MemHandle h)
-{
-    return h->ptr;
-}
-
 void *MapMemRef(MemRef *r)
 {
     return (char *)r->handle->ptr + r->offset;

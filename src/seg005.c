@@ -48,7 +48,6 @@ int16_t last_my = 100;
 int16_t joy_recal = 0;
 int16_t key_accel = 1;                      /* held keypad arrows speed up */
 uint32_t key_tick0 = 0;
-int32_t key_unused = 0;
 uint32_t last_key_tick = 0;
 
 void EventInit(void)
@@ -474,13 +473,4 @@ void ReadKey(void)
             break;
         }
     }
-}
-
-/* The pointer is drawn by the game; the host's is hidden. */
-void MouseShow(void)
-{
-}
-
-void MouseReset(void)
-{
 }

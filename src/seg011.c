@@ -37,17 +37,3 @@ void ListRemove(List *l, Node *n)
     n->next = 0;
     n->prev = 0;
 }
-
-/* Not called anywhere in the game. */
-int16_t ListCount(List *l)
-{
-    Node *n;
-    Node *tail;
-    int16_t count;
-
-    tail = &l->tail;
-    count = 0;
-    for (n = l->head.prev; n != tail; ++count, n = n->prev)
-        ;
-    return count;
-}

@@ -1,4 +1,4 @@
-/* The scripts of every room (tools/rdf2c.py). */
+/* The scripts of every room. */
 
 #include "rooms.h"
 

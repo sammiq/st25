@@ -36,7 +36,6 @@ static uint32_t last_present;
 static int opt_scale = 3;
 static int opt_fullscreen;
 static int opt_square_pixels;
-static int quitting;
 
 /* ---- keyboard ---- */
 

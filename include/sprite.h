@@ -53,7 +53,6 @@ extern Sprite mouse_sprite;
 int16_t ClipRect(Rect *out, Rect *a, Rect *b);      /* seg007 */
 void UnionRect(Rect *out, Rect *a, Rect *b);    /* seg007 */
 
-void GetSpriteList(Sprite **list, int16_t *count);
 void SetSpriteList(Sprite **list, int16_t *count);
 void ResetSpriteList(void);
 void MarkAllDirty(void);

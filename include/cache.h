@@ -79,7 +79,6 @@ int16_t NameHash(char *s);
 void StreamInit(void);
 void StreamFill(void);
 MemHandle LoadSfxFile(char *name, char *ext);
-void *MapHandle(MemHandle h);
 void *MapMemRef(MemRef *r);
 void *MapStream(void);
 void CacheNop(void);

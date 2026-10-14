@@ -250,25 +250,6 @@ Matrix *MatRotY(int16_t a, Matrix *out)
     return out;
 }
 
-Matrix *MatRotZ(int16_t a, Matrix *out)
-{
-    int32_t s;
-    int32_t c;
-    Matrix m;
-    Matrix r;
-
-    s = FixSin(a);
-    c = FixCos(a);
-    MatIdentity(&m);
-    m.e[0][0] = c;
-    m.e[0][1] = s;
-    m.e[1][0] = -s;
-    m.e[1][1] = c;
-    MatMul(out, &m, &r);
-    *out = r;
-    return out;
-}
-
 Matrix *MatRotXPre(int16_t a, Matrix *out)
 {
     int32_t s;
@@ -302,25 +283,6 @@ Matrix *MatRotYPre(int16_t a, Matrix *out)
     m.e[0][2] = -s;
     m.e[2][0] = s;
     m.e[2][2] = c;
-    MatMul(&m, out, &r);
-    *out = r;
-    return out;
-}
-
-Matrix *MatRotZPre(int16_t a, Matrix *out)
-{
-    int32_t s;
-    int32_t c;
-    Matrix m;
-    Matrix r;
-
-    s = FixSin(a);
-    c = FixCos(a);
-    MatIdentity(&m);
-    m.e[0][0] = c;
-    m.e[0][1] = s;
-    m.e[1][0] = -s;
-    m.e[1][1] = c;
     MatMul(&m, out, &r);
     *out = r;
     return out;
@@ -411,41 +373,6 @@ int16_t MatFromVecs(int32_t *dir, int16_t *up, int16_t *alt, Matrix *m)
     VecNorm(m->e[0], m->e[0]);
     VecCross(m->e[2], m->e[0], m->e[1]);
     return 1;
-}
-
-void MatFromDir(int16_t *v, Matrix *m)
-{
-    int16_t len;
-    int16_t x;
-    int16_t y;
-    int16_t z;
-    int16_t w;
-    int16_t xx;
-    int16_t xy;
-    int16_t yy;
-
-    if (v[0] == 0 && v[1] == 0) {
-        MatIdentity(m);
-        return;
-    }
-    len = FixLength(v[0], v[1], 0);
-    x = FixDiv(v[1], len);
-    y = FixDiv(-v[0], len);
-    z = v[2];
-    w = FixSqrt(0x10000000L - (int32_t)z * z);
-    xx = FixMul(x, x);
-    xy = FixMul(x, y);
-    yy = FixMul(y, y);
-    m->e[0][0] = FixMul(z, yy) + xx;
-    m->e[0][1] = xy - FixMul(z, xy);
-    m->e[0][2] = -FixMul(w, y);
-    m->e[1][0] = m->e[0][1];
-    m->e[1][1] = FixMul(z, xx) + yy;
-    m->e[1][2] = FixMul(w, x);
-    m->e[2][0] = -m->e[0][2];
-    m->e[2][1] = -m->e[1][2];
-    m->e[2][2] = z;
-    return;
 }
 
 Matrix *MatRotXSC(int16_t s, int16_t c, Matrix *out)

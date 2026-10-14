@@ -27,7 +27,6 @@ typedef struct FileInfo {
 } FileInfo;
 
 extern int16_t voc_on_cd;       /* 1 when speech is read from the CD */
-extern char *exit_msg;      /* printed by PrintExitMsg */
 extern int16_t data_not_open;
 extern int16_t dir_last;        /* DATA.DIR index of the last lookup */
 extern char voc_path[];     /* directory holding the speech files */
@@ -36,11 +35,8 @@ extern uint16_t dir_size;
 extern uint16_t dir_count;
 extern MemHandle run_handle;
 extern int16_t data_fd;
-extern char file_buf[];
 
 void FindCD(void);
-void PrintExitMsg(void);
-void SetExitMsg(char *msg);
 int16_t UnpackChunk(unsigned char *src, unsigned char **pdst, uint16_t len);
 void Unpack(unsigned char *src, unsigned char *dst, uint16_t len);
 void UnpackAll(unsigned char *src, unsigned char *dst, uint16_t len);

@@ -664,10 +664,6 @@ static int find_sequence(const uint8_t *d, int seq, const uint8_t **evnt, const 
     return 0;
 }
 
-void AIL_startup(void)
-{
-}
-
 void AIL_shutdown(char *msg)
 {
     int i;

@@ -18,6 +18,5 @@ typedef struct List {
 void ListInit(List *l);
 void ListAdd(List *l, Node *n);
 void ListRemove(List *l, Node *n);
-int16_t ListCount(List *l);
 
 #endif

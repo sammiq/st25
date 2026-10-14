@@ -465,6 +465,7 @@ void SpockHostages(void)
     MsgBox(crew_names[1], buf, 0x126, 0x6A, 0x2C, 0);
 }
 
+/* The talk with Elasi Cereth. */
 void UhuraSay63(void)
 {
     BridgeSfx(0x22);

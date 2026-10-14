@@ -1,7 +1,6 @@
 /* rooms.h - what the room scripts (src/rooms) run on.
  *
- * The scripts are the .RDF files' machine code translated to C
- * (tools/rdf2c.py).  They keep their variables, strings and tables in the
+ * The scripts are the .RDF files' machine code translated to C.  They keep their variables, strings and tables in the
  * loaded room file (rdf_image: CS_B and CS_W read and write it by offset),
  * use the room state through `room`, and call the game through the svc_
  * macros, which are ScriptService's commands (src/seg008.c).

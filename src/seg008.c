@@ -1237,26 +1237,6 @@ void CallScript(void *code)
     Fatal("room %s has no script at %04X", room_name, offset);
 }
 
-/* Play name.anm as actor n at (x, y) (its sprite's place for -1) and
- * report msg when it ends. */
-void PlayRoomAnim(int16_t n, char *name, int16_t x, int16_t y, uint16_t msg)
-{
-    Actor *a;
-    char buf[10];
-
-    a = actors;
-    if (x == -1 || y == -1) {
-        x = actors[n].sprite.x;
-        y = actors[n].sprite.y;
-    }
-    MemCpy(buf, name, 10);
-    a += StartAnim(n, buf, x, y, 256);
-    if (msg) {
-        a->notify = 1;
-        a->notify_arg = msg;
-    }
-}
-
 /* The scripts' service call (rdf->service). */
 int32_t ScriptService(int16_t cmd, int16_t a1, int16_t a2, int16_t a3, int16_t a4, uint16_t a5)
 {
@@ -2154,26 +2134,6 @@ void RoomTimers(void)
     for (i = 0; i != 8; i++)
         if (room.timers[i] && --room.timers[i] == 0)
             PostRoomMsg(8, i & 0xFF, 0, 0);
-}
-
-/* x on screen. */
-int16_t ClampX(int16_t x)
-{
-    if (x <= 0)
-        x = 0;
-    if (x >= 320)
-        x = 319;
-    return x;
-}
-
-/* y on screen. */
-int16_t ClampY(int16_t y)
-{
-    if (y <= 0)
-        y = 0;
-    if (y >= 200)
-        y = 199;
-    return y;
 }
 
 /* Is (x, y) blocked in the walk map? */

@@ -14,12 +14,9 @@ uint16_t dir_size;
 MemHandle run_handle;
 uint16_t dir_count;
 
-char file_buf[0x800];           /* ReadChunk reads through this (in FAR_BSS) */
-int16_t voc_on_cd = 0;
-int16_t word_45D18 = 0;             /* never used */
-char *exit_msg = 0;
 int16_t data_not_open = -1;
 int16_t dir_last = 0;
+int16_t voc_on_cd = 0;
 
 /* Locate the speech directory.  The original looked for ./voc/speech.mrk
  * (installed) and then for the CD; the data directory (see plat_init)
@@ -28,17 +25,6 @@ void FindCD(void)
 {
     strcpy(voc_path, "voc/");
     voc_on_cd = 0;
-}
-
-void PrintExitMsg(void)
-{
-    if (exit_msg)
-        printf("%s", exit_msg);
-}
-
-void SetExitMsg(char *msg)
-{
-    exit_msg = msg;
 }
 
 /* The game's compression: flag bytes, each covering eight items from the

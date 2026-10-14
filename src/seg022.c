@@ -181,14 +181,6 @@ done:
     return sel;
 }
 
-void OffsetRect(Rect *out, Rect *r, int16_t dx, int16_t dy)
-{
-    out->x0 = r->x0 + dx;
-    out->y0 = r->y0 + dy;
-    out->x1 = r->x1 + dx;
-    out->y1 = r->y1 + dy;
-}
-
 #define ABS(v) ((v) > 0 ? (v) : -(v))
 
 Point *NearestStar(int16_t x, int16_t y)

@@ -53,22 +53,14 @@ typedef struct DmaReq {
 #define HALF        0x1000      /* half of the DMA buffer */
 
 /* seg028: AIL */
-void AIL_startup(void);
 void AIL_shutdown(char *msg);
-int16_t AIL_register_driver(void *driver);
-drvr_desc *AIL_describe_driver(int16_t h);
-int16_t AIL_detect_device(int16_t h, uint16_t IO, uint16_t IRQ, uint16_t DMA, uint16_t DRQ);
-void AIL_init_driver(int16_t h, uint16_t IO, uint16_t IRQ, uint16_t DMA, uint16_t DRQ);
 uint16_t AIL_state_table_size(int16_t h);
 int16_t AIL_register_sequence(int16_t h, void *data, int16_t seq, void *state, void *ctrl);
 void AIL_release_sequence_handle(int16_t h, int16_t seq);
-uint16_t AIL_default_timbre_cache_size(int16_t h);
-void AIL_define_timbre_cache(int16_t h, void *cache, uint16_t size);
 void AIL_install_timbre(int16_t h, int16_t bank, int16_t patch, void *data);
 void AIL_start_sequence(int16_t h, int16_t seq);
 void AIL_stop_sequence(int16_t h, int16_t seq);
 int16_t AIL_sequence_status(int16_t h, int16_t seq);
-void sub_3B584(int16_t h, char *s);
 
 extern int16_t music_on;
 extern int16_t sfx_on;
@@ -80,7 +72,6 @@ extern int16_t digi_driver;
 void HookTimer(void);
 void UnhookTimer(void);
 void SoundInit(void);
-int16_t ParseBlaster(drvr_desc *desc, char *a, char *b);
 void SoundStop(void);
 void StopSeq(uint16_t slot);
 void PlaySeq(uint16_t slot, int16_t seq);
@@ -88,7 +79,6 @@ int16_t MusicPlaying(void);
 void StopVoc(void);
 void StopAllSound(void);
 void LoadMusic(char *name);
-int16_t SoundShutdown(void);
 void PlayMusic(int16_t seq, int16_t next);
 int16_t ReadVoc(char *buf, int16_t len);
 void MusicTick(void);
@@ -100,7 +90,6 @@ void SaveMusicState(void);
 void LoadMusicState(void);
 void DigiInit(void);
 void DigiTick(void);
-void DigiStop(void);
 void DigiPlay(DmaReq *req);
 int16_t DigiStatus(void);
 void DigiStart(void);

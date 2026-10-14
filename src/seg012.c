@@ -81,7 +81,6 @@ int16_t game_mode;               /* 1 bridge, 2 away team; 3, 4 beaming */
 int16_t prev_mode;
 
 MemHandle space_bmp_handle = 0;
-Point old_item_pos[5] = { { 0x89, 0x7A }, { 0x78, 0x85 }, { 0x99, 0x91 }, { 0xF7, 0x9C }, { 0x75, 0xA9 } };
 Point item_pos[5] = { { 0x29, 0x80 }, { 0x58, 0x7D }, { 0x82, 0x7D }, { 0xAE, 0x79 }, { 0xE1, 0x7D } };
 
 #define ABS(x)  ((x) > 0 ? (x) : -(x))
@@ -93,7 +92,6 @@ void GameMain(int argc, char **argv)
 {
     int16_t play_intro = 1;
 
-    atexit(PrintExitMsg);
     ReadConfig(argc, argv);
     InitMem();
     HookKbd();

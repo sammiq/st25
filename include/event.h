@@ -57,7 +57,5 @@ void UnhookKbd(void);
 int16_t TestAndClear(int16_t *p);
 int16_t KeyReady(void);
 void ReadKey(void);
-void MouseShow(void);
-void MouseReset(void);
 
 #endif

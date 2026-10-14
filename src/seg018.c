@@ -76,7 +76,6 @@ int16_t planet_pals[22][25] = {
 };
 
 int16_t small_planets = 0;                  /* generating textures is too slow */
-int16_t planet_unused[6] = { 0, 1, 0, 0, 0, -1 };
 uint32_t planet_frame = 0;
 int16_t planet_n = 0;
 
@@ -392,12 +391,6 @@ void InitDummyPlanet(void)
 void CreatePlanet(Obj3D *o, char *name, int16_t radius, int16_t small, uint16_t seed, int16_t pal)
 {
     InitPlanet(o, name, radius, small, 1, seed, pal);
-}
-
-/* A planet textured with name.spl / name.lpl. */
-void CreatePlanetBmp(Obj3D *o, char *name, int16_t radius, int16_t small)
-{
-    InitPlanet(o, name, radius, small, 0, 0, 0);
 }
 
 void RandomPlanet(Obj3D *o)

@@ -87,7 +87,6 @@ unsigned char dither[8] = { 0x00, 0x80, 0x40, 0xC0, 0x20, 0xA0, 0x60, 0xE0 };
 void CamReset(void);
 void SetView(int16_t x0, int16_t y0, int16_t x1, int16_t y1, int16_t fov);
 void DrawStatic(void);
-void ClearR3List(void);
 void AddR3(Obj3D *o);
 void DelR3(Obj3D *o);
 void ClearView(void);
@@ -197,16 +196,6 @@ void DrawStatic(void)
             }
     UnlockMem(h);
     CacheRelease(h);
-}
-
-void ClearR3List(void)
-{
-    Obj3D **p;
-
-    for (p = r3_list; p != &r3_list[MAX_R3]; p++)
-        if (*p)
-            (*p)->visible = 0;
-    MemSet(r3_list, sizeof(r3_list), 0);
 }
 
 void AddR3(Obj3D *o)

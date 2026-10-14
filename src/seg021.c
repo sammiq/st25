@@ -21,12 +21,6 @@ int16_t sprite_count0 = 0;
 Sprite **sprite_list = sprite_array;
 int16_t *sprite_count = &sprite_count0;
 Rect screen_rect = { 0, 0, 319, 199 };
-/* Assigns the parameters, not what they point to, so does nothing. */
-void GetSpriteList(Sprite **list, int16_t *count)
-{
-    list = sprite_list;
-    count = sprite_count;
-}
 
 void SetSpriteList(Sprite **list, int16_t *count)
 {

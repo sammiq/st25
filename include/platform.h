@@ -72,6 +72,5 @@ int32_t plat_filelength(int fd);
 int plat_access(const char *path, int mode);
 void *plat_fopen(const char *path, const char *mode);   /* a FILE * */
 int plat_scan_dir(const char *dir, void (*cb)(const char *name));  /* names in dir */
-const char *plat_data_dir(void);
 
 #endif

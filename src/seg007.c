@@ -35,12 +35,6 @@ void TextMode(void)
 {
 }
 
-/* Set all 256 DAC registers from 768 bytes of 6 bit components. */
-void SetPalette(unsigned char *pal)
-{
-    plat_set_palette(0, 256, pal);
-}
-
 void SetPaletteRange(unsigned char *pal, int16_t first, int16_t count)
 {
     plat_set_palette(first, count, pal);
@@ -321,10 +315,6 @@ void LoadFont(void)
 void FreeFont(void)
 {
     CacheRelease(font_handle);
-}
-
-void VideoNop(void)
-{
 }
 
 void FadeIn(void)
