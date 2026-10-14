@@ -1,6 +1,8 @@
-# Star Trek: 25th Anniversary (CD, DOS) - portable port
+# Star Trek: 25th Anniversary (CD, DOS) - portable version
 
 This branch (`portable-version`) turns the decompilation into portable C that builds for 32/64 bit hosts with SDL2. The matching decompilation of the DOS executable, and its build, are on `main`.
+
+This repository does not include the original game files, you must provide them yourself.
 
 ## Building and running
 
@@ -9,12 +11,12 @@ cmake -B build/port && cmake --build build/port -j     # needs SDL2; -DPLATFORM_
 build/port/startrek --data orig/CD/TREKCD              # or set STARTREK_DATA; also --scale N, --fullscreen, --square
 ```
 
-The game data is the original CD's `TREKCD` directory (`DATA.DIR`, `DATA.RUN`, `DATA.001`, `VOC/`), not in git. Saved games and the settings file go to `$XDG_DATA_HOME/startrek` (default `~/.local/share/startrek`); saves an earlier version left in the data directory are copied there on first run. Old DOS saves can't be loaded.
+The game data is the original CD's `TREKCD` directory (`DATA.DIR`, `DATA.RUN`, `DATA.001`, `VOC/`). Saved games and the settings file go to `$XDG_DATA_HOME/startrek` (default `~/.local/share/startrek`). Old DOS saves can't be loaded.
 
 ## How it is put together
 
 - `src/` the game, as C. `include/compat.h` supplies the 16 bit types it was written with. `include/platform.h` is the only boundary to the host: VGA mode 13h video, keyboard, mouse, joystick, timer, files with DOS-style names, all implemented in `platform/` (SDL2, or a headless one for tests).
-- `src/rooms/*.c` the scripts of the 53 rooms: the original `.RDF` files' machine code, translated to C and maintained as C from here on (the tool that produced them is gone). They run against the loaded `.RDF` image and call the engine through `ScriptService` (`include/rooms.h`).
+- `src/rooms/*.c` the scripts of the 53 rooms: the original `.RDF` files' machine code, translated to C. They run against the loaded `.RDF` image and call the engine through `ScriptService` (`include/rooms.h`).
 - `audio/` the sound hardware, emulated: an AdLib/Sound Blaster FM chip (Nuked OPL3, LGPL-2.1, in `audio/nuked/`) driven by an XMIDI sequencer standing in for the Miles AIL music driver, and the Sound Blaster DAC with its DMA buffer. `platform/plat_audio_sdl.c` is the output.
 - The original's assembly (fixed point maths, decompression, line and sprite drawing, the scaler, mixing, ...) is C now, each replacement checked against the original machine code under the Unicorn emulator: `tests/test_*.py` (needs `.venv` with `unicorn`, and the unpacked original EXE in `build/exe/`).
 
@@ -39,4 +41,4 @@ mkdir -p build/exe && python3 tools/unexepack.py orig/CD/TREKCD/STARTREK.EXE bui
 for t in seg027 seg003 gfx qsort; do .venv/bin/python tests/test_$t.py; done
 ```
 
-The one mismatch `test_gfx.py` reports is the intentional negative-length `HLine` case.
+The one mismatch `test_gfx.py` reports is an intentional negative-length `HLine` case.
