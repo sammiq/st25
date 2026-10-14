@@ -2,6 +2,15 @@
 ; how the mission ended (ending, set in rooms 0-5) is told through
 ; messages from the K'lirta and the Captain's log.
 ;
+; Unused: nothing enters room 9 (the trial rooms only go to rooms 1, 2, 4
+; and 5, and StartAway always starts in room 0), there is no TRIAL9.BMP or
+; .PRI for LoadRoom to load, and its strings have no voice tags. The game
+; plays the ending on the bridge instead: the rooms pass the ending as
+; RC_BEAMUP's outcome, and seg034 picks TrialKenka, TrialSpock, TrialSulu
+; or TrialKallarax from it, with text from TRIAL.TXT. The rooms' writes to
+; the ending variable are left over from this room. The floppy version
+; has no TRIAL9.RDF at all.
+;
 ; Labels: H_ script headers, L branch targets, C_ conversations,
 ; T_/N_/S_ strings; talk_buf: the conversation buffer of Say.
 ;
