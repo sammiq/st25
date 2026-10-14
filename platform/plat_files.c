@@ -44,6 +44,83 @@ static int find_entry(const char *dir, const char *name, char *out, size_t outsi
     return found;
 }
 
+/* The player's own files (saved games, the settings file) live under
+ * $XDG_DATA_HOME/startrek, else ~/.local/share/startrek, not in the game data. */
+static char user_dir_path[1024];
+static int user_dir_ready;
+
+static void make_dirs(char *path)
+{
+    char *p;
+
+    for (p = path + 1; *p; p++)
+        if (*p == '/') {
+            *p = 0;
+            mkdir(path, 0755);
+            *p = '/';
+        }
+    mkdir(path, 0755);
+}
+
+static void copy_file(const char *from, const char *to)
+{
+    FILE *in = fopen(from, "rb"), *out;
+    char buf[4096];
+    size_t n;
+
+    if (!in)
+        return;
+    out = fopen(to, "wb");
+    if (out) {
+        while ((n = fread(buf, 1, sizeof(buf), in)) > 0)
+            fwrite(buf, 1, n, out);
+        fclose(out);
+    }
+    fclose(in);
+}
+
+static int is_user_file(const char *path)
+{
+    return strchr(path, '/') == NULL && strchr(path, '\\') == NULL
+        && (strncasecmp(path, "savegame.", 9) == 0 || strcasecmp(path, "intrplay.cfg") == 0);
+}
+
+static const char *user_dir(void)
+{
+    if (!user_dir_ready) {
+        const char *xdg = getenv("XDG_DATA_HOME"), *home = getenv("HOME");
+        DIR *d;
+        struct dirent *e;
+
+        user_dir_ready = 1;
+        if (xdg && xdg[0] == '/')
+            snprintf(user_dir_path, sizeof(user_dir_path), "%s/startrek", xdg);
+        else if (home)
+            snprintf(user_dir_path, sizeof(user_dir_path), "%s/.local/share/startrek", home);
+        else
+            snprintf(user_dir_path, sizeof(user_dir_path), "%s", data_dir);
+        make_dirs(user_dir_path);
+        /* saves an earlier version left in the game data directory come along, once */
+        if (strcmp(user_dir_path, data_dir) != 0) {
+            char to[1400];
+
+            snprintf(to, sizeof(to), "%s/savegame.dir", user_dir_path);
+            if (access(to, F_OK) != 0 && (d = opendir(data_dir)) != NULL) {
+                while ((e = readdir(d)) != NULL)
+                    if (strncasecmp(e->d_name, "savegame.", 9) == 0 || strcasecmp(e->d_name, "intrplay.cfg") == 0) {
+                        char from[1400];
+
+                        snprintf(from, sizeof(from), "%s/%s", data_dir, e->d_name);
+                        snprintf(to, sizeof(to), "%s/%s", user_dir_path, e->d_name);
+                        copy_file(from, to);
+                    }
+                closedir(d);
+            }
+        }
+    }
+    return user_dir_path;
+}
+
 /* Resolve a DOS path to a real one under the data directory.  Components
  * that do not exist are appended as given, so that a file can be created.
  * Returns 1 if the whole path exists. */
@@ -53,6 +130,10 @@ static int resolve(const char *path, char *out, size_t outsize)
     size_t len;
     int exists = 1;
 
+    if (is_user_file(path)) {
+        snprintf(out, outsize, "%s/%s", user_dir(), path);
+        return access(out, F_OK) == 0;
+    }
     snprintf(out, outsize, "%s", data_dir);
     len = strlen(out);
     if (path[0] != 0 && path[1] == ':')         /* drive letter */

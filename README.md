@@ -9,7 +9,7 @@ cmake -B build/port && cmake --build build/port -j     # needs SDL2; -DPLATFORM_
 build/port/startrek --data orig/CD/TREKCD              # or set STARTREK_DATA; also --scale N, --fullscreen, --square
 ```
 
-The game data is the original CD's `TREKCD` directory (`DATA.DIR`, `DATA.RUN`, `DATA.001`, `VOC/`), not in git.
+The game data is the original CD's `TREKCD` directory (`DATA.DIR`, `DATA.RUN`, `DATA.001`, `VOC/`), not in git. Saved games and the settings file go to `$XDG_DATA_HOME/startrek` (default `~/.local/share/startrek`); saves an earlier version left in the data directory are copied there on first run. Old DOS saves can't be loaded.
 
 ## How it is put together
 
