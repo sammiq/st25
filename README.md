@@ -1,4 +1,29 @@
-# Star Trek: 25th Anniversary (CD, DOS) decompilation
+# Star Trek: 25th Anniversary (CD, DOS) - portable port
+
+This branch (`portable-version`) turns the decompilation into portable C that builds for 32/64 bit hosts with SDL2. The matching decompilation of the DOS executable, and its build, are on `main`; everything below the "Decompilation" heading describes that and no longer builds on this branch (the sources here use portable types and the DOS-only assembly is gone).
+
+## Building and running
+
+```sh
+cmake -G Ninja -B build/port && ninja -C build/port    # needs SDL2; -DPLATFORM_NULL=ON builds a headless host
+build/port/startrek --data orig/CD/TREKCD              # or set STARTREK_DATA; also --scale N, --fullscreen, --square
+```
+
+The game data is the original CD's `TREKCD` directory (`DATA.DIR`, `DATA.RUN`, `DATA.001`, `VOC/`), not in git.
+
+## How it is put together
+
+- `src/` the game, as C. `include/compat.h` supplies the 16 bit types it was written with. `include/platform.h` is the only boundary to the host: VGA mode 13h video, keyboard, mouse, joystick, timer, files with DOS-style names, all implemented in `platform/` (SDL2, or a headless one for tests).
+- `src/rooms/*.c` the scripts of the 53 rooms (the original `.RDF` files' machine code), translated to C by `tools/rdf2c.py` from the labelled sources in `src/rdf/*.asm`. They run against the loaded `.RDF` image and call the engine through `ScriptService`. `src/rooms/` is generated: edit the generator and rerun `tools/rdf2c.py --all`.
+- `audio/` the sound hardware, emulated: an AdLib/Sound Blaster FM chip (Nuked OPL3, LGPL-2.1, in `audio/nuked/`) driven by an XMIDI sequencer standing in for the Miles AIL music driver, and the Sound Blaster DAC with its DMA buffer. `platform/plat_audio_sdl.c` is the output.
+- The original's assembly (fixed point maths, decompression, line and sprite drawing, the scaler, mixing, ...) is C now, each replacement checked against the original machine code under the Unicorn emulator: `tests/test_*.py` (needs `.venv` with `unicorn`, `iced_x86`, and the unpacked original EXE in `build/exe/`).
+- `tests/test_rooms.py` runs every room script both ways (original code under Unicorn, generated C) and compares what they do.
+
+## Testing hooks
+
+`STARTREK_SHOT=file.ppm STARTREK_SHOT_MS=n` writes the screen after n ms and quits; `STARTREK_SHOTS=ms,ms,..` writes several; `STARTREK_INPUT="ms:key:0x1C0D,ms:click:x:y,..."` scripts input; `STARTREK_ROOM=demon:1` starts the away team in that room. `SDL_AUDIODRIVER=disk SDL_DISKAUDIOFILE=out.raw` records the sound (16 bit stereo, 48 kHz).
+
+# Decompilation
 
 Matching decompilation of `STARTREK.EXE`, the DOS executable from the CD release. The aim is C source that compiles to the original machine code with the original compiler. Progress is measured, and functions are compared, with [objdiff](https://github.com/encounter/objdiff).
 

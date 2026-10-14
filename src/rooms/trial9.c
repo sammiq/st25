@@ -1,0 +1,180 @@
+/* TRIAL9.RDF: the room's scripts, translated from the machine code in the room file
+ * (src/rdf/trial9.asm) by tools/rdf2c.py.  They run on the loaded file (CS_B/CS_W) and the
+ * room state (`room`), and call the game through the svc_ macros of rooms.h.
+ *
+ * TRIAL9.RDF - "The Feathered Serpent", the end: back on the Enterprise,
+ * how the mission ended (ending, set in rooms 0-5) is told through
+ * messages from the K'lirta and the Captain's log.
+ *
+ * Labels: H_ script headers, L branch targets, C_ conversations,
+ * T_/N_/S_ strings; talk_buf: the conversation buffer of Say.
+ *
+ * Quirks of the original:
+ * - The conversation at 00CA is built at run time.
+ */
+
+#include "rooms.h"
+
+/* where the file keeps its strings, conversations and tables */
+enum {
+    talk_buf = 0x00CA,
+    N_Capt_Kirk = 0x0113,
+    N_Dr_McCoy = 0x011E,
+    N_Mr_Spock = 0x0128,
+    N_Lt_Uhura = 0x0140,
+    N_Sulu = 0x014A,
+    N_Vlict = 0x014F,
+    N_Kallarax = 0x0155,
+    S_019B = 0x019B,
+    S_01C2 = 0x01C2,
+    N_Onscreen = 0x01FA,
+    N_p1talk = 0x0206,
+    S_022E = 0x022E,
+    S_02DB = 0x02DB,
+    S_039E = 0x039E,
+    S_03C7 = 0x03C7,
+    N_Aye_sir = 0x0419,
+    S_0430 = 0x0430,
+    S_0457 = 0x0457,
+    S_04D7 = 0x04D7,
+    S_0525 = 0x0525,
+    S_0551 = 0x0551,
+    S_05D7 = 0x05D7,
+    S_0604 = 0x0604,
+    S_06E9 = 0x06E9,
+    S_070F = 0x070F,
+    S_0736 = 0x0736,
+    S_0775 = 0x0775,
+    S_07C3 = 0x07C3,
+    S_080E = 0x080E,
+    S_0834 = 0x0834,
+    S_0858 = 0x0858,
+    S_0894 = 0x0894,
+    S_090E = 0x090E,
+    S_0988 = 0x0988,
+    S_0A23 = 0x0A23,
+    S_0AC3 = 0x0AC3,
+    S_0B21 = 0x0B21,
+    N_Aye_Captain = 0x0B94,
+    S_0BAC = 0x0BAC,
+    S_0BD9 = 0x0BD9,
+    S_0C2F = 0x0C2F,
+};
+
+/* the room's variables: in the room state, and in the file itself */
+#define fv_choice_jumps CS_W(0xDE)
+#define fv_talk_buf CS_W(0xCA)
+#define rv_ending ROOM_W(0x5F)
+
+/* functions */
+static void trial9_Talk(uint16_t ax);
+static void trial9_Say(uint16_t ax, uint16_t bx);
+static void trial9_Epilogue(void);
+
+/* Talk: conversation AX (speaker, choices, 0); returns the choice. */
+static void trial9_Talk(uint16_t ax)
+{
+    svc_Talk(ax);
+    return;
+}
+
+/* Say: one line, BX, said by AX (0: narration). */
+static void trial9_Say(uint16_t ax, uint16_t bx)
+{
+    fv_talk_buf = ax;
+    CS_W(0xCC) = bx;
+    CS_W(0xCE) = 0;
+    trial9_Talk(talk_buf);
+    return;
+}
+
+/* Tick 30: the epilogue for each ending: 0 "Scenario completed" (Kirk was
+ * dismissed from the court); 1 Vlict's taunts after Kirk left mid-trial;
+ * 2 Quetzecoatl lost; 3 the Klingons leave orbit; 4 the Klingons demand
+ * Vlict, tried and executed by an alien computer.
+ * [MSG_TICK 1E 00 00] */
+static void trial9_Epilogue(void)
+{
+    uint16_t ax = 0, si = 0;
+    if (rv_ending == 0) {
+    } else {
+        if (rv_ending == 1) {
+            goto L01B7;
+        }
+        if (rv_ending == 2) {
+            goto L044C;
+        }
+        if (rv_ending == 3) {
+            goto L0704;
+        }
+        if (rv_ending == 4) {
+            goto L0829;
+        }
+        return;
+    }
+    trial9_Say(0, S_019B);
+    return;
+L01B7:;
+    trial9_Say(N_Lt_Uhura, S_01C2);
+    trial9_Say(N_Capt_Kirk, N_Onscreen);
+    svc_Anim(8, N_p1talk, 0, 0, 0);
+    trial9_Say(N_Vlict, S_022E);
+    trial9_Say(N_Vlict, S_02DB);
+    svc_StopAnim(8);
+    trial9_Say(N_Lt_Uhura, S_039E);
+    trial9_Say(N_Capt_Kirk, S_03C7);
+    trial9_Say(N_Sulu, N_Aye_sir);
+    trial9_Say(0, S_0430);
+    return;
+L044C:;
+    trial9_Say(N_Capt_Kirk, S_0457);
+    trial9_Say(N_Mr_Spock, S_04D7);
+    trial9_Say(N_Capt_Kirk, S_0525);
+    trial9_Say(N_Mr_Spock, S_0551);
+    trial9_Say(N_Dr_McCoy, S_05D7);
+    trial9_Say(N_Capt_Kirk, S_0604);
+    trial9_Say(0, S_06E9);
+    return;
+L0704:;
+    trial9_Say(N_Sulu, S_070F);
+    trial9_Say(N_Mr_Spock, S_0736);
+    trial9_Say(N_Capt_Kirk, S_0775);
+    trial9_Say(N_Capt_Kirk, S_07C3);
+    trial9_Say(0, S_080E);
+    return;
+L0829:;
+    trial9_Say(N_Lt_Uhura, S_0834);
+    trial9_Say(N_Kallarax, S_0858);
+    fv_talk_buf = N_Capt_Kirk;
+    CS_W(0xCC) = S_0894;
+    fv_choice_jumps = 0xA17;
+    CS_W(0xCE) = S_090E;
+    CS_W(0xE0) = 0xA17;
+    CS_W(0xD0) = S_0988;
+    CS_W(0xE2) = 0xBA1;
+    CS_W(0xD2) = 0;
+    ax = (uint16_t)svc_Talk(talk_buf);
+    ax = ax << 1;
+    si = ax;
+    switch (CS_W(0xDE + si)) {
+    case 0x0A17: goto L0A17;
+    case 0x0BA1: goto L0BA1;
+    default: return;
+    }
+L0A17:;
+    trial9_Say(N_Kallarax, S_0A23);
+    trial9_Say(N_Lt_Uhura, S_0AC3);
+    trial9_Say(N_Capt_Kirk, S_0B21);
+    trial9_Say(N_Sulu, N_Aye_Captain);
+L0BA1:;
+    trial9_Say(N_Capt_Kirk, S_0BAC);
+    trial9_Say(N_Capt_Kirk, S_0BD9);
+    trial9_Say(0, S_0C2F);
+    return;
+}
+
+/* the scripts, by the offset of their code in the room file */
+const RoomScript trial9_scripts[] = {
+    { 0x0164, trial9_Epilogue },    /* MSG_TICK 1E 00 00 */
+    { 0, 0 }
+};

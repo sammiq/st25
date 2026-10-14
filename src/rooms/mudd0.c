@@ -1,0 +1,816 @@
+/* MUDD0.RDF: the room's scripts, translated from the machine code in the room file
+ * (src/rdf/mudd0.asm) by tools/rdf2c.py.  They run on the loaded file (CS_B/CS_W) and the
+ * room state (`room`), and call the game through the svc_ macros of rooms.h.
+ *
+ * MUDD0.RDF - "Another Fine Mess", the storage bay of Harry Mudd's
+ * alien ship, where Mudd welcomes the landing party: he found the derelict
+ * and has been selling off its contents, and the Elasi want it too. The
+ * bay holds the alien lenses, the memory disks and a de-grimer; the
+ * cleaned lenses make the alien device. Common to all of the mission's
+ * rooms: the failing life support, the device and the de-grimer.
+ *
+ * Actors: 8 Mudd, 9 the device's explosion, 10 (0Ah) the upper door.
+ * Objects: 8 Mudd, 20h the disks, 21h the lenses, 22h the de-grimer,
+ * 23h/24h crates, 25h/26h by the doors.
+ * Exits: 0 room 1, 1 room 5. Regions 0, 1: the doorsteps.
+ *
+ * Labels: H_ script headers, L branch targets, C_ conversations,
+ * T_/N_/S_ strings; talk_buf: the conversation buffer of Say.
+ */
+
+#include "rooms.h"
+
+/* where the file keeps its strings, conversations and tables */
+enum {
+    N_MUD0LOOP = 0x01E8,
+    T_MUD0_001 = 0x02B2,
+    N_Lt_Uhura = 0x02D7,
+    T_STATICU1 = 0x02E1,
+    N_EXPLO3 = 0x0500,
+    N_SMADOOR3 = 0x0656,
+    N_SMADOOR3_2 = 0x06AF,
+    T_MUD0_011 = 0x06EE,
+    T_MUD0_020 = 0x0977,
+    T_MUD0_019 = 0x09A9,
+    T_MUD0_018 = 0x09DB,
+    T_MUD0N006 = 0x0A0D,
+    T_MUD0N009 = 0x0ADD,
+    talk_buf = 0x0B77,
+    N_Capt_Kirk = 0x0B7D,
+    N_Dr_McCoy = 0x0B96,
+    N_Mr_Spock = 0x0BA0,
+    N_Lt_Buchert = 0x0BAA,
+    S_0BB6 = 0x0BB6,
+    N_Harry_Mudd = 0x0BB7,
+    MuddWelcome1 = 0x0BC2,
+    KirkWelcome2 = 0x0BC8,
+    MuddWelcome3 = 0x0BCE,
+    McCoyWelcome4 = 0x0BD4,
+    MuddWelcome5 = 0x0BDA,
+    KirkWelcome6 = 0x0BE0,
+    MuddWelcome7 = 0x0BE6,
+    KirkWelcome8 = 0x0BEC,
+    MuddWelcome9 = 0x0BF2,
+    FoodCrate = 0x11F5,
+    PartsCrate = 0x11FB,
+    ScanBay = 0x1201,
+    Bay = 0x1207,
+    McCoyOnBay = 0x120D,
+    Disks = 0x1213,
+    SpockOnDisks = 0x1219,
+    Degrimer = 0x1225,
+    Device = 0x122B,
+    Degrimed = 0x1231,
+    Lenses = 0x1237,
+    McCoyOnLenses = 0x123D,
+    McCoyOnLenses2 = 0x1243,
+    LensesFit = 0x1249,
+    Done = 0x124F,
+    AlreadyHave = 0x1255,
+    KirkOnDevice = 0x1261,
+    T_MUD0N004 = 0x17E5,
+    T_MUD0N007 = 0x1827,
+    T_MUD0N001 = 0x186D,
+    T_MUD0N005 = 0x18E6,
+    T_MUD0N003 = 0x194E,
+    T_MUD0_010 = 0x19AC,
+    T_MUD0_031 = 0x19F9,
+    T_MUD0_007 = 0x1A2A,
+    T_MUD0_022 = 0x1A5F,
+    T_MUD0_034 = 0x1ACD,
+    T_MUD0_023 = 0x1B3A,
+    T_MUD0_015 = 0x1BC4,
+    T_MUD0_038 = 0x1C0B,
+    T_MUD0_016 = 0x1C4B,
+    T_MUD0_003 = 0x1CA5,
+    T_MUD0_027 = 0x1D10,
+    T_MUD0_014 = 0x1D54,
+    T_MUD0_032 = 0x1D9D,
+    T_MUD0_024 = 0x1DF7,
+    T_MUD0_035 = 0x1ED1,
+    T_MUD0_004 = 0x1F1A,
+    T_MUD0_040 = 0x1F47,
+    T_MUD0_030 = 0x1F9D,
+    T_MUD0_041 = 0x2049,
+    T_MUD0_036 = 0x2099,
+    T_MUD0_039 = 0x20E0,
+    T_MUD0_008 = 0x2129,
+    T_MUD0_025 = 0x2178,
+    N_s4cbhr = 0x22AB,
+    N_s4cbdo = 0x22B2,
+    N_s4cbxp = 0x22B9,
+    N_s5r1kg = 0x22C0,
+    N_kusemw = 0x22C7,
+    N_kuseln = 0x22CE,
+    N_kgetdw = 0x22D5,
+    N_sgetds = 0x22DC,
+    N_mgetdn = 0x22E3,
+    N_rgetde = 0x22EA,
+    N_sscann = 0x22F1,
+    N_sscans = 0x22F8,
+    N_sscanw = 0x22FF,
+    N_mscans = 0x2306,
+    N_mscane = 0x230D,
+};
+
+/* the room's variables: in the room state, and in the file itself */
+#define fv_collapsed CS_B(0x22AA)
+#define fv_going_door CS_B(0x22A9)
+#define fv_talk_buf CS_W(0xB77)
+#define rv_air_countdown ROOM_W(0x52)
+#define rv_air_failing ROOM_B(0x46)
+#define rv_air_left ROOM_W(0x50)
+#define rv_mudd_talk ROOM_B(0x29)
+#define rv_music_started ROOM_B(0x54)
+#define rv_score ROOM_W(0x5A)
+#define rv_took_degrimer ROOM_B(0x4A)
+#define rv_took_disks ROOM_B(0x48)
+#define rv_took_lenses ROOM_B(0x49)
+#define rv_used_device ROOM_B(0x3C)
+
+/* functions */
+static void mudd0_StartRoom(void);
+static void mudd0_MusicStarts(void);
+static void mudd0_MuddWelcomes(void);
+static void mudd0_E_0287(void);
+static void mudd0_PhaserMudd(void);
+static void mudd0_CallEnterprise(void);
+static void mudd0_LookAtFoodCrate(void);
+static void mudd0_LookAtPartsCrate(void);
+static void mudd0_LookAtScene(void);
+static void mudd0_LookAtDisks(void);
+static void mudd0_LookAtDegrimer(void);
+static void mudd0_LookAtLenses(void);
+static void mudd0_SpockScans(void);
+static void mudd0_McCoyScans(void);
+static void mudd0_SpockScansDisks(void);
+static void mudd0_SpockScansDegrimer(void);
+static void mudd0_McCoyScansLenses(void);
+static void mudd0_CleanLenses(void);
+static void mudd0_FireDevice(void);
+static void mudd0_DeviceFired(void);
+static void mudd0_UseDegrimer(void);
+static void mudd0_GetLenses(void);
+static void mudd0_GetDisks(void);
+static void mudd0_GetDegrimer(void);
+static void mudd0_part_05F8(void);
+static void mudd0_TookItem(void);
+static void mudd0_TookItem2(void);
+static void mudd0_WalkToLowerDoor(void);
+static void mudd0_ReachLowerDoor(void);
+static void mudd0_WalkToUpperDoor(void);
+static void mudd0_Talk(uint16_t ax);
+static void mudd0_ReachUpperDoor(void);
+static void mudd0_UseMedkit(void);
+static void mudd0_LookAtKirk(void);
+static void mudd0_LookAtSpock(void);
+static void mudd0_LookAtMcCoy(void);
+static void mudd0_LookAtRedshirt(void);
+static void mudd0_LookAtMudd(void);
+static void mudd0_TalkToKirk(void);
+static void mudd0_TalkToSpock(void);
+static void mudd0_TalkToMcCoy(void);
+static void mudd0_TalkToRedshirt(void);
+static void mudd0_TalkToMudd(void);
+static void mudd0_AirRunsOut(void);
+static void mudd0_KirkCollapses(void);
+static void mudd0_SpockCollapses(void);
+static void mudd0_McCoyCollapses(void);
+static void mudd0_RedshirtCollapses(void);
+static void mudd0_part_0AC6(void);
+static void mudd0_Say(uint16_t ax, uint16_t bx);
+
+/* The room starts: Mudd, the first time.
+ * [MSG_TICK 01 00 00] */
+static void mudd0_StartRoom(void)
+{
+    svc_Sfx(N_MUD0LOOP);
+    room.busy = 2;
+    svc_Anim0(8, N_s4cbhr, 0xA2, 0xA9, 0);
+    return;
+}
+
+/* Tick 50: the music, once.
+ * [MSG_TICK 32 00 00] */
+static void mudd0_MusicStarts(void)
+{
+    if (rv_music_started == 0) {
+        svc_Music(3, STALE_ARG);
+        rv_music_started = 1;
+    }
+    return;
+}
+
+/* Tick 60, the first time: Mudd explains himself, nine lines in a row
+ * (one Talk per conversation pushed).
+ * [MSG_TICK 3C 00 00] */
+static void mudd0_MuddWelcomes(void)
+{
+    uint16_t di = 0;
+    uint16_t stk[32 + 8] = { 0 };       /* the top 8 are what a service call reads past the stack */
+    int sp_ = 32;
+    room.busy = 0;
+    if (rv_mudd_talk == 0) {
+        rv_mudd_talk++;
+        stk[--sp_] = MuddWelcome9;
+        stk[--sp_] = KirkWelcome8;
+        stk[--sp_] = MuddWelcome7;
+        stk[--sp_] = KirkWelcome6;
+        stk[--sp_] = MuddWelcome5;
+        stk[--sp_] = McCoyWelcome4;
+        stk[--sp_] = MuddWelcome3;
+        stk[--sp_] = KirkWelcome2;
+        stk[--sp_] = MuddWelcome1;
+        di = 9;
+L0273:;
+        stk[--sp_] = 3;
+        ScriptService(stk[sp_], stk[sp_ + 1], stk[sp_ + 2], stk[sp_ + 3], stk[sp_ + 4], stk[sp_ + 5]);
+        sp_ += 2;
+        di = di - 1;
+        if (di != 0)
+            goto L0273;
+    }
+    return;
+}
+
+/* Phasers on Mudd, and the communicator (static).
+ * [MSG_USE 40 08 00] */
+static void mudd0_E_0287(void)
+{
+    { mudd0_PhaserMudd(); return; }
+}
+
+/* [MSG_USE 41 08 00] */
+static void mudd0_PhaserMudd(void)
+{
+    mudd0_Say(N_Harry_Mudd, T_MUD0_025);
+    return;
+}
+
+/* [MSG_USE 47 FF 00] */
+static void mudd0_CallEnterprise(void)
+{
+    mudd0_Say(N_Capt_Kirk, T_MUD0_001);
+    mudd0_Say(N_Lt_Uhura, T_STATICU1);
+    return;
+}
+
+/* Looking: narration conversations (no speaker), through TalkPushed.
+ * [MSG_LOOK 23 00 00] */
+static void mudd0_LookAtFoodCrate(void)
+{
+    room.fall[0] = 1;
+    svc_StopAnim(0);
+    svc_Talk(FoodCrate);
+    return;
+}
+
+/* [MSG_LOOK 24 00 00] */
+static void mudd0_LookAtPartsCrate(void)
+{
+    uint16_t s0;
+    room.fall[0] = 1;
+    svc_StopAnim(0);
+    s0 = PartsCrate;
+    svc_Talk(s0);
+    return;
+}
+
+/* [MSG_LOOK FF 00 00] */
+static void mudd0_LookAtScene(void)
+{
+    uint16_t s0;
+    s0 = ScanBay;
+    svc_Talk(s0);
+    return;
+}
+
+/* [MSG_LOOK 20 00 00] */
+static void mudd0_LookAtDisks(void)
+{
+    uint16_t s0;
+    room.fall[0] = 0;
+    svc_StopAnim(0);
+    s0 = Disks;
+    svc_Talk(s0);
+    return;
+}
+
+/* [MSG_LOOK 22 00 00] */
+static void mudd0_LookAtDegrimer(void)
+{
+    uint16_t s0;
+    room.fall[0] = 3;
+    svc_StopAnim(0);
+    s0 = Degrimer;
+    svc_Talk(s0);
+    return;
+}
+
+/* [MSG_LOOK 21 00 00] */
+static void mudd0_LookAtLenses(void)
+{
+    uint16_t s0;
+    room.fall[0] = 2;
+    svc_StopAnim(0);
+    s0 = Lenses;
+    svc_Talk(s0);
+    return;
+}
+
+/* [MSG_USE 44 FF 00] */
+static void mudd0_SpockScans(void)
+{
+    uint16_t s0;
+    svc_Anim(1, N_sscans, -1, -1, 0);
+    svc_BridgeSfx(4);
+    s0 = Bay;
+    svc_Talk(s0);
+    return;
+}
+
+/* [MSG_USE 45 FF 00] */
+static void mudd0_McCoyScans(void)
+{
+    uint16_t s0;
+    svc_Anim(2, N_mscans, -1, -1, 0);
+    svc_BridgeSfx(4);
+    s0 = McCoyOnBay;
+    svc_Talk(s0);
+    return;
+}
+
+/* Tricorders.
+ * [MSG_USE 44 20 00] */
+static void mudd0_SpockScansDisks(void)
+{
+    uint16_t s0;
+    room.fall[1] = 0;
+    svc_Anim(1, N_sscann, -1, -1, 0);
+    svc_BridgeSfx(4);
+    s0 = SpockOnDisks;
+    svc_Talk(s0);
+    return;
+}
+
+/* [MSG_USE 44 22 00] */
+static void mudd0_SpockScansDegrimer(void)
+{
+    uint16_t s0;
+    room.fall[1] = 3;
+    svc_Anim(1, N_sscanw, -1, -1, 0);
+    svc_BridgeSfx(4);
+    s0 = Device;
+    svc_Talk(s0);
+    return;
+}
+
+/* [MSG_USE 45 21 00] */
+static void mudd0_McCoyScansLenses(void)
+{
+    uint16_t ax = 0;
+    uint16_t s0;
+    room.fall[2] = 2;
+    svc_Anim(2, N_mscane, -1, -1, 0);
+    svc_BridgeSfx(4);
+    ax = McCoyOnLenses;
+    if (rv_used_device != 0) {
+        ax = McCoyOnLenses2;
+    }
+    s0 = ax;
+    svc_Talk(s0);
+    return;
+}
+
+/* Common to all of the mission's rooms: the de-grimer on the lenses makes
+ * the alien device (+1); firing the device sets off an explosion at Kirk
+ * (anim msg 9), +5 the first time anywhere; the de-grimer on anything else
+ * just cleans it.
+ * [MSG_USE 5F 5E 00] */
+static void mudd0_CleanLenses(void)
+{
+    uint16_t di = 0;
+    uint16_t stk[32 + 8] = { 0 };       /* the top 8 are what a service call reads past the stack */
+    int sp_ = 32;
+    stk[--sp_] = 0x5F;
+    stk[--sp_] = 7;
+    stk[--sp_] = 0x5E;
+    stk[--sp_] = 7;
+    stk[--sp_] = 0x7D;
+    stk[--sp_] = 4;
+    di = 3;
+L04AF:;
+    ScriptService(stk[sp_], stk[sp_ + 1], stk[sp_ + 2], stk[sp_ + 3], stk[sp_ + 4], stk[sp_ + 5]);
+    sp_ += 2;
+    di = di - 1;
+    if (di != 0)
+        goto L04AF;
+    rv_score += 1;
+    stk[--sp_] = LensesFit;
+    stk[--sp_] = 3;
+    ScriptService(stk[sp_], stk[sp_ + 1], stk[sp_ + 2], stk[sp_ + 3], stk[sp_ + 4], stk[sp_ + 5]);
+    sp_ += 2;
+    return;
+}
+
+/* [MSG_USE 7D FF 00] */
+static void mudd0_FireDevice(void)
+{
+    uint16_t ax = 0;
+    room.busy = 1;
+    room.fall[0] = 1;
+    svc_StopAnim(0);
+    ax = (uint16_t)svc_ActorPos(0);
+    svc_Anim0(9, N_s4cbxp, ax, 0xA, 9);
+    svc_Sfx(N_EXPLO3);
+    return;
+}
+
+/* [MSG_ANIM_DONE 09 00 00] */
+static void mudd0_DeviceFired(void)
+{
+    uint16_t s0;
+    room.busy = 0;
+    if (rv_used_device == 0) {
+        rv_used_device = 1;
+        rv_score += 5;
+        s0 = KirkOnDevice;
+    } else {
+        return;
+    }
+    svc_Talk(s0);
+    return;
+}
+
+/* [MSG_USE 5E FF 00] */
+static void mudd0_UseDegrimer(void)
+{
+    uint16_t s0;
+    s0 = Degrimed;
+    svc_Talk(s0);
+    return;
+}
+
+/* Taking the lenses, the disks and the de-grimer (+1 each, once).
+ * [MSG_GET 21 00 00] */
+static void mudd0_GetLenses(void)
+{
+    if (rv_took_lenses != 0) {
+        { mudd0_part_05F8(); return; }
+    }
+    rv_took_lenses = 1;
+    rv_score += 1;
+    svc_GiveItem(IT_LENSES);
+    room.fall[0] = 2;
+    svc_Anim(0, N_s5r1kg, -1, -1, 0);
+    room.timers[1] = 0x1B;
+    return;
+}
+
+/* [MSG_GET 20 00 00] */
+static void mudd0_GetDisks(void)
+{
+    if (rv_took_disks != 0)
+        { mudd0_part_05F8(); return; }
+    rv_took_disks = 1;
+    rv_score += 1;
+    svc_GiveItem(IT_DISKS);
+    room.fall[0] = 0;
+    svc_Anim(0, N_kuseln, -1, -1, 1);
+    return;
+}
+
+/* [MSG_GET 22 00 00] */
+static void mudd0_GetDegrimer(void)
+{
+    if (rv_took_degrimer != 0)
+        { mudd0_part_05F8(); return; }
+    rv_took_degrimer = 1;
+    rv_score += 1;
+    svc_GiveItem(IT_DEGRIME);
+    room.fall[0] = 1;
+    svc_Anim(0, N_kusemw, -1, -1, 1);
+    return;
+}
+
+static void mudd0_part_05F8(void)
+{
+    uint16_t s0;
+    s0 = AlreadyHave;
+    svc_Talk(s0);
+    return;
+}
+
+/* Timer 1, or the reaching animation done (msg 1): "Done."
+ * [MSG_TIMER 01 00 00] */
+static void mudd0_TookItem(void)
+{
+    svc_StopAnim(0);
+    { mudd0_TookItem2(); return; }
+}
+
+/* [MSG_ANIM_DONE 01 00 00] */
+static void mudd0_TookItem2(void)
+{
+    uint16_t s0;
+    room.busy = 0;
+    s0 = Done;
+    svc_Talk(s0);
+    return;
+}
+
+/* The doors: walk there; at the step the door slides (regions 0, 1).
+ * [MSG_WALK 26 00 00] */
+static void mudd0_WalkToLowerDoor(void)
+{
+    fv_going_door = 1;
+    room.busy = 1;
+    svc_Walk(0, 0x5A, 0xC7, 0);
+    return;
+}
+
+/* [MSG_REGION 01 00 00] */
+static void mudd0_ReachLowerDoor(void)
+{
+    if (fv_going_door == 1) {
+        svc_Sfx(N_SMADOOR3);
+    }
+    return;
+}
+
+/* [MSG_WALK 25 00 00] */
+static void mudd0_WalkToUpperDoor(void)
+{
+    fv_going_door = 1;
+    room.busy = 1;
+    svc_Walk(0, 0xA0, 0x68, 0);
+    return;
+}
+
+/* Talk: conversation AX (speaker, choices, 0); returns the choice. */
+static void mudd0_Talk(uint16_t ax)
+{
+    svc_Talk(ax);
+    return;
+}
+
+/* [MSG_REGION 00 00 00] */
+static void mudd0_ReachUpperDoor(void)
+{
+    if (fv_going_door == 1) {
+        svc_Sfx(N_SMADOOR3_2);
+        svc_Anim0(0xA, N_s4cbdo, 0xA0, 0x6B, 0);
+    }
+    return;
+}
+
+/* The medkit, and looking and talking.
+ * [MSG_USE 7F FF 00] */
+static void mudd0_UseMedkit(void)
+{
+    mudd0_Say(N_Dr_McCoy, T_MUD0_011);
+    return;
+}
+
+/* [MSG_LOOK 00 00 00] */
+static void mudd0_LookAtKirk(void)
+{
+    mudd0_Say(0, T_MUD0N004);
+    return;
+}
+
+/* [MSG_LOOK 01 00 00] */
+static void mudd0_LookAtSpock(void)
+{
+    mudd0_Say(0, T_MUD0N007);
+    return;
+}
+
+/* [MSG_LOOK 02 00 00] */
+static void mudd0_LookAtMcCoy(void)
+{
+    mudd0_Say(0, T_MUD0N001);
+    return;
+}
+
+/* [MSG_LOOK 03 00 00] */
+static void mudd0_LookAtRedshirt(void)
+{
+    mudd0_Say(0, T_MUD0N005);
+    return;
+}
+
+/* [MSG_LOOK 08 00 00] */
+static void mudd0_LookAtMudd(void)
+{
+    mudd0_Say(0, T_MUD0N003);
+    return;
+}
+
+/* [MSG_TALK 00 00 00] */
+static void mudd0_TalkToKirk(void)
+{
+    if (rv_mudd_talk != 2) {
+        mudd0_Say(N_Capt_Kirk, T_MUD0_010);
+        mudd0_Say(N_Harry_Mudd, T_MUD0_031);
+        mudd0_Say(N_Capt_Kirk, T_MUD0_007);
+        return;
+    }
+    mudd0_Say(N_Capt_Kirk, T_MUD0_010);
+    return;
+}
+
+/* [MSG_TALK 01 00 00] */
+static void mudd0_TalkToSpock(void)
+{
+    if (rv_mudd_talk != 2) {
+        mudd0_Say(N_Mr_Spock, T_MUD0_022);
+        mudd0_Say(N_Harry_Mudd, T_MUD0_034);
+        mudd0_Say(N_Mr_Spock, T_MUD0_023);
+        mudd0_Say(N_Dr_McCoy, T_MUD0_015);
+        mudd0_Say(N_Harry_Mudd, T_MUD0_038);
+        return;
+    }
+    mudd0_Say(N_Mr_Spock, T_MUD0_022);
+    return;
+}
+
+/* [MSG_TALK 02 00 00] */
+static void mudd0_TalkToMcCoy(void)
+{
+    if (rv_mudd_talk != 2) {
+        mudd0_Say(N_Dr_McCoy, T_MUD0_016);
+        mudd0_Say(N_Capt_Kirk, T_MUD0_003);
+        mudd0_Say(N_Harry_Mudd, T_MUD0_027);
+        mudd0_Say(N_Dr_McCoy, T_MUD0_014);
+        return;
+    }
+    mudd0_Say(N_Dr_McCoy, T_MUD0_016);
+    return;
+}
+
+/* [MSG_TALK 03 00 00] */
+static void mudd0_TalkToRedshirt(void)
+{
+    if (rv_mudd_talk != 2) {
+        mudd0_Say(N_Lt_Buchert, T_MUD0_040);
+        mudd0_Say(N_Harry_Mudd, T_MUD0_030);
+        mudd0_Say(N_Lt_Buchert, T_MUD0_041);
+        mudd0_Say(N_Harry_Mudd, T_MUD0_036);
+        return;
+    }
+    mudd0_Say(N_Lt_Buchert, T_MUD0_039);
+    mudd0_Say(N_Capt_Kirk, T_MUD0_008);
+    return;
+}
+
+/* [MSG_TALK 08 00 00] */
+static void mudd0_TalkToMudd(void)
+{
+    mudd0_Say(N_Harry_Mudd, T_MUD0_032);
+    mudd0_Say(N_Mr_Spock, T_MUD0_024);
+    mudd0_Say(N_Harry_Mudd, T_MUD0_035);
+    mudd0_Say(N_Capt_Kirk, T_MUD0_004);
+    return;
+}
+
+/* Every tick, common to all of the mission's rooms: while life support is
+ * failing, the air runs down from 6978h, with warnings at 4F1Ah, 34BCh
+ * and 1A5Eh; at 1 the crew collapse (walk msgs 9-12) and the game is
+ * over.
+ * [MSG_TICK FF FF FF] */
+static void mudd0_AirRunsOut(void)
+{
+    if (rv_air_failing == 0) {
+    } else {
+        if (rv_air_countdown != 1) {
+            rv_air_countdown = 1;
+            rv_air_left = 0x6978;
+        }
+        rv_air_left--;
+        if (rv_air_left == 0x1A5E) {
+            goto L096D;
+        }
+        if (rv_air_left == 0x34BC) {
+            goto L0963;
+        }
+        if (rv_air_left == 0x4F1A)
+            goto L0959;
+        if (rv_air_left == 1) {
+            room.busy = 1;
+            svc_Walk(0, 0xBB, 0x8D, 9);
+            svc_Walk(1, 0xD0, 0x89, 0xA);
+            svc_Walk(2, 0xAA, 0x85, 0xB);
+            svc_Walk(3, 0xBF, 0x83, 0xC);
+            mudd0_Say(S_0BB6, T_MUD0N006);
+            svc_GameOver();
+        }
+    }
+    return;
+L0959:;
+    mudd0_Say(N_Mr_Spock, T_MUD0_020);
+    return;
+L0963:;
+    mudd0_Say(N_Mr_Spock, T_MUD0_019);
+    return;
+L096D:;
+    mudd0_Say(N_Mr_Spock, T_MUD0_018);
+    return;
+}
+
+/* [MSG_WALK_DONE 09 00 00] */
+static void mudd0_KirkCollapses(void)
+{
+    svc_Anim(0, N_kgetdw, -1, -1, 0);
+    { mudd0_part_0AC6(); return; }
+}
+
+/* [MSG_WALK_DONE 0A 00 00] */
+static void mudd0_SpockCollapses(void)
+{
+    svc_Anim(1, N_sgetds, -1, -1, 0);
+    { mudd0_part_0AC6(); return; }
+}
+
+/* [MSG_WALK_DONE 0B 00 00] */
+static void mudd0_McCoyCollapses(void)
+{
+    svc_Anim(2, N_mgetdn, -1, -1, 0);
+    { mudd0_part_0AC6(); return; }
+}
+
+/* [MSG_WALK_DONE 0C 00 00] */
+static void mudd0_RedshirtCollapses(void)
+{
+    svc_Anim(3, N_rgetde, -1, -1, 0);
+    { mudd0_part_0AC6(); return; }
+}
+
+static void mudd0_part_0AC6(void)
+{
+    fv_collapsed++;
+    if (fv_collapsed == 4) {
+        mudd0_Say(S_0BB6, T_MUD0N009);
+    }
+    return;
+}
+
+/* Say: one line, BX, said by AX (0: narration). */
+static void mudd0_Say(uint16_t ax, uint16_t bx)
+{
+    fv_talk_buf = ax;
+    CS_W(0xB79) = bx;
+    mudd0_Talk(talk_buf);
+    return;
+}
+
+/* the scripts, by the offset of their code in the room file */
+const RoomScript mudd0_scripts[] = {
+    { 0x01E6, mudd0_StartRoom },    /* MSG_TICK 01 00 00 */
+    { 0x022B, mudd0_MusicStarts },    /* MSG_TICK 32 00 00 */
+    { 0x0248, mudd0_MuddWelcomes },    /* MSG_TICK 3C 00 00 */
+    { 0x0287, mudd0_E_0287 },    /* MSG_USE 40 08 00 */
+    { 0x028F, mudd0_PhaserMudd },    /* MSG_USE 41 08 00 */
+    { 0x029F, mudd0_CallEnterprise },    /* MSG_USE 47 FF 00 */
+    { 0x030D, mudd0_LookAtFoodCrate },    /* MSG_LOOK 23 00 00 */
+    { 0x0331, mudd0_LookAtPartsCrate },    /* MSG_LOOK 24 00 00 */
+    { 0x034C, mudd0_LookAtScene },    /* MSG_LOOK FF 00 00 */
+    { 0x0357, mudd0_LookAtDisks },    /* MSG_LOOK 20 00 00 */
+    { 0x0372, mudd0_LookAtDegrimer },    /* MSG_LOOK 22 00 00 */
+    { 0x038D, mudd0_LookAtLenses },    /* MSG_LOOK 21 00 00 */
+    { 0x03A9, mudd0_SpockScans },    /* MSG_USE 44 FF 00 */
+    { 0x03D6, mudd0_McCoyScans },    /* MSG_USE 45 FF 00 */
+    { 0x0403, mudd0_SpockScansDisks },    /* MSG_USE 44 20 00 */
+    { 0x0434, mudd0_SpockScansDegrimer },    /* MSG_USE 44 22 00 */
+    { 0x0465, mudd0_McCoyScansLenses },    /* MSG_USE 45 21 00 */
+    { 0x04A0, mudd0_CleanLenses },    /* MSG_USE 5F 5E 00 */
+    { 0x04CA, mudd0_FireDevice },    /* MSG_USE 7D FF 00 */
+    { 0x051D, mudd0_DeviceFired },    /* MSG_ANIM_DONE 09 00 00 */
+    { 0x053C, mudd0_UseDegrimer },    /* MSG_USE 5E FF 00 */
+    { 0x0548, mudd0_GetLenses },    /* MSG_GET 21 00 00 */
+    { 0x058A, mudd0_GetDisks },    /* MSG_GET 20 00 00 */
+    { 0x05C4, mudd0_GetDegrimer },    /* MSG_GET 22 00 00 */
+    { 0x0604, mudd0_TookItem },    /* MSG_TIMER 01 00 00 */
+    { 0x0618, mudd0_TookItem2 },    /* MSG_ANIM_DONE 01 00 00 */
+    { 0x0628, mudd0_WalkToLowerDoor },    /* MSG_WALK 26 00 00 */
+    { 0x064C, mudd0_ReachLowerDoor },    /* MSG_REGION 01 00 00 */
+    { 0x0675, mudd0_WalkToUpperDoor },    /* MSG_WALK 25 00 00 */
+    { 0x06A5, mudd0_ReachUpperDoor },    /* MSG_REGION 00 00 00 */
+    { 0x06E4, mudd0_UseMedkit },    /* MSG_USE 7F FF 00 */
+    { 0x0747, mudd0_LookAtKirk },    /* MSG_LOOK 00 00 00 */
+    { 0x0756, mudd0_LookAtSpock },    /* MSG_LOOK 01 00 00 */
+    { 0x0765, mudd0_LookAtMcCoy },    /* MSG_LOOK 02 00 00 */
+    { 0x0774, mudd0_LookAtRedshirt },    /* MSG_LOOK 03 00 00 */
+    { 0x0783, mudd0_LookAtMudd },    /* MSG_LOOK 08 00 00 */
+    { 0x0792, mudd0_TalkToKirk },    /* MSG_TALK 00 00 00 */
+    { 0x07C4, mudd0_TalkToSpock },    /* MSG_TALK 01 00 00 */
+    { 0x0808, mudd0_TalkToMcCoy },    /* MSG_TALK 02 00 00 */
+    { 0x0843, mudd0_TalkToRedshirt },    /* MSG_TALK 03 00 00 */
+    { 0x0887, mudd0_TalkToMudd },    /* MSG_TALK 08 00 00 */
+    { 0x08B2, mudd0_AirRunsOut },    /* MSG_TICK FF FF FF */
+    { 0x0A5A, mudd0_KirkCollapses },    /* MSG_WALK_DONE 09 00 00 */
+    { 0x0A77, mudd0_SpockCollapses },    /* MSG_WALK_DONE 0A 00 00 */
+    { 0x0A94, mudd0_McCoyCollapses },    /* MSG_WALK_DONE 0B 00 00 */
+    { 0x0AB1, mudd0_RedshirtCollapses },    /* MSG_WALK_DONE 0C 00 00 */
+    { 0, 0 }
+};

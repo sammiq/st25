@@ -15,5 +15,6 @@ void sb_play(void *buf, unsigned len, unsigned rate);
 void sb_stop(void);
 int sb_remaining(void);
 int16_t *sb_status(void);
+int sb_busy(void);
 
 #endif

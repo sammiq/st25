@@ -1,0 +1,884 @@
+/* VENG0.RDF: the room's scripts, translated from the machine code in the room file
+ * (src/rdf/veng0.asm) by tools/rdf2c.py.  They run on the loaded file (CS_B/CS_W) and the
+ * room state (`room`), and call the game through the svc_ macros of rooms.h.
+ *
+ * VENG0.RDF - "Vengeance", the bridge of the U.S.S. Republic, found
+ * wrecked with all hands dead. Its records say the Enterprise attacked
+ * it. The Enterprise leaves to answer a distress call while Kirk's party
+ * searches the ship; the Elasi will soon arrive (room 2).
+ *
+ * Actors: 8 the beam, 9/10 (0Ah) the saw's sparks.
+ * Objects: 8 the beam, 20h a crewman, 21h the captain's chair, 22h a
+ * body, 23h the computer, 24h Captain Patterson, 25h navigation, 26h the
+ * helm, 27h the viewscreen. Exit 1: the turbolift.
+ *
+ * Labels: H_ script headers, L branch targets, C_ conversations,
+ * T_/N_/S_ strings; talk_buf: the conversation buffer of Say.
+ *
+ * Quirks of the original:
+ * - The script chain runs on into code at 18A8: the engine reads its bytes
+ * as key 50 6A 03 2E and next 1EFF (beyond rdf_scripts_end, so the search
+ * stops).
+ */
+
+#include "rooms.h"
+
+/* where the file keeps its strings, conversations and tables */
+enum {
+    N_VEN0LOOP = 0x00EE,
+    N_s7r0bo = 0x010E,
+    N_s7r0bf = 0x012F,
+    T_VEN0_018 = 0x0182,
+    T_VEN0_006 = 0x01DC,
+    T_VEN0_S12 = 0x025F,
+    T_VEN0_008 = 0x0295,
+    T_VEN0_S52 = 0x02CF,
+    T_VEN0_007 = 0x0381,
+    T_VEN0_030 = 0x03E2,
+    T_VEN0_S15 = 0x0497,
+    T_VEN0_005 = 0x04D3,
+    T_VEN0_039 = 0x0520,
+    T_VEN0_009 = 0x0570,
+    T_VEN0_S54 = 0x05FF,
+    T_VEN0_011 = 0x0640,
+    T_VEN0_010 = 0x068B,
+    T_VEN0_017 = 0x06DD,
+    N_sscans = 0x0779,
+    T_VEN0_025 = 0x07DE,
+    N_sscans_2 = 0x0845,
+    T_VEN0_026 = 0x08A1,
+    N_sscans_3 = 0x08E9,
+    T_VEN0_027 = 0x0921,
+    T_VEN0_015 = 0x09D0,
+    N_sscanw = 0x0A14,
+    T_VEN0_021 = 0x0A54,
+    T_VEN0_037 = 0x0A99,
+    T_VEN0_024 = 0x0B0B,
+    T_VEN0_038 = 0x0B99,
+    T_VEN0_013 = 0x0C03,
+    N_mscans = 0x0CA0,
+    T_VEN0N008 = 0x0D14,
+    N_kcutw = 0x0D66,
+    N_MUR3E2 = 0x0D8E,
+    N_s7r0s1 = 0x0DA6,
+    N_s7r0b1 = 0x0DC5,
+    T_VEN0N007 = 0x0E28,
+    T_VEN0N019 = 0x0EA4,
+    N_s7r0bf_2 = 0x0F07,
+    T_VEN0N009 = 0x0F30,
+    T_VEN0N010 = 0x104F,
+    T_VEN0N011 = 0x1093,
+    T_VEN0N012 = 0x10FF,
+    T_VEN0N000 = 0x1177,
+    T_VEN0N013 = 0x11E1,
+    T_VEN0N018 = 0x122D,
+    N_mscane = 0x12DD,
+    N_mscane_2 = 0x131D,
+    T_VEN2_098 = 0x1398,
+    T_VENA_F40 = 0x13F7,
+    T_VENA_F32 = 0x147E,
+    T_VENA_F34 = 0x158C,
+    T_VEN4N010 = 0x1626,
+    T_VEN6N007 = 0x1667,
+    T_MUD4_018 = 0x16BC,
+    T_BRIDU146 = 0x1701,
+    T_MUD4_018_2 = 0x1741,
+    T_VEN2U093 = 0x1785,
+    T_VEN2_028 = 0x17F0,
+    T_VEN2_066 = 0x183E,
+    N_Capt_Kirk = 0x19BE,
+    N_Dr_McCoy = 0x19C9,
+    N_Mr_Spock = 0x19D3,
+    N_Ensign_Kije = 0x19DD,
+    N_Mr_Scott = 0x19E9,
+    S_19F3 = 0x19F3,
+    N_Mr_Chekov = 0x1A05,
+    N_Lt_Uhura = 0x1A10,
+    N_Elasi_Captain = 0x1A1A,
+    S_1A28 = 0x1A28,
+    T_VEN0N016 = 0x1A29,
+    T_VEN0_022 = 0x1A4A,
+    T_VEN0_003 = 0x1A99,
+    T_VEN0_019 = 0x1AC0,
+    T_VEN0N004 = 0x1B5A,
+    T_VEN0N017 = 0x1BBF,
+    T_VEN0N005 = 0x1BE3,
+    T_VEN0N015 = 0x1C29,
+    T_VEN0N001 = 0x1C7B,
+    T_VEN0N006 = 0x1CCF,
+    T_VEN0N002 = 0x1CFA,
+    T_VEN0N003 = 0x1D4D,
+    T_VEN0_001 = 0x1DA9,
+    T_VEN0_023 = 0x1DF2,
+    T_VEN0_014 = 0x1E4A,
+    T_VEN0_036 = 0x1E8D,
+    T_VEN0_028 = 0x1EA9,
+    T_VEN0_002 = 0x1F10,
+    T_VEN0_029 = 0x1F3D,
+    T_VEN0_020 = 0x1FA5,
+    T_VEN0_031 = 0x1FEA,
+    T_VEN0_32 = 0x20CF,
+    T_VEN0_035 = 0x2119,
+    T_VEN0_033 = 0x2213,
+    T_VEN0_004 = 0x2240,
+    T_VEN0_016 = 0x2286,
+    T_VEN0_012 = 0x22B6,
+    T_VEN0_034 = 0x2328,
+    talk_buf = 0x2439,
+};
+
+/* the room's variables: in the room state, and in the file itself */
+#define fv_talk_buf CS_W(0x2439)
+#define rv_attack_timer ROOM_W(0x51)
+#define rv_beam ROOM_B(0x35)
+#define rv_board_timer ROOM_W(0x49)
+#define rv_clue_crewman ROOM_B(0x68)
+#define rv_clue_log ROOM_B(0x6B)
+#define rv_clue_records ROOM_B(0x6C)
+#define rv_complied ROOM_B(0x45)
+#define rv_comply_timer ROOM_W(0x4D)
+#define rv_elasi_here ROOM_B(0x43)
+#define rv_enterprise_away ROOM_B(0x36)
+#define rv_hypo_oiled ROOM_B(0x3A)
+#define rv_power_on ROOM_B(0x34)
+#define rv_power_to ROOM_B(0x3C)
+#define rv_read_log ROOM_B(0x31)
+#define rv_read_records ROOM_B(0x32)
+#define rv_rescued ROOM_B(0x42)
+#define rv_saw_crewman ROOM_B(0x30)
+#define rv_scott_left ROOM_B(0x2D)
+#define rv_stall_timer ROOM_W(0x4B)
+#define rv_torpedo_timer ROOM_W(0x4F)
+
+/* functions */
+static void veng0_StartRoom(void);
+static void veng0_Tick10(void);
+static void veng0_ScottLeaves(void);
+static void veng0_ToTurbolift(void);
+static void veng0_SpockScansComputer(void);
+static void veng0_SpockScansChair(void);
+static void veng0_E_08D6(void);
+static void veng0_SpockScans(void);
+static void veng0_McCoyOnBeam(void);
+static void veng0_E_0A0A(void);
+static void veng0_SpockOnBeam(void);
+static void veng0_KijeOnBeam(void);
+static void veng0_E_0AE8(void);
+static void veng0_SpockOnNavigation(void);
+static void veng0_SpockScansHelm(void);
+static void veng0_SpockScansNavigation(void);
+static void veng0_E_0B86(void);
+static void veng0_KijeOnNavigation(void);
+static void veng0_E_0BF0(void);
+static void veng0_PhaserBeam(void);
+static void veng0_E_0C76(void);
+static void veng0_McCoyScansPatterson(void);
+static void veng0_McCoyOnBody(void);
+static void veng0_MedkitOnBody(void);
+static void veng0_MedkitOnPatterson(void);
+static void veng0_McCoyScansBody(void);
+static void veng0_SawOnBeam(void);
+static void veng0_KirkAtBeam(void);
+static void veng0_Sawing(void);
+static void veng0_BeamCut(void);
+static void veng0_GetBeam(void);
+static void veng0_TalkToKirk(void);
+static void veng0_TalkToMcCoy(void);
+static void veng0_TalkToSpock(void);
+static void veng0_TalkToRedshirt(void);
+static void veng0_LookAtPatterson(void);
+static void veng0_LookAtBody(void);
+static void veng0_LookAtComputer(void);
+static void veng0_LookAtChair(void);
+static void veng0_LookAtKirk(void);
+static void veng0_LookAtSpock(void);
+static void veng0_LookAtMcCoy(void);
+static void veng0_LookAtRedshirt(void);
+static void veng0_LookAtViewscreen(void);
+static void veng0_LookAtHelm(void);
+static void veng0_LookAtNavigation(void);
+static void veng0_LookAtBeam(void);
+static void veng0_LookAtScene(void);
+static void veng0_LookAtCrewman(void);
+static void veng0_E_1290(void);
+static void veng0_McCoyScansCrewman(void);
+static void veng0_McCoyOnCrewman(void);
+static void veng0_McCoyAtCrewman(void);
+static void veng0_CrewmanDied(void);
+static void veng0_ElasiDeadlines(void);
+static void veng0_E_1578(void);
+static void veng0_KillAnything(void);
+static void veng0_LookAtHypo(void);
+static void veng0_CallEnterprise(void);
+static void veng0_Talk(uint16_t ax);
+static void veng0_Say(uint16_t ax, uint16_t bx);
+
+/* The room starts: the beam, fixed or fallen.
+ * [MSG_TICK 01 00 00] */
+static void veng0_StartRoom(void)
+{
+    svc_Sfx(N_VEN0LOOP);
+    if (rv_beam != 2) {
+        svc_Anim(8, N_s7r0bo, 0x28, 0xC6, 0);
+    } else {
+        svc_Anim(8, N_s7r0bf, 0xE, 0x9A, 0);
+    }
+    room.fall[0] = 1;
+    room.fall[1] = 1;
+    room.fall[2] = 1;
+    room.fall[3] = 1;
+    return;
+}
+
+/* [MSG_TICK 0A 00 00] */
+static void veng0_Tick10(void)
+{
+    return;
+}
+
+/* Tick 50, the first time: the Enterprise picks up a distress call, and
+ * Kirk sends it off, staying aboard (enterprise_away).
+ * [MSG_TICK 32 00 00] */
+static void veng0_ScottLeaves(void)
+{
+    if (rv_scott_left != 0) {
+    } else {
+        rv_scott_left = 1;
+        veng0_Say(N_Dr_McCoy, T_VEN0_018);
+        veng0_Say(N_Capt_Kirk, T_VEN0_006);
+        veng0_Say(N_Mr_Scott, T_VEN0_S12);
+        veng0_Say(N_Capt_Kirk, T_VEN0_008);
+        veng0_Say(N_Mr_Scott, T_VEN0_S52);
+        veng0_Say(N_Capt_Kirk, T_VEN0_007);
+        veng0_Say(N_Mr_Spock, T_VEN0_030);
+        veng0_Say(N_Mr_Scott, T_VEN0_S15);
+        veng0_Say(N_Capt_Kirk, T_VEN0_005);
+        veng0_Say(N_Mr_Chekov, T_VEN0_039);
+        veng0_Say(N_Capt_Kirk, T_VEN0_009);
+        veng0_Say(N_Mr_Scott, T_VEN0_S54);
+        veng0_Say(N_Capt_Kirk, T_VEN0_011);
+        veng0_Say(N_Capt_Kirk, T_VEN0_010);
+        veng0_Say(N_Dr_McCoy, T_VEN0_017);
+        rv_enterprise_away = 1;
+    }
+    return;
+}
+
+/* Exit 1: the turbolift.
+ * [MSG_EXIT 01 00 00] */
+static void veng0_ToTurbolift(void)
+{
+    svc_BridgeSfx(5);
+    svc_Turbolift(0, 0);
+    return;
+}
+
+/* Spock scans the computer (the Enterprise's transponder in the attack
+ * records) and the captain's chair (Patterson's last log).
+ * [MSG_USE 44 23 00] */
+static void veng0_SpockScansComputer(void)
+{
+    if (rv_read_records != 1) {
+        rv_read_records = 1;
+        rv_clue_records = 1;
+        svc_Anim(1, N_sscans, -1, -1, 0);
+        svc_BridgeSfx(4);
+        veng0_Say(N_Mr_Spock, T_VEN0_028);
+        veng0_Say(N_Capt_Kirk, T_VEN0_002);
+        veng0_Say(N_Mr_Spock, T_VEN0_029);
+        veng0_Say(N_Dr_McCoy, T_VEN0_020);
+        veng0_Say(N_Mr_Spock, T_VEN0_031);
+        return;
+    }
+    veng0_Say(N_Mr_Spock, T_VEN0_025);
+    return;
+}
+
+/* [MSG_USE 44 21 00] */
+static void veng0_SpockScansChair(void)
+{
+    if (rv_read_log != 1) {
+        rv_read_log = 1;
+        rv_clue_log = 1;
+        svc_Anim(1, N_sscans_2, -1, -1, 0);
+        svc_BridgeSfx(4);
+        veng0_Say(N_Mr_Spock, T_VEN0_32);
+        veng0_Say(S_19F3, T_VEN0_035);
+        veng0_Say(N_Mr_Spock, T_VEN0_033);
+        veng0_Say(N_Capt_Kirk, T_VEN0_004);
+        return;
+    }
+    veng0_Say(N_Mr_Spock, T_VEN0_026);
+    return;
+}
+
+/* [MSG_USE 44 27 00] */
+static void veng0_E_08D6(void)
+{
+    { veng0_SpockScans(); return; }
+}
+
+/* [MSG_USE 44 FF 00] */
+static void veng0_SpockScans(void)
+{
+    if (rv_power_on == 1) {
+    } else {
+        svc_Anim(1, N_sscans_3, -1, -1, 0);
+        svc_BridgeSfx(4);
+        veng0_Say(N_Mr_Spock, T_VEN0_027);
+        goto L09BE;
+    }
+L09BE:;
+    return;
+}
+
+/* The crew on the beam and the controls.
+ * [MSG_USE 02 08 00] */
+static void veng0_McCoyOnBeam(void)
+{
+    veng0_Say(N_Dr_McCoy, T_VEN0_015);
+    return;
+}
+
+/* [MSG_USE 44 08 00] */
+static void veng0_E_0A0A(void)
+{
+    { veng0_SpockOnBeam(); return; }
+}
+
+/* [MSG_USE 01 08 00] */
+static void veng0_SpockOnBeam(void)
+{
+    svc_Anim(1, N_sscanw, -1, -1, 0);
+    svc_BridgeSfx(4);
+    veng0_Say(N_Mr_Spock, T_VEN0_034);
+    veng0_Say(N_Dr_McCoy, T_VEN0_021);
+    return;
+}
+
+/* [MSG_USE 03 08 00] */
+static void veng0_KijeOnBeam(void)
+{
+    veng0_Say(N_Ensign_Kije, T_VEN0_037);
+    return;
+}
+
+/* [MSG_USE 01 26 00] */
+static void veng0_E_0AE8(void)
+{
+    { veng0_SpockOnNavigation(); return; }
+}
+
+/* [MSG_USE 01 25 00] */
+static void veng0_SpockOnNavigation(void)
+{
+    { veng0_SpockScansHelm(); return; }
+}
+
+/* [MSG_USE 44 26 00] */
+static void veng0_SpockScansHelm(void)
+{
+    { veng0_SpockScansNavigation(); return; }
+}
+
+/* [MSG_USE 44 25 00] */
+static void veng0_SpockScansNavigation(void)
+{
+    veng0_Say(N_Mr_Spock, T_VEN0_024);
+    return;
+}
+
+/* [MSG_USE 03 26 00] */
+static void veng0_E_0B86(void)
+{
+    { veng0_KijeOnNavigation(); return; }
+}
+
+/* [MSG_USE 03 25 00] */
+static void veng0_KijeOnNavigation(void)
+{
+    veng0_Say(N_Ensign_Kije, T_VEN0_038);
+    return;
+}
+
+/* Phasers on the beam.
+ * [MSG_USE 40 08 00] */
+static void veng0_E_0BF0(void)
+{
+    { veng0_PhaserBeam(); return; }
+}
+
+/* [MSG_USE 41 08 00] */
+static void veng0_PhaserBeam(void)
+{
+    veng0_Say(N_Mr_Spock, T_VEN0_013);
+    return;
+}
+
+/* McCoy and the bodies.
+ * [MSG_USE 02 24 00] */
+static void veng0_E_0C76(void)
+{
+    { veng0_McCoyScansPatterson(); return; }
+}
+
+/* [MSG_USE 45 24 00] */
+static void veng0_McCoyScansPatterson(void)
+{
+    { veng0_McCoyOnBody(); return; }
+}
+
+/* [MSG_USE 02 22 00] */
+static void veng0_McCoyOnBody(void)
+{
+    { veng0_MedkitOnBody(); return; }
+}
+
+/* [MSG_USE 7F 22 00] */
+static void veng0_MedkitOnBody(void)
+{
+    { veng0_MedkitOnPatterson(); return; }
+}
+
+/* [MSG_USE 7F 24 00] */
+static void veng0_MedkitOnPatterson(void)
+{
+    { veng0_McCoyScansBody(); return; }
+}
+
+/* [MSG_USE 45 22 00] */
+static void veng0_McCoyScansBody(void)
+{
+    svc_Anim(2, N_mscans, -1, -1, 0);
+    svc_BridgeSfx(4);
+    veng0_Say(N_Dr_McCoy, T_VEN0_016);
+    return;
+}
+
+/* The molecular saw on the beam (msgs 1, 2, timer 0): it comes free.
+ * [MSG_USE 86 08 00] */
+static void veng0_SawOnBeam(void)
+{
+    if (rv_beam != 1) {
+        if (rv_beam != 2) {
+            room.busy = 1;
+            svc_Walk(0, 0x24, 0xC2, 1);
+            return;
+        }
+    }
+    veng0_Say(0, T_VEN0N008);
+    return;
+}
+
+/* [MSG_WALK_DONE 01 00 00] */
+static void veng0_KirkAtBeam(void)
+{
+    svc_Anim(0, N_kcutw, -1, -1, 2);
+    room.timers[0] = 8;
+    return;
+}
+
+/* [MSG_TIMER 00 00 00] */
+static void veng0_Sawing(void)
+{
+    svc_Sfx(N_MUR3E2);
+    svc_Anim(9, N_s7r0s1, 0, 0xC7, 0);
+    svc_Anim(0xA, N_s7r0b1, 0, 0xC7, 0);
+    svc_BridgeSfx(6);
+    return;
+}
+
+/* [MSG_ANIM_DONE 02 00 00] */
+static void veng0_BeamCut(void)
+{
+    room.busy = 0;
+    svc_StopAnim(9);
+    svc_StopAnim(0xA);
+    veng0_Say(0, T_VEN0N007);
+    rv_beam = 1;
+    { veng0_GetBeam(); return; }
+}
+
+/* Taking the beam, once cut.
+ * [MSG_GET 08 00 00] */
+static void veng0_GetBeam(void)
+{
+    if (rv_beam != 1) {
+    } else {
+        veng0_Say(0, T_VEN0N019);
+        rv_beam = 2;
+        svc_GiveItem(IT_BEAM);
+        svc_Anim(8, N_s7r0bf_2, 0xE, 0x9A, 0);
+        return;
+    }
+    veng0_Say(0, T_VEN0N009);
+    return;
+}
+
+/* Talking and looking.
+ * [MSG_TALK 00 00 00] */
+static void veng0_TalkToKirk(void)
+{
+    veng0_Say(N_Capt_Kirk, T_VEN0_001);
+    return;
+}
+
+/* [MSG_TALK 02 00 00] */
+static void veng0_TalkToMcCoy(void)
+{
+    veng0_Say(N_Dr_McCoy, T_VEN0_014);
+    return;
+}
+
+/* [MSG_TALK 01 00 00] */
+static void veng0_TalkToSpock(void)
+{
+    if (rv_read_records == 1) {
+        if (rv_read_log == 1) {
+            veng0_Say(N_Mr_Spock, T_VEN0_012);
+            return;
+        }
+    }
+    veng0_Say(N_Mr_Spock, T_VEN0_023);
+    return;
+}
+
+/* [MSG_TALK 03 00 00] */
+static void veng0_TalkToRedshirt(void)
+{
+    veng0_Say(N_Ensign_Kije, T_VEN0_036);
+    return;
+}
+
+/* [MSG_LOOK 24 00 00] */
+static void veng0_LookAtPatterson(void)
+{
+    veng0_Say(0, T_VEN0N004);
+    return;
+}
+
+/* [MSG_LOOK 22 00 00] */
+static void veng0_LookAtBody(void)
+{
+    veng0_Say(0, T_VEN0N017);
+    return;
+}
+
+/* [MSG_LOOK 23 00 00] */
+static void veng0_LookAtComputer(void)
+{
+    veng0_Say(0, T_VEN0N005);
+    return;
+}
+
+/* [MSG_LOOK 21 00 00] */
+static void veng0_LookAtChair(void)
+{
+    veng0_Say(0, T_VEN0N015);
+    return;
+}
+
+/* [MSG_LOOK 00 00 00] */
+static void veng0_LookAtKirk(void)
+{
+    veng0_Say(0, T_VEN0N001);
+    return;
+}
+
+/* [MSG_LOOK 01 00 00] */
+static void veng0_LookAtSpock(void)
+{
+    veng0_Say(0, T_VEN0N006);
+    return;
+}
+
+/* [MSG_LOOK 02 00 00] */
+static void veng0_LookAtMcCoy(void)
+{
+    veng0_Say(0, T_VEN0N002);
+    return;
+}
+
+/* [MSG_LOOK 03 00 00] */
+static void veng0_LookAtRedshirt(void)
+{
+    veng0_Say(0, T_VEN0N003);
+    return;
+}
+
+/* [MSG_LOOK 27 00 00] */
+static void veng0_LookAtViewscreen(void)
+{
+    veng0_Say(0, T_VEN0N010);
+    return;
+}
+
+/* [MSG_LOOK 26 00 00] */
+static void veng0_LookAtHelm(void)
+{
+    veng0_Say(0, T_VEN0N011);
+    return;
+}
+
+/* [MSG_LOOK 25 00 00] */
+static void veng0_LookAtNavigation(void)
+{
+    veng0_Say(0, T_VEN0N012);
+    return;
+}
+
+/* [MSG_LOOK 08 00 00] */
+static void veng0_LookAtBeam(void)
+{
+    if (rv_beam != 1) {
+        veng0_Say(0, T_VEN0N000);
+        return;
+    }
+    veng0_Say(0, T_VEN0N013);
+    return;
+}
+
+/* [MSG_LOOK FF 00 00] */
+static void veng0_LookAtScene(void)
+{
+    veng0_Say(0, T_VEN0N018);
+    return;
+}
+
+/* [MSG_LOOK 20 00 00] */
+static void veng0_LookAtCrewman(void)
+{
+    veng0_Say(S_1A28, T_VEN0N016);
+    return;
+}
+
+/* The crewman: McCoy (msg 3, anim msg 1) finds he died moments ago
+ * (evidence).
+ * [MSG_USE 7F 20 00] */
+static void veng0_E_1290(void)
+{
+    { veng0_McCoyScansCrewman(); return; }
+}
+
+/* [MSG_USE 45 20 00] */
+static void veng0_McCoyScansCrewman(void)
+{
+    { veng0_McCoyOnCrewman(); return; }
+}
+
+/* [MSG_USE 02 20 00] */
+static void veng0_McCoyOnCrewman(void)
+{
+    if (rv_saw_crewman != 1) {
+        room.busy = 1;
+        room.fall[2] = 2;
+        svc_Walk(2, 0xDC, 0xA0, 3);
+        return;
+    }
+    veng0_Say(N_Dr_McCoy, T_VEN0_016);
+    return;
+}
+
+/* [MSG_WALK_DONE 03 00 00] */
+static void veng0_McCoyAtCrewman(void)
+{
+    rv_saw_crewman = 1;
+    rv_clue_crewman = 1;
+    svc_Anim(2, N_mscane, -1, -1, 0);
+    svc_BridgeSfx(4);
+    veng0_Say(N_Dr_McCoy, T_VEN0_022);
+    veng0_Say(N_Capt_Kirk, T_VEN0_003);
+    svc_Anim(2, N_mscane_2, -1, -1, 1);
+    return;
+}
+
+/* [MSG_ANIM_DONE 01 00 00] */
+static void veng0_CrewmanDied(void)
+{
+    veng0_Say(N_Dr_McCoy, T_VEN0_019);
+    room.busy = 0;
+    return;
+}
+
+/* Every tick, common to the mission's rooms: the Elasi deadlines set on
+ * the bridge (room 2). Until the Enterprise returns: boarding unless the
+ * shields are up, the thirty minutes, the wait after Kirk complies (then
+ * a warning and the torpedoes), the chance after they lower their
+ * shields. When one runs out, the game is over.
+ * [MSG_TICK FF FF FF] */
+static void veng0_ElasiDeadlines(void)
+{
+    if (rv_board_timer != 0) {
+        rv_board_timer--;
+        if (rv_board_timer == 0) {
+            if (rv_power_to != 2) {
+                goto L1468;
+            }
+        }
+    }
+    if (rv_stall_timer != 0) {
+        rv_stall_timer--;
+        if (rv_stall_timer == 0) {
+            if (rv_complied != 1) {
+                goto L1468;
+            }
+        }
+    }
+    if (rv_comply_timer != 0) {
+        rv_comply_timer--;
+        if (rv_comply_timer == 0) {
+            if (rv_rescued != 1) {
+                veng0_Say(N_Elasi_Captain, T_VEN2_098);
+                rv_torpedo_timer = 0xA8C;
+            }
+        }
+    }
+    if (rv_torpedo_timer != 0) {
+        rv_torpedo_timer--;
+        if (rv_torpedo_timer == 0) {
+            if (rv_rescued != 1) {
+                veng0_Say(0, T_VENA_F40);
+                svc_GameOver();
+            }
+        }
+    }
+    if (rv_attack_timer != 0) {
+        rv_attack_timer--;
+        if (rv_attack_timer == 0) {
+            if (rv_rescued != 1) {
+                goto L1468;
+            }
+        }
+    }
+    return;
+L1468:;
+    veng0_Say(0, T_VENA_F32);
+    svc_GameOver();
+    return;
+}
+
+/* [MSG_USE 40 FF 00] */
+static void veng0_E_1578(void)
+{
+    { veng0_KillAnything(); return; }
+}
+
+/* [MSG_USE 41 FF 00] */
+static void veng0_KillAnything(void)
+{
+    veng0_Say(N_Mr_Spock, T_VENA_F34);
+    return;
+}
+
+/* The hypo, empty or full of oil.
+ * [MSG_LOOK 82 00 00] */
+static void veng0_LookAtHypo(void)
+{
+    if (rv_hypo_oiled != 1) {
+        veng0_Say(0, T_VEN4N010);
+        return;
+    }
+    veng0_Say(0, T_VEN6N007);
+    return;
+}
+
+/* The communicator: before the Enterprise leaves, Uhura; while the Elasi
+ * jam it, Spock; otherwise Uhura, tracking the distress call.
+ * [MSG_USE 47 00 00] */
+static void veng0_CallEnterprise(void)
+{
+    if (rv_enterprise_away != 1) {
+        veng0_Say(N_Capt_Kirk, T_MUD4_018);
+        veng0_Say(N_Lt_Uhura, T_BRIDU146);
+        return;
+    }
+    if (rv_elasi_here == 1) {
+    } else {
+        veng0_Say(N_Capt_Kirk, T_MUD4_018_2);
+        veng0_Say(N_Lt_Uhura, T_VEN2U093);
+        veng0_Say(N_Capt_Kirk, T_VEN2_028);
+        return;
+    }
+    veng0_Say(N_Mr_Spock, T_VEN2_066);
+    return;
+}
+
+/* Talk: conversation AX (speaker, choices, 0); returns the choice. */
+static void veng0_Talk(uint16_t ax)
+{
+    svc_Talk(ax);
+    return;
+}
+
+/* Say: one line, BX, said by AX (0: narration). */
+static void veng0_Say(uint16_t ax, uint16_t bx)
+{
+    fv_talk_buf = ax;
+    CS_W(0x243B) = bx;
+    veng0_Talk(talk_buf);
+    return;
+}
+
+/* the scripts, by the offset of their code in the room file */
+const RoomScript veng0_scripts[] = {
+    { 0x00EC, veng0_StartRoom },    /* MSG_TICK 01 00 00 */
+    { 0x0163, veng0_Tick10 },    /* MSG_TICK 0A 00 00 */
+    { 0x016A, veng0_ScottLeaves },    /* MSG_TICK 32 00 00 */
+    { 0x0744, veng0_ToTurbolift },    /* MSG_EXIT 01 00 00 */
+    { 0x0769, veng0_SpockScansComputer },    /* MSG_USE 44 23 00 */
+    { 0x0835, veng0_SpockScansChair },    /* MSG_USE 44 21 00 */
+    { 0x08D6, veng0_E_08D6 },    /* MSG_USE 44 27 00 */
+    { 0x08DE, veng0_SpockScans },    /* MSG_USE 44 FF 00 */
+    { 0x09C5, veng0_McCoyOnBeam },    /* MSG_USE 02 08 00 */
+    { 0x0A0A, veng0_E_0A0A },    /* MSG_USE 44 08 00 */
+    { 0x0A12, veng0_SpockOnBeam },    /* MSG_USE 01 08 00 */
+    { 0x0A8E, veng0_KijeOnBeam },    /* MSG_USE 03 08 00 */
+    { 0x0AE8, veng0_E_0AE8 },    /* MSG_USE 01 26 00 */
+    { 0x0AF0, veng0_SpockOnNavigation },    /* MSG_USE 01 25 00 */
+    { 0x0AF8, veng0_SpockScansHelm },    /* MSG_USE 44 26 00 */
+    { 0x0B00, veng0_SpockScansNavigation },    /* MSG_USE 44 25 00 */
+    { 0x0B86, veng0_E_0B86 },    /* MSG_USE 03 26 00 */
+    { 0x0B8E, veng0_KijeOnNavigation },    /* MSG_USE 03 25 00 */
+    { 0x0BF0, veng0_E_0BF0 },    /* MSG_USE 40 08 00 */
+    { 0x0BF8, veng0_PhaserBeam },    /* MSG_USE 41 08 00 */
+    { 0x0C76, veng0_E_0C76 },    /* MSG_USE 02 24 00 */
+    { 0x0C7E, veng0_McCoyScansPatterson },    /* MSG_USE 45 24 00 */
+    { 0x0C86, veng0_McCoyOnBody },    /* MSG_USE 02 22 00 */
+    { 0x0C8E, veng0_MedkitOnBody },    /* MSG_USE 7F 22 00 */
+    { 0x0C96, veng0_MedkitOnPatterson },    /* MSG_USE 7F 24 00 */
+    { 0x0C9E, veng0_McCoyScansBody },    /* MSG_USE 45 22 00 */
+    { 0x0CDC, veng0_SawOnBeam },    /* MSG_USE 86 08 00 */
+    { 0x0D64, veng0_KirkAtBeam },    /* MSG_WALK_DONE 01 00 00 */
+    { 0x0D8C, veng0_Sawing },    /* MSG_TIMER 00 00 00 */
+    { 0x0DF9, veng0_BeamCut },    /* MSG_ANIM_DONE 02 00 00 */
+    { 0x0E90, veng0_GetBeam },    /* MSG_GET 08 00 00 */
+    { 0x0F76, veng0_TalkToKirk },    /* MSG_TALK 00 00 00 */
+    { 0x0F86, veng0_TalkToMcCoy },    /* MSG_TALK 02 00 00 */
+    { 0x0F96, veng0_TalkToSpock },    /* MSG_TALK 01 00 00 */
+    { 0x0FBC, veng0_TalkToRedshirt },    /* MSG_TALK 03 00 00 */
+    { 0x0FCC, veng0_LookAtPatterson },    /* MSG_LOOK 24 00 00 */
+    { 0x0FDB, veng0_LookAtBody },    /* MSG_LOOK 22 00 00 */
+    { 0x0FEA, veng0_LookAtComputer },    /* MSG_LOOK 23 00 00 */
+    { 0x0FF9, veng0_LookAtChair },    /* MSG_LOOK 21 00 00 */
+    { 0x1008, veng0_LookAtKirk },    /* MSG_LOOK 00 00 00 */
+    { 0x1017, veng0_LookAtSpock },    /* MSG_LOOK 01 00 00 */
+    { 0x1026, veng0_LookAtMcCoy },    /* MSG_LOOK 02 00 00 */
+    { 0x1035, veng0_LookAtRedshirt },    /* MSG_LOOK 03 00 00 */
+    { 0x1044, veng0_LookAtViewscreen },    /* MSG_LOOK 27 00 00 */
+    { 0x1088, veng0_LookAtHelm },    /* MSG_LOOK 26 00 00 */
+    { 0x10F4, veng0_LookAtNavigation },    /* MSG_LOOK 25 00 00 */
+    { 0x1166, veng0_LookAtBeam },    /* MSG_LOOK 08 00 00 */
+    { 0x1222, veng0_LookAtScene },    /* MSG_LOOK FF 00 00 */
+    { 0x1280, veng0_LookAtCrewman },    /* MSG_LOOK 20 00 00 */
+    { 0x1290, veng0_E_1290 },    /* MSG_USE 7F 20 00 */
+    { 0x1298, veng0_McCoyScansCrewman },    /* MSG_USE 45 20 00 */
+    { 0x12A0, veng0_McCoyOnCrewman },    /* MSG_USE 02 20 00 */
+    { 0x12D3, veng0_McCoyAtCrewman },    /* MSG_WALK_DONE 03 00 00 */
+    { 0x1340, veng0_CrewmanDied },    /* MSG_ANIM_DONE 01 00 00 */
+    { 0x1354, veng0_ElasiDeadlines },    /* MSG_TICK FF FF FF */
+    { 0x1578, veng0_E_1578 },    /* MSG_USE 40 FF 00 */
+    { 0x1580, veng0_KillAnything },    /* MSG_USE 41 FF 00 */
+    { 0x1615, veng0_LookAtHypo },    /* MSG_LOOK 82 00 00 */
+    { 0x16AB, veng0_CallEnterprise },    /* MSG_USE 47 00 00 */
+    { 0, 0 }
+};

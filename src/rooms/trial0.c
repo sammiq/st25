@@ -1,0 +1,754 @@
+/* TRIAL0.RDF: the room's scripts, translated from the machine code in the room file
+ * (src/rdf/trial0.asm) by tools/rdf2c.py.  They run on the loaded file (CS_B/CS_W) and the
+ * room state (`room`), and call the game through the svc_ macros of rooms.h.
+ *
+ * TRIAL0.RDF - "The Feathered Serpent", part two (the trial): the Klingon
+ * court on Hrakkour, a world destroyed in the war.
+ * Admiral Vlict tries Quetzecoatl. Kirk can let the trial run (he is
+ * dismissed as a coward, and the mission ends), or claim a warrior's
+ * trial for Quetzecoatl: the Test of Life, which starts in room 1.
+ *
+ * Actors: 8 Vlict, 9 the guard, 10 (0Ah) Quetzecoatl.
+ * Objects: 8 Vlict, 9 the guard, 0Ah Quetzecoatl, 23h the bench, 25h the
+ * city, 26h the seal (walk: step forward).
+ * Timer 0: background sounds.
+ *
+ * Labels: H_ script headers, L branch targets, C_ conversations,
+ * T_/N_/S_ strings; talk_buf: the conversation buffer of Say.
+ *
+ * Quirks of the original:
+ * - The conversation at 00CE is built at run time.
+ */
+
+#include "rooms.h"
+
+/* where the file keeps its strings, conversations and tables */
+enum {
+    talk_buf = 0x00CE,
+    N_Capt_Kirk = 0x0117,
+    N_Dr_McCoy = 0x0122,
+    N_Mr_Spock = 0x012C,
+    N_Ensign_Bennie = 0x0136,
+    N_Lt_Uhura = 0x0144,
+    N_Vlict = 0x014E,
+    N_Klingon_Guard = 0x0154,
+    N_Quetzecoatl = 0x0162,
+    N_TRI0LOOP = 0x01EE,
+    N_vlict1 = 0x021F,
+    N_kgstnd = 0x023E,
+    N_qteleg = 0x025D,
+    T_TRI0_058 = 0x028D,
+    T_TRI0_053 = 0x033F,
+    T_TRI0_019 = 0x03BD,
+    T_TRI0_016 = 0x043B,
+    T_TRI0_021 = 0x0496,
+    T_TRI0_054 = 0x0546,
+    T_TRI0_004 = 0x0614,
+    T_TRI0_047 = 0x0681,
+    T_TRI0_011 = 0x0728,
+    T_TRI0_018 = 0x07B9,
+    T_TRI0_015 = 0x0813,
+    T_TRI0_043 = 0x0892,
+    T_TRI0_002 = 0x090B,
+    T_TRI0_056 = 0x09C4,
+    T_TRI0_061 = 0x0A0A,
+    T_TRI0_001 = 0x0AA8,
+    T_TRI0_060 = 0x0B23,
+    T_TRI0_048 = 0x0BA5,
+    T_TRI0_041 = 0x0C34,
+    T_TRI0_050 = 0x0CC5,
+    T_TRI0_039 = 0x0D78,
+    T_TRI0_059 = 0x0DDE,
+    T_TRI0_040 = 0x0EB5,
+    T_TRI0_046 = 0x0EF7,
+    T_TRI0_023 = 0x0F78,
+    T_TRI0_006 = 0x1001,
+    T_TRI0_010 = 0x10AC,
+    T_TRI0_017 = 0x1139,
+    T_TRI0_020 = 0x11DA,
+    T_TRI0_008 = 0x1271,
+    T_TRI0_057 = 0x130E,
+    T_TRI0_003 = 0x1356,
+    T_TRI0_051 = 0x1393,
+    T_TRI0_009 = 0x1438,
+    T_TRI0_014 = 0x1495,
+    T_TRI0_013 = 0x152F,
+    T_TRI0_055 = 0x15F3,
+    T_TRI0_045 = 0x169B,
+    T_TRI0_049 = 0x17A6,
+    T_TRI0_044 = 0x17F4,
+    T_TRI0N007 = 0x18DB,
+    T_TRI0N001 = 0x1980,
+    T_TRI0N000 = 0x19DC,
+    T_TRI0N006 = 0x1A7A,
+    T_TRI0N008 = 0x1B1D,
+    T_TRI0N004 = 0x1B6D,
+    T_TRI0N005 = 0x1BF6,
+    T_TRI0N002 = 0x1C77,
+    T_TRI0N003 = 0x1D09,
+    T_TRI0N009 = 0x1D79,
+    T_TRI0_062 = 0x1DEC,
+    T_TRI0_F24 = 0x1E44,
+    T_TRI0_065 = 0x1E81,
+    T_TRI0_007 = 0x1EE7,
+    T_TRI0_064 = 0x1F09,
+    T_TRI0_022 = 0x1F89,
+    T_TRI0_066 = 0x2023,
+    T_TRI0_042 = 0x204D,
+    T_TRI0_031 = 0x20B2,
+    T_TRI0_025 = 0x20F8,
+    T_TRI0_063 = 0x216D,
+    T_TRI0_026 = 0x21BC,
+    T_TRI0_036 = 0x225A,
+    T_TRI4_076 = 0x22DF,
+    T_TRI0_F24_2 = 0x2347,
+    N_mscans = 0x2386,
+    T_TRI0_029 = 0x23BD,
+    N_mscans_2 = 0x23FD,
+    T_TRI0_030 = 0x2434,
+    N_mscans_3 = 0x2470,
+    T_TRI0_035 = 0x24A7,
+    N_sscans = 0x24D8,
+    T_TRI0_037 = 0x250F,
+    T_TRI0_038 = 0x2595,
+    T_TRI0U075 = 0x25CB,
+    T_TRI0_024 = 0x267A,
+    T_TRI0_027 = 0x26E4,
+    T_TRI0_028 = 0x2731,
+    T_TRI0_034 = 0x278D,
+    rdf_scripts_end = 0x27DE,
+};
+
+/* the room's variables: in the room state, and in the file itself */
+#define fv_choice_jumps CS_W(0xE2)
+#define fv_talk_buf CS_W(0xCE)
+#define rv_ending ROOM_W(0x5F)
+#define rv_max_score ROOM_W(0x2B)
+#define rv_score ROOM_W(0x29)
+
+/* functions */
+static void trial0_Talk(uint16_t ax);
+static void trial0_Say(uint16_t ax, uint16_t bx);
+static void trial0_StartRoom(void);
+static void trial0_VlictOpens(void);
+static void trial0_Ambience(void);
+static void trial0_StandForth(void);
+static void trial0_TheTrial(void);
+static void trial0_LookAtCity(void);
+static void trial0_LookAtVlict(void);
+static void trial0_LookAtGuard(void);
+static void trial0_LookAtBench(void);
+static void trial0_LookAtSeal(void);
+static void trial0_LookAtKirk(void);
+static void trial0_LookAtSpock(void);
+static void trial0_LookAtMcCoy(void);
+static void trial0_LookAtRedshirt(void);
+static void trial0_LookAtQuetzecoatl(void);
+static void trial0_TalkToVlict(void);
+static void trial0_TalkToGuard(void);
+static void trial0_TalkToQuetzecoatl(void);
+static void trial0_TalkToMcCoy(void);
+static void trial0_TalkToSpock(void);
+static void trial0_TalkToRedshirt(void);
+static void trial0_StunAnything(void);
+static void trial0_KillAnything(void);
+static void trial0_RockAtAnyone(void);
+static void trial0_part_21B0(void);
+static void trial0_SnakeOnVlict(void);
+static void trial0_SnakeOnGuard(void);
+static void trial0_McCoyScansQuetzecoatl(void);
+static void trial0_McCoyScansVlict(void);
+static void trial0_McCoyScans(void);
+static void trial0_SpockScansCity(void);
+static void trial0_SpockScans(void);
+static void trial0_UseCommunicator(void);
+static void trial0_SpockOnGuard(void);
+static void trial0_KirkOnGuard(void);
+static void trial0_BennieOnGuard(void);
+static void trial0_SpockOnVlict(void);
+static void trial0_BennieOnVlict(void);
+static void trial0_KirkOnVlict(void);
+static void trial0_part_266F(void);
+static void trial0_McCoyOnVlict(void);
+static void trial0_McCoyOnGuard(void);
+static void trial0_UseMedkit(void);
+
+/* Talk: conversation AX (speaker, choices, 0); returns the choice. */
+static void trial0_Talk(uint16_t ax)
+{
+    svc_Talk(ax);
+    return;
+}
+
+/* Say: one line, BX, said by AX (0: narration). */
+static void trial0_Say(uint16_t ax, uint16_t bx)
+{
+    fv_talk_buf = ax;
+    CS_W(0xD0) = bx;
+    CS_W(0xD2) = 0;
+    trial0_Talk(talk_buf);
+    return;
+}
+
+/* The room starts: the score's maximum, Vlict, the guard, Quetzecoatl.
+ * [MSG_TICK 01 00 00] */
+static void trial0_StartRoom(void)
+{
+    uint16_t ax = 0;
+    svc_Sfx(N_TRI0LOOP);
+    ax = (uint16_t)svc_Random(0xB4, 0x258);
+    room.timers[0] = ax;
+    rv_max_score = 0x1D;
+    svc_Anim(8, N_vlict1, 0x9F, 0x48, 0);
+    svc_Anim(9, N_kgstnd, 0xDC, 0x6A, 0);
+    svc_Anim(0xA, N_qteleg, 0x10E, 0xAA, 0);
+    return;
+}
+
+/* Tick 40: Vlict calls the trial to order.
+ * [MSG_TICK 28 00 00] */
+static void trial0_VlictOpens(void)
+{
+    trial0_Say(N_Vlict, T_TRI0_058);
+    return;
+}
+
+/* Timer 0: a random sound, again in 180-600 ticks.
+ * [MSG_TIMER 00 00 00] */
+static void trial0_Ambience(void)
+{
+    uint16_t ax = 0;
+    ax = (uint16_t)svc_Random(0xB4, 0x258);
+    room.timers[0] = ax;
+    return;
+}
+
+/* Kirk steps forward (msg 1) and the trial is held: a run of
+ * conversations built at run time (talk_buf, choice_jumps). Claiming a
+ * warrior's rights for Quetzecoatl sends the party to the Test of Life
+ * (room 1); letting the trial run ends the mission (ending 0).
+ * [MSG_WALK 26 00 00] */
+static void trial0_StandForth(void)
+{
+    room.busy = 1;
+    room.fall[0] = 0;
+    svc_Walk(0, 0xA0, 0xAA, 1);
+    return;
+}
+
+/* [MSG_WALK_DONE 01 00 00] */
+static void trial0_TheTrial(void)
+{
+    uint16_t ax = 0, si = 0;
+    uint16_t stk[32 + 8] = { 0 };       /* the top 8 are what a service call reads past the stack */
+    int sp_ = 32;
+    room.busy = 0;
+    trial0_Say(N_Vlict, T_TRI0_053);
+    fv_talk_buf = N_Capt_Kirk;
+    CS_W(0xD0) = T_TRI0_019;
+    fv_choice_jumps = 0x535;
+    CS_W(0xD2) = T_TRI0_016;
+    CS_W(0xE4) = 0x535;
+    CS_W(0xD4) = T_TRI0_021;
+    CS_W(0xE6) = 0x535;
+    CS_W(0xD6) = 0;
+    stk[--sp_] = talk_buf;
+    stk[--sp_] = 3;
+    ax = (uint16_t)ScriptService(stk[sp_], stk[sp_ + 1], stk[sp_ + 2], stk[sp_ + 3], stk[sp_ + 4], stk[sp_ + 5]);
+    sp_ += 2;
+    ax = ax << 1;
+    si = ax;
+    switch (CS_W(0xE2 + si)) {
+    case 0x0535: goto L0535;
+    case 0x0882: goto L0882;
+    case 0x0B94: goto L0B94;
+    case 0x1121: goto L1121;
+    case 0x12FE: goto L12FE;
+    case 0x15E2: goto L15E2;
+    case 0x168A: goto L168A;
+    case 0x1782: goto L1782;
+    default: return;
+    }
+L0535:;
+    trial0_Say(N_Vlict, T_TRI0_054);
+    trial0_Say(N_Capt_Kirk, T_TRI0_004);
+    trial0_Say(N_Vlict, T_TRI0_047);
+    fv_talk_buf = N_Capt_Kirk;
+    CS_W(0xD0) = T_TRI0_011;
+    fv_choice_jumps = 0x882;
+    CS_W(0xD2) = T_TRI0_018;
+    CS_W(0xE4) = 0xB94;
+    CS_W(0xD4) = T_TRI0_015;
+    CS_W(0xE6) = 0x1782;
+    CS_W(0xD6) = 0;
+    stk[--sp_] = talk_buf;
+    stk[--sp_] = 3;
+    ax = (uint16_t)ScriptService(stk[sp_], stk[sp_ + 1], stk[sp_ + 2], stk[sp_ + 3], stk[sp_ + 4], stk[sp_ + 5]);
+    sp_ += 2;
+    ax = ax << 1;
+    si = ax;
+    switch (CS_W(0xE2 + si)) {
+    case 0x0535: goto L0535;
+    case 0x0882: goto L0882;
+    case 0x0B94: goto L0B94;
+    case 0x1121: goto L1121;
+    case 0x12FE: goto L12FE;
+    case 0x15E2: goto L15E2;
+    case 0x168A: goto L168A;
+    case 0x1782: goto L1782;
+    default: return;
+    }
+L0882:;
+    trial0_Say(N_Vlict, T_TRI0_043);
+    trial0_Say(N_Capt_Kirk, T_TRI0_002);
+    trial0_Say(N_Vlict, T_TRI0_056);
+    trial0_Say(N_Vlict, T_TRI0_061);
+    trial0_Say(N_Capt_Kirk, T_TRI0_001);
+    trial0_Say(N_Vlict, T_TRI0_060);
+    room.busy = 1;
+    stk[--sp_] = 4;
+    stk[--sp_] = 1;
+    stk[--sp_] = 6;
+    ScriptService(stk[sp_], stk[sp_ + 1], stk[sp_ + 2], stk[sp_ + 3], stk[sp_ + 4], stk[sp_ + 5]);
+L0B94:;
+    trial0_Say(N_Vlict, T_TRI0_048);
+    trial0_Say(N_Quetzecoatl, T_TRI0_041);
+    trial0_Say(N_Vlict, T_TRI0_050);
+    trial0_Say(N_Quetzecoatl, T_TRI0_039);
+    trial0_Say(N_Vlict, T_TRI0_059);
+    trial0_Say(N_Quetzecoatl, T_TRI0_040);
+    trial0_Say(N_Vlict, T_TRI0_046);
+    fv_talk_buf = N_Capt_Kirk;
+    CS_W(0xD0) = T_TRI0_023;
+    fv_choice_jumps = 0x1121;
+    CS_W(0xD2) = T_TRI0_006;
+    CS_W(0xE4) = 0x1121;
+    CS_W(0xD4) = T_TRI0_010;
+    CS_W(0xE6) = 0x1782;
+    CS_W(0xD6) = 0;
+    stk[--sp_] = talk_buf;
+    stk[--sp_] = 3;
+    ax = (uint16_t)ScriptService(stk[sp_], stk[sp_ + 1], stk[sp_ + 2], stk[sp_ + 3], stk[sp_ + 4], stk[sp_ + 5]);
+    sp_ += 2;
+    ax = ax << 1;
+    si = ax;
+    switch (CS_W(0xE2 + si)) {
+    case 0x0535: goto L0535;
+    case 0x0882: goto L0882;
+    case 0x0B94: goto L0B94;
+    case 0x1121: goto L1121;
+    case 0x12FE: goto L12FE;
+    case 0x15E2: goto L15E2;
+    case 0x168A: goto L168A;
+    case 0x1782: goto L1782;
+    default: return;
+    }
+L1121:;
+    trial0_Say(N_Vlict, rdf_scripts_end);
+    fv_talk_buf = N_Capt_Kirk;
+    CS_W(0xD0) = T_TRI0_017;
+    fv_choice_jumps = 0x12FE;
+    CS_W(0xD2) = T_TRI0_020;
+    CS_W(0xE4) = 0x12FE;
+    CS_W(0xD4) = T_TRI0_008;
+    CS_W(0xE6) = 0x1782;
+    CS_W(0xD6) = 0;
+    stk[--sp_] = talk_buf;
+    stk[--sp_] = 3;
+    ax = (uint16_t)ScriptService(stk[sp_], stk[sp_ + 1], stk[sp_ + 2], stk[sp_ + 3], stk[sp_ + 4], stk[sp_ + 5]);
+    sp_ += 2;
+    ax = ax << 1;
+    si = ax;
+    switch (CS_W(0xE2 + si)) {
+    case 0x0535: goto L0535;
+    case 0x0882: goto L0882;
+    case 0x0B94: goto L0B94;
+    case 0x1121: goto L1121;
+    case 0x12FE: goto L12FE;
+    case 0x15E2: goto L15E2;
+    case 0x168A: goto L168A;
+    case 0x1782: goto L1782;
+    default: return;
+    }
+L12FE:;
+    trial0_Say(N_Vlict, T_TRI0_057);
+    trial0_Say(N_Capt_Kirk, T_TRI0_003);
+    trial0_Say(N_Vlict, T_TRI0_051);
+    fv_talk_buf = N_Capt_Kirk;
+    CS_W(0xD0) = T_TRI0_009;
+    fv_choice_jumps = 0x15E2;
+    CS_W(0xD2) = T_TRI0_014;
+    CS_W(0xE4) = 0x15E2;
+    CS_W(0xD4) = T_TRI0_013;
+    CS_W(0xE6) = 0x168A;
+    CS_W(0xD6) = 0;
+    stk[--sp_] = talk_buf;
+    stk[--sp_] = 3;
+    ax = (uint16_t)ScriptService(stk[sp_], stk[sp_ + 1], stk[sp_ + 2], stk[sp_ + 3], stk[sp_ + 4], stk[sp_ + 5]);
+    sp_ += 2;
+    ax = ax << 1;
+    si = ax;
+    switch (CS_W(0xE2 + si)) {
+    case 0x0535: goto L0535;
+    case 0x0882: goto L0882;
+    case 0x0B94: goto L0B94;
+    case 0x1121: goto L1121;
+    case 0x12FE: goto L12FE;
+    case 0x15E2: goto L15E2;
+    case 0x168A: goto L168A;
+    case 0x1782: goto L1782;
+    default: return;
+    }
+L15E2:;
+    trial0_Say(N_Vlict, T_TRI0_055);
+    room.busy = 1;
+    stk[--sp_] = 4;
+    stk[--sp_] = 1;
+    stk[--sp_] = 6;
+    ScriptService(stk[sp_], stk[sp_ + 1], stk[sp_ + 2], stk[sp_ + 3], stk[sp_ + 4], stk[sp_ + 5]);
+L168A:;
+    trial0_Say(N_Vlict, T_TRI0_045);
+    room.busy = 1;
+    stk[--sp_] = 4;
+    stk[--sp_] = 1;
+    stk[--sp_] = 6;
+    ScriptService(stk[sp_], stk[sp_ + 1], stk[sp_ + 2], stk[sp_ + 3], stk[sp_ + 4], stk[sp_ + 5]);
+L1782:;
+    stk[--sp_] = 0xFFFF;
+    stk[--sp_] = 2;
+    stk[--sp_] = 0x10;
+    ScriptService(stk[sp_], stk[sp_ + 1], stk[sp_ + 2], stk[sp_ + 3], stk[sp_ + 4], stk[sp_ + 5]);
+    sp_ += 3;
+    trial0_Say(N_Vlict, T_TRI0_049);
+    trial0_Say(N_Vlict, T_TRI0_044);
+    rv_ending = 0;
+    stk[--sp_] = 0;
+    stk[--sp_] = rv_max_score;
+    stk[--sp_] = rv_score;
+    stk[--sp_] = 0x11;
+    ScriptService(stk[sp_], stk[sp_ + 1], stk[sp_ + 2], stk[sp_ + 3], stk[sp_ + 4], stk[sp_ + 5]);
+    sp_ += 4;
+    return;
+}
+
+/* Looking and talking.
+ * [MSG_LOOK 25 00 00] */
+static void trial0_LookAtCity(void)
+{
+    trial0_Say(0, T_TRI0N007);
+    return;
+}
+
+/* [MSG_LOOK 08 00 00] */
+static void trial0_LookAtVlict(void)
+{
+    trial0_Say(0, T_TRI0N001);
+    return;
+}
+
+/* [MSG_LOOK 09 00 00] */
+static void trial0_LookAtGuard(void)
+{
+    trial0_Say(0, T_TRI0N000);
+    return;
+}
+
+/* [MSG_LOOK 23 00 00] */
+static void trial0_LookAtBench(void)
+{
+    trial0_Say(0, T_TRI0N006);
+    return;
+}
+
+/* [MSG_LOOK 26 00 00] */
+static void trial0_LookAtSeal(void)
+{
+    trial0_Say(0, T_TRI0N008);
+    return;
+}
+
+/* [MSG_LOOK 00 00 00] */
+static void trial0_LookAtKirk(void)
+{
+    trial0_Say(0, T_TRI0N004);
+    return;
+}
+
+/* [MSG_LOOK 01 00 00] */
+static void trial0_LookAtSpock(void)
+{
+    trial0_Say(0, T_TRI0N005);
+    return;
+}
+
+/* [MSG_LOOK 02 00 00] */
+static void trial0_LookAtMcCoy(void)
+{
+    trial0_Say(0, T_TRI0N002);
+    return;
+}
+
+/* [MSG_LOOK 03 00 00] */
+static void trial0_LookAtRedshirt(void)
+{
+    trial0_Say(0, T_TRI0N003);
+    return;
+}
+
+/* [MSG_LOOK 0A 00 00] */
+static void trial0_LookAtQuetzecoatl(void)
+{
+    trial0_Say(0, T_TRI0N009);
+    return;
+}
+
+/* [MSG_TALK 08 00 00] */
+static void trial0_TalkToVlict(void)
+{
+    trial0_Say(N_Vlict, T_TRI0_062);
+    return;
+}
+
+/* [MSG_TALK 09 00 00] */
+static void trial0_TalkToGuard(void)
+{
+    trial0_Say(N_Klingon_Guard, T_TRI0_F24);
+    trial0_Say(N_Ensign_Bennie, T_TRI0_065);
+    trial0_Say(N_Capt_Kirk, T_TRI0_007);
+    trial0_Say(N_Ensign_Bennie, T_TRI0_064);
+    trial0_Say(N_Capt_Kirk, T_TRI0_022);
+    trial0_Say(N_Ensign_Bennie, T_TRI0_066);
+    return;
+}
+
+/* [MSG_TALK 0A 00 00] */
+static void trial0_TalkToQuetzecoatl(void)
+{
+    trial0_Say(N_Quetzecoatl, T_TRI0_042);
+    return;
+}
+
+/* [MSG_TALK 02 00 00] */
+static void trial0_TalkToMcCoy(void)
+{
+    trial0_Say(N_Dr_McCoy, T_TRI0_031);
+    return;
+}
+
+/* [MSG_TALK 01 00 00] */
+static void trial0_TalkToSpock(void)
+{
+    trial0_Say(N_Mr_Spock, T_TRI0_025);
+    return;
+}
+
+/* [MSG_TALK 03 00 00] */
+static void trial0_TalkToRedshirt(void)
+{
+    trial0_Say(N_Ensign_Bennie, T_TRI0_063);
+    return;
+}
+
+/* [MSG_USE 40 FF 00] */
+static void trial0_StunAnything(void)
+{
+    { trial0_part_21B0(); return; }
+}
+
+/* [MSG_USE 41 FF 00] */
+static void trial0_KillAnything(void)
+{
+    { trial0_part_21B0(); return; }
+}
+
+/* Attacking anyone: Spock and McCoy object.
+ * [MSG_USE 43 FF 00] */
+static void trial0_RockAtAnyone(void)
+{
+    { trial0_part_21B0(); return; }
+}
+
+static void trial0_part_21B0(void)
+{
+    trial0_Say(N_Mr_Spock, T_TRI0_026);
+    trial0_Say(N_Dr_McCoy, T_TRI0_036);
+    return;
+}
+
+/* [MSG_USE 76 08 00] */
+static void trial0_SnakeOnVlict(void)
+{
+    trial0_Say(N_Vlict, T_TRI4_076);
+    return;
+}
+
+/* [MSG_USE 76 09 00] */
+static void trial0_SnakeOnGuard(void)
+{
+    trial0_Say(N_Klingon_Guard, T_TRI0_F24_2);
+    return;
+}
+
+/* Tricorders, the communicator, and the crew on the Klingons.
+ * [MSG_USE 45 0A 00] */
+static void trial0_McCoyScansQuetzecoatl(void)
+{
+    room.fall[2] = 1;
+    svc_Anim(2, N_mscans, -1, -1, 0);
+    svc_BridgeSfx(4);
+    trial0_Say(N_Dr_McCoy, T_TRI0_029);
+    return;
+}
+
+/* [MSG_USE 45 08 00] */
+static void trial0_McCoyScansVlict(void)
+{
+    room.fall[2] = 1;
+    svc_Anim(2, N_mscans_2, -1, -1, 0);
+    svc_BridgeSfx(4);
+    trial0_Say(N_Dr_McCoy, T_TRI0_030);
+    return;
+}
+
+/* [MSG_USE 45 FF 00] */
+static void trial0_McCoyScans(void)
+{
+    room.fall[2] = 1;
+    svc_Anim(2, N_mscans_3, -1, -1, 0);
+    svc_BridgeSfx(4);
+    trial0_Say(N_Dr_McCoy, T_TRI0_035);
+    return;
+}
+
+/* [MSG_USE 44 25 00] */
+static void trial0_SpockScansCity(void)
+{
+    room.fall[1] = 1;
+    svc_Anim(1, N_sscans, -1, -1, 0);
+    svc_BridgeSfx(4);
+    trial0_Say(N_Mr_Spock, T_TRI0_037);
+    return;
+}
+
+/* [MSG_USE 44 FF 00] */
+static void trial0_SpockScans(void)
+{
+    trial0_Say(N_Mr_Spock, T_TRI0_038);
+    return;
+}
+
+/* [MSG_USE 47 FF 00] */
+static void trial0_UseCommunicator(void)
+{
+    trial0_Say(N_Lt_Uhura, T_TRI0U075);
+    return;
+}
+
+/* [MSG_USE 01 09 00] */
+static void trial0_SpockOnGuard(void)
+{
+    { trial0_part_266F(); return; }
+}
+
+/* [MSG_USE 00 09 00] */
+static void trial0_KirkOnGuard(void)
+{
+    { trial0_part_266F(); return; }
+}
+
+/* [MSG_USE 03 09 00] */
+static void trial0_BennieOnGuard(void)
+{
+    { trial0_part_266F(); return; }
+}
+
+/* [MSG_USE 01 08 00] */
+static void trial0_SpockOnVlict(void)
+{
+    { trial0_part_266F(); return; }
+}
+
+/* [MSG_USE 03 08 00] */
+static void trial0_BennieOnVlict(void)
+{
+    { trial0_part_266F(); return; }
+}
+
+/* [MSG_USE 00 08 00] */
+static void trial0_KirkOnVlict(void)
+{
+    { trial0_part_266F(); return; }
+}
+
+static void trial0_part_266F(void)
+{
+    trial0_Say(N_Mr_Spock, T_TRI0_024);
+    return;
+}
+
+/* [MSG_USE 02 08 00] */
+static void trial0_McCoyOnVlict(void)
+{
+    trial0_Say(N_Dr_McCoy, T_TRI0_027);
+    return;
+}
+
+/* [MSG_USE 02 09 00] */
+static void trial0_McCoyOnGuard(void)
+{
+    trial0_Say(N_Dr_McCoy, T_TRI0_028);
+    return;
+}
+
+/* [MSG_USE 7F FF 00] */
+static void trial0_UseMedkit(void)
+{
+    trial0_Say(N_Dr_McCoy, T_TRI0_034);
+    return;
+}
+
+/* the scripts, by the offset of their code in the room file */
+const RoomScript trial0_scripts[] = {
+    { 0x01EC, trial0_StartRoom },    /* MSG_TICK 01 00 00 */
+    { 0x0282, trial0_VlictOpens },    /* MSG_TICK 28 00 00 */
+    { 0x02EC, trial0_Ambience },    /* MSG_TIMER 00 00 00 */
+    { 0x0305, trial0_StandForth },    /* MSG_WALK 26 00 00 */
+    { 0x0330, trial0_TheTrial },    /* MSG_WALK_DONE 01 00 00 */
+    { 0x18CF, trial0_LookAtCity },    /* MSG_LOOK 25 00 00 */
+    { 0x1975, trial0_LookAtVlict },    /* MSG_LOOK 08 00 00 */
+    { 0x19D0, trial0_LookAtGuard },    /* MSG_LOOK 09 00 00 */
+    { 0x1A6E, trial0_LookAtBench },    /* MSG_LOOK 23 00 00 */
+    { 0x1B12, trial0_LookAtSeal },    /* MSG_LOOK 26 00 00 */
+    { 0x1B62, trial0_LookAtKirk },    /* MSG_LOOK 00 00 00 */
+    { 0x1BEB, trial0_LookAtSpock },    /* MSG_LOOK 01 00 00 */
+    { 0x1C6B, trial0_LookAtMcCoy },    /* MSG_LOOK 02 00 00 */
+    { 0x1CFE, trial0_LookAtRedshirt },    /* MSG_LOOK 03 00 00 */
+    { 0x1D6E, trial0_LookAtQuetzecoatl },    /* MSG_LOOK 0A 00 00 */
+    { 0x1DE1, trial0_TalkToVlict },    /* MSG_TALK 08 00 00 */
+    { 0x1E39, trial0_TalkToGuard },    /* MSG_TALK 09 00 00 */
+    { 0x2042, trial0_TalkToQuetzecoatl },    /* MSG_TALK 0A 00 00 */
+    { 0x20A7, trial0_TalkToMcCoy },    /* MSG_TALK 02 00 00 */
+    { 0x20ED, trial0_TalkToSpock },    /* MSG_TALK 01 00 00 */
+    { 0x2162, trial0_TalkToRedshirt },    /* MSG_TALK 03 00 00 */
+    { 0x219E, trial0_StunAnything },    /* MSG_USE 40 FF 00 */
+    { 0x21A6, trial0_KillAnything },    /* MSG_USE 41 FF 00 */
+    { 0x21AE, trial0_RockAtAnyone },    /* MSG_USE 43 FF 00 */
+    { 0x22D4, trial0_SnakeOnVlict },    /* MSG_USE 76 08 00 */
+    { 0x233C, trial0_SnakeOnGuard },    /* MSG_USE 76 09 00 */
+    { 0x2380, trial0_McCoyScansQuetzecoatl },    /* MSG_USE 45 0A 00 */
+    { 0x23F7, trial0_McCoyScansVlict },    /* MSG_USE 45 08 00 */
+    { 0x246A, trial0_McCoyScans },    /* MSG_USE 45 FF 00 */
+    { 0x24D2, trial0_SpockScansCity },    /* MSG_USE 44 25 00 */
+    { 0x258A, trial0_SpockScans },    /* MSG_USE 44 FF 00 */
+    { 0x25C0, trial0_UseCommunicator },    /* MSG_USE 47 FF 00 */
+    { 0x2645, trial0_SpockOnGuard },    /* MSG_USE 01 09 00 */
+    { 0x264D, trial0_KirkOnGuard },    /* MSG_USE 00 09 00 */
+    { 0x2655, trial0_BennieOnGuard },    /* MSG_USE 03 09 00 */
+    { 0x265D, trial0_SpockOnVlict },    /* MSG_USE 01 08 00 */
+    { 0x2665, trial0_BennieOnVlict },    /* MSG_USE 03 08 00 */
+    { 0x266D, trial0_KirkOnVlict },    /* MSG_USE 00 08 00 */
+    { 0x26D9, trial0_McCoyOnVlict },    /* MSG_USE 02 08 00 */
+    { 0x2726, trial0_McCoyOnGuard },    /* MSG_USE 02 09 00 */
+    { 0x2782, trial0_UseMedkit },    /* MSG_USE 7F FF 00 */
+    { 0, 0 }
+};

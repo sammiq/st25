@@ -56,6 +56,10 @@
 #define _fstrupr    strupr
 #define strcmpi     strcasecmp
 
+/* the original runtime's qsort: it orders elements that compare equal in its own way (src/qsort.c) */
+void ms_qsort(void *base, size_t num, size_t width, int (*cmp)(const void *, const void *));
+#define qsort       ms_qsort
+
 /* Case-insensitive/in-place string helpers that are not in ISO C. */
 char *strupr(char *s);
 char *strlwr(char *s);

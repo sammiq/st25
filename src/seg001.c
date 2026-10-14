@@ -465,6 +465,34 @@ void BridgeLoop(void)
         }
         switch (ev.type) {
         case EV_TICK:
+            {   /* test hook: STARTREK_LOAD=savegame.N loads that save a few seconds into the bridge */
+                static int loaded;
+                const char *ld = loaded || bridge_ticks != 60 ? NULL : getenv("STARTREK_LOAD");
+
+                if (ld) {
+                    extern char save_path[80];
+                    extern void LoadGame(void);
+
+                    loaded = 1;
+                    fprintf(stderr, "test hook: load %s\n", ld);
+                    strcpy(save_path, ld);
+                    LoadGame();
+                }
+            }
+            {   /* test hook: STARTREK_ORDER=n posts crew order n after the load */
+                static int ordered;
+                static int n_ticks;
+                const char *od = ordered || ++n_ticks != 350 ? NULL : getenv("STARTREK_ORDER");
+
+                if (od) {
+                    ordered = 1;
+                    fprintf(stderr, "test hook: order %s\n", od);
+                    if (!strcmp(od, "orbit"))
+                        Orbit(1, 1);    /* as if the destination were reached */
+                    else
+                        PostRoomMsg(1, (int16_t)strtol(od, 0, 0), 0, 0);
+                }
+            }
             PostRoomMsg(0, (int16_t)bridge_ticks & 0xFF, (int16_t)(bridge_ticks >> 8) & 0xFF, (int16_t)(bridge_ticks >> 16) & 0xFF);
             blink_count++;
             bridge_ticks++;

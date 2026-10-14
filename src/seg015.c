@@ -10,6 +10,7 @@
 #include "cache.h"
 #include "resource.h"
 #include "sound.h"
+#include "audio.h"
 
 /* Globals this file owns (declared in the headers). */
 int16_t digi_driver;
@@ -107,21 +108,65 @@ int16_t *blaster_vals[4] = {
 int16_t sound_closed = 0;
 
 /* The original's timer interrupt ran the digital sound tick (DigiTick) 18
- * times a second; the host calls DigiTick through the audio layer now. */
+ * times a second: the host calls it at that rate from its event pump. */
 void HookTimer(void)
 {
+    plat_set_timer_callback(DigiTick);
 }
 
 void UnhookTimer(void)
 {
+    plat_set_timer_callback(0);
 }
 
-/* Start the sound system: music and digital sound.  (No sound yet.) */
+/* Start the sound system: the emulated AdLib/Sound Blaster FM for music and
+ * the emulated Sound Blaster DAC for digital sound.  (The drivers the
+ * original loaded from .ADV files are not needed: audio/ is their stand-in.) */
 void SoundInit(void)
 {
-    midi_ok = 0;
-    digi_ok = 0;
-    no_midi = 1;
+    int rate;
+    int16_t i;
+    uint16_t size;
+    GTLEntry *e;
+    MemHandle h;
+    char *gtl;
+
+    if (!plat_audio_open(&rate)) {
+        no_midi = 1;
+        return;
+    }
+    fm_init(rate);
+    sb_init(rate);
+    midi_ok = 1;
+    digi_ok = 1;
+    midi_handle = 0;
+    digi_handle = 1;
+    dma_buf = PushMem(0x2000);
+    HookTimer();
+    StreamInit();
+    size = AIL_state_table_size(midi_handle);
+    for (i = 0; i < NUM_SEQ; i++) {
+        seq_state[i] = PushMem(size);
+        seq_handles[i] = -1;
+    }
+    strcpy(midi_suffix, "ad");
+    timbre_cache_size = 0;
+    h = getanyfile("gtl", midi_suffix);
+    gtl = LockMem(h);
+    for (e = (GTLEntry *)gtl; e->bank != -1; e++)
+        AIL_install_timbre(midi_handle, e->bank, e->patch, gtl + e->offset);
+    UnlockMem(h);
+    FreeAnyFile(h);
+    strcpy(music_name, "");
+    music_data = 0;
+    ListInit(&seq_list);
+    for (i = 1; i < NUM_SEQ; i++) {
+        seq_nodes[i].slot = i;
+        ListAdd(&seq_list, &seq_nodes[i].node);
+        seq_ids[i] = -1;
+    }
+    music_on = 1;
+    sfx_on = 1;
 }
 
 /* Read the BLASTER environment variable into desc (A port, I irq, D dma,
@@ -178,8 +223,11 @@ void SoundStop(void)
 {
     if (digi_ok)
         UnhookTimer();
-    if (midi_ok || digi_ok)
+    if (midi_ok || digi_ok) {
         AIL_shutdown(0);
+        sb_stop();
+        plat_audio_close();
+    }
 }
 
 void StopSeq(uint16_t slot)
@@ -267,17 +315,11 @@ int16_t SoundShutdown(void)
         PopMem();
     no_midi = 1;
     midi_ok = 0;
-    if (timbre_cache_size)
-        PopMem();
     for (i = 0; i < NUM_SEQ; i++)
         PopMem();
-    if (digi_ok) {
+    if (digi_ok)
         PopMem();
-        if (dma_buf_moved)
-            PopMem();
-        PopMem();
-    }
-    PopMem();
+    digi_ok = 0;
     sound_closed = 1;
     return 1;
 }

@@ -7,12 +7,13 @@
 #include "cache.h"
 #include "gfx.h"
 #include "event.h"
+#include "platform.h"
 #include "sound.h"
 #include "sprite.h"
 #include "fixmath.h"
 #include "obj3d.h"
 
-#define VGA_MEM ((char *)0xA0000000L)
+#define VGA_MEM ((char *)plat_vram())
 
 void BridgeSfx(int16_t n);              /* seg001 */
 void CyclePalette(void);               /* seg000 */

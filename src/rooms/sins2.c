@@ -1,0 +1,690 @@
+/* SINS2.RDF: the room's scripts, translated from the machine code in the room file
+ * (src/rdf/sins2.asm) by tools/rdf2c.py.  They run on the loaded file (CS_B/CS_W) and the
+ * room state (`room`), and call the game through the svc_ macros of rooms.h.
+ *
+ * SINS2.RDF - "Sins of Omission", the airlock between the two doors of
+ * the Lucrs' Scythe missile base. Its terminal tells the base's history;
+ * the inner door's keypad wants a code in base three.
+ *
+ * Actors: 8 the inner door.
+ * Objects: 8 the chamber beyond, 20h the terminal, 21h the door, 22h the
+ * keypad. Exits: 0 room 4, 1 room 1.
+ *
+ * Labels: H_ script headers, L branch targets, C_ conversations,
+ * T_/N_/S_ strings; talk_buf: the conversation buffer of Say.
+ *
+ * Quirks of the original:
+ * - The conversation at 00D8 is built at run time.
+ */
+
+#include "rooms.h"
+
+/* where the file keeps its strings, conversations and tables */
+enum {
+    N_sscans = 0x00CA,
+    N_mscans = 0x00D1,
+    talk_buf = 0x00D8,
+    N_Capt_Kirk = 0x012D,
+    N_Dr_McCoy = 0x0138,
+    N_Mr_Spock = 0x0142,
+    N_Ensign_Mosher = 0x014C,
+    N_Lt_Uhura = 0x015A,
+    N_Mr_Scott = 0x0164,
+    N_SIN2LOOP = 0x0200,
+    N_s2dro = 0x023D,
+    N_sins22 = 0x025A,
+    N_sins2 = 0x0271,
+    T_SIN2_025 = 0x029E,
+    T_SIN2_026 = 0x0315,
+    T_SIN2_002 = 0x037C,
+    N_EFX14S = 0x03E2,
+    N_susehw = 0x03FA,
+    T_SIN2_042 = 0x0428,
+    T_SIN2_044 = 0x0467,
+    T_SIN2_015 = 0x0549,
+    T_SIN2_032 = 0x059C,
+    T_SIN2_050 = 0x0667,
+    T_SIN2_043 = 0x06EA,
+    T_SIN2_041 = 0x07B6,
+    T_SIN2_040 = 0x087A,
+    T_SIN2_021 = 0x08FF,
+    T_SIN2_034 = 0x0944,
+    T_SIN2_031 = 0x0A1A,
+    T_SIN2_038 = 0x0A7F,
+    T_SIN2_020 = 0x0B13,
+    T_SIN2_033 = 0x0B78,
+    T_SIN2_007 = 0x0BFE,
+    T_SIN2_037 = 0x0C93,
+    T_SIN2_022 = 0x0CC4,
+    T_SIN2_029 = 0x0CE6,
+    T_SIN2_012 = 0x0DBA,
+    T_SIN2_045 = 0x0E1F,
+    N_sscanw = 0x0E83,
+    T_SIN2_009 = 0x0EBA,
+    N_sscann = 0x0F26,
+    T_SIN2_028 = 0x0F5D,
+    N_sscann_2 = 0x0FCD,
+    T_SIN2_027 = 0x1005,
+    T_SIN2_001 = 0x10E4,
+    N_122 = 0x114A,
+    N_EFX28S = 0x116F,
+    N_susehe = 0x1187,
+    N_sins22_2 = 0x11B6,
+    N_BIGDOOR3 = 0x11CC,
+    N_s2door = 0x11E6,
+    N_EFX28S_2 = 0x1205,
+    N_susehe_2 = 0x121D,
+    T_SIN2_024 = 0x124B,
+    T_SIN2_010 = 0x12CB,
+    T_SIN2_005 = 0x13BC,
+    T_SIN2_S05 = 0x13FC,
+    T_SIN2U085 = 0x1484,
+    T_SIN2_008 = 0x1518,
+    T_SIN2U097 = 0x1545,
+    T_SIN2_F26 = 0x15D7,
+    T_SIN2U096 = 0x1627,
+    T_SIN2_019 = 0x16AE,
+    T_SIN2_004 = 0x16ED,
+    T_SIN2N006 = 0x173C,
+    T_SIN2N007 = 0x17AC,
+    T_SIN2N000 = 0x17E7,
+    T_SIN2N001 = 0x189D,
+    T_SIN2N003 = 0x18D7,
+    T_SIN2N005 = 0x1933,
+    T_SIN2N004 = 0x1988,
+    T_SIN2N002 = 0x19DC,
+    T_SIN2_003 = 0x1A43,
+    T_SIN2_039 = 0x1A9D,
+    T_SIN2_016 = 0x1B44,
+    T_SIN2_023 = 0x1B98,
+    T_SIN2_049 = 0x1BF3,
+    T_SIN2_047 = 0x1CA0,
+    T_SIN2N008 = 0x1D64,
+    T_SIN2_F12 = 0x1DB8,
+    T_SIN2_048 = 0x1E73,
+    T_SIN2_030 = 0x1EEA,
+    T_SIN2_006 = 0x1FB4,
+    T_SIN2_S16 = 0x1FF3,
+    T_SIN2_017 = 0x2068,
+    T_SIN1U070 = 0x20B2,
+    T_SIN2_014 = 0x210A,
+    T_SIN3_008 = 0x218F,
+    T_SIN2_013 = 0x220D,
+    T_SIN2_046 = 0x2274,
+    rdf_scripts_end = 0x22F8,
+};
+
+/* the room's variables: in the room state, and in the file itself */
+#define fv_talk_buf CS_W(0xD8)
+#define rv_door_open2 ROOM_B(0x3E)
+#define rv_read_history ROOM_B(0x35)
+#define rv_score ROOM_W(0x52)
+#define rv_virus_cured ROOM_B(0x46)
+#define rv_virus_found ROOM_B(0x44)
+
+/* functions */
+static void sins2_Talk(uint16_t ax);
+static void sins2_Say(uint16_t ax, uint16_t bx);
+static void sins2_StartRoom(void);
+static void sins2_E_028B(void);
+static void sins2_PhaserDoor(void);
+static void sins2_SpockScans(void);
+static void sins2_KirkOnTerminal(void);
+static void sins2_SpockOnTerminal(void);
+static void sins2_SpockAtTerminal(void);
+static void sins2_BaseHistory(void);
+static void sins2_McCoyOnTerminal(void);
+static void sins2_MosherOnTerminal(void);
+static void sins2_SpockScansTerminal(void);
+static void sins2_SpockScansKeypad(void);
+static void sins2_SpockScansDoor(void);
+static void sins2_KirkOnKeypad(void);
+static void sins2_SpockOnKeypad(void);
+static void sins2_EnterCode(void);
+static void sins2_DoorOpens(void);
+static void sins2_WrongCode(void);
+static void sins2_DoorOpened(void);
+static void sins2_UhuraFindsVirus(void);
+static void sins2_LookAtScene(void);
+static void sins2_LookAtChamber(void);
+static void sins2_LookAtTerminal(void);
+static void sins2_LookAtKeypad(void);
+static void sins2_LookAtKirk(void);
+static void sins2_LookAtSpock(void);
+static void sins2_LookAtMcCoy(void);
+static void sins2_LookAtRedshirt(void);
+static void sins2_TalkToKirk(void);
+static void sins2_TalkToSpock(void);
+static void sins2_TalkToMcCoy(void);
+static void sins2_TalkToRedshirt(void);
+static void sins2_LookAtDoor(void);
+static void sins2_SpockReadsDoor(void);
+static void sins2_UseCommunicator(void);
+static void sins2_E_20E7(void);
+static void sins2_MedkitOnSpock(void);
+static void sins2_MedkitOnMcCoy(void);
+static void sins2_MedkitOnRedshirt(void);
+static void sins2_E_214B(void);
+static void sins2_E_2153(void);
+static void sins2_E_215B(void);
+static void sins2_McCoyScansRedshirt(void);
+static void sins2_McCoyOnKeypad(void);
+static void sins2_MosherOnKeypad(void);
+static void sins2_WalkThrough(void);
+static void sins2_WalkThrough2(void);
+
+/* Talk: conversation AX (speaker, choices, 0); returns the choice. */
+static void sins2_Talk(uint16_t ax)
+{
+    svc_Talk(ax);
+    return;
+}
+
+/* Say: one line, BX, said by AX (0: narration). */
+static void sins2_Say(uint16_t ax, uint16_t bx)
+{
+    fv_talk_buf = ax;
+    CS_W(0xDA) = bx;
+    CS_W(0xDC) = 0;
+    sins2_Talk(talk_buf);
+    return;
+}
+
+/* The room starts: the inner door. Until Uhura's call (tick 40) the
+ * party can't move.
+ * [MSG_TICK 01 00 00] */
+static void sins2_StartRoom(void)
+{
+    svc_Sfx(N_SIN2LOOP);
+    svc_Music(0x1B, -3);
+    if (rv_virus_found == 0) {
+        room.busy = 2;
+    }
+    if (rv_door_open2 == 1) {
+        svc_Anim(8, N_s2dro, 0, 0, 1);
+        svc_LoadMap(N_sins22);
+        return;
+    }
+    svc_LoadMap(N_sins2);
+    return;
+}
+
+/* Phasers and tricorders.
+ * [MSG_USE 41 21 00] */
+static void sins2_E_028B(void)
+{
+    { sins2_PhaserDoor(); return; }
+}
+
+/* [MSG_USE 40 21 00] */
+static void sins2_PhaserDoor(void)
+{
+    sins2_Say(N_Mr_Spock, T_SIN2_025);
+    return;
+}
+
+/* [MSG_USE 44 FF 00] */
+static void sins2_SpockScans(void)
+{
+    svc_Anim(1, N_sscans, -1, -1, 0);
+    svc_BridgeSfx(4);
+    sins2_Say(N_Mr_Spock, T_SIN2_026);
+    return;
+}
+
+/* The terminal: Spock reads it (msgs 5, 6, +2 once): the Lucrs' Scythe
+ * base, a thousand years old, has woken and is about to attack Proxtrey.
+ * [MSG_USE 00 20 00] */
+static void sins2_KirkOnTerminal(void)
+{
+    sins2_Say(N_Capt_Kirk, T_SIN2_002);
+    { sins2_SpockOnTerminal(); return; }
+}
+
+/* [MSG_USE 01 20 00] */
+static void sins2_SpockOnTerminal(void)
+{
+    room.fall[1] = 3;
+    svc_Walk(1, 0x5F, 0xA7, 5);
+    return;
+}
+
+/* [MSG_WALK_DONE 05 00 00] */
+static void sins2_SpockAtTerminal(void)
+{
+    svc_Sfx(N_EFX14S);
+    svc_Anim(1, N_susehw, -1, -1, 6);
+    return;
+}
+
+/* [MSG_ANIM_DONE 06 00 00] */
+static void sins2_BaseHistory(void)
+{
+    sins2_Say(N_Mr_Spock, T_SIN2_042);
+    sins2_Say(N_Mr_Spock, T_SIN2_044);
+    if (rv_read_history != 1) {
+        rv_score += 2;
+        rv_read_history = 1;
+    }
+    sins2_Say(N_Dr_McCoy, T_SIN2_015);
+    sins2_Say(N_Mr_Spock, T_SIN2_032);
+    sins2_Say(N_Ensign_Mosher, T_SIN2_050);
+    sins2_Say(N_Mr_Spock, rdf_scripts_end);
+    sins2_Say(N_Mr_Spock, T_SIN2_043);
+    sins2_Say(N_Mr_Spock, T_SIN2_041);
+    sins2_Say(N_Mr_Spock, T_SIN2_040);
+    sins2_Say(N_Dr_McCoy, T_SIN2_021);
+    sins2_Say(N_Mr_Spock, T_SIN2_034);
+    sins2_Say(N_Mr_Spock, T_SIN2_031);
+    sins2_Say(N_Mr_Spock, T_SIN2_038);
+    sins2_Say(N_Dr_McCoy, T_SIN2_020);
+    sins2_Say(N_Mr_Spock, T_SIN2_033);
+    sins2_Say(N_Capt_Kirk, T_SIN2_007);
+    sins2_Say(N_Mr_Spock, T_SIN2_037);
+    sins2_Say(N_Dr_McCoy, T_SIN2_022);
+    sins2_Say(N_Mr_Spock, T_SIN2_029);
+    return;
+}
+
+/* The others on the terminal.
+ * [MSG_USE 02 20 00] */
+static void sins2_McCoyOnTerminal(void)
+{
+    sins2_Say(N_Dr_McCoy, T_SIN2_012);
+    return;
+}
+
+/* [MSG_USE 03 20 00] */
+static void sins2_MosherOnTerminal(void)
+{
+    sins2_Say(N_Ensign_Mosher, T_SIN2_045);
+    return;
+}
+
+/* Tricorders.
+ * [MSG_USE 44 20 00] */
+static void sins2_SpockScansTerminal(void)
+{
+    svc_Anim(1, N_sscanw, -1, -1, 0);
+    svc_BridgeSfx(4);
+    sins2_Say(N_Mr_Spock, T_SIN2_009);
+    return;
+}
+
+/* [MSG_USE 44 22 00] */
+static void sins2_SpockScansKeypad(void)
+{
+    svc_Anim(1, N_sscann, -1, -1, 0);
+    svc_BridgeSfx(4);
+    sins2_Say(N_Mr_Spock, T_SIN2_028);
+    return;
+}
+
+/* [MSG_USE 44 21 00] */
+static void sins2_SpockScansDoor(void)
+{
+    svc_Anim(1, N_sscann_2, -1, -1, 0);
+    svc_BridgeSfx(4);
+    sins2_Say(N_Mr_Spock, T_SIN2_027);
+    return;
+}
+
+/* The keypad: Spock enters the code typed (msg 2): "122" opens the
+ * inner door (anim msgs 3, 1); anything else fails (msg 4).
+ * [MSG_USE 00 22 00] */
+static void sins2_KirkOnKeypad(void)
+{
+    if (rv_door_open2 != 1) {
+        sins2_Say(N_Capt_Kirk, T_SIN2_001);
+        { sins2_SpockOnKeypad(); return; }
+    }
+    return;
+}
+
+/* [MSG_USE 01 22 00] */
+static void sins2_SpockOnKeypad(void)
+{
+    if (rv_door_open2 == 0) {
+        svc_Walk(1, 0xC3, 0x9B, 2);
+    }
+    return;
+}
+
+/* [MSG_WALK_DONE 02 00 00] */
+static void sins2_EnterCode(void)
+{
+    uint16_t ax = 0;
+    ax = (uint16_t)svc_InputCode(N_122);
+    if (ax != 1) {
+    } else {
+        svc_Sfx(N_EFX28S);
+        svc_Anim(1, N_susehe, -1, -1, 3);
+        return;
+    }
+    svc_Sfx(N_EFX28S_2);
+    svc_Anim(1, N_susehe_2, -1, -1, 4);
+    return;
+}
+
+/* [MSG_ANIM_DONE 03 00 00] */
+static void sins2_DoorOpens(void)
+{
+    rv_door_open2 = 1;
+    svc_LoadMap(N_sins22_2);
+    svc_Sfx(N_BIGDOOR3);
+    svc_Anim(8, N_s2door, 0, 0, 1);
+    return;
+}
+
+/* [MSG_ANIM_DONE 04 00 00] */
+static void sins2_WrongCode(void)
+{
+    sins2_Say(0, T_SIN2_024);
+    return;
+}
+
+/* [MSG_ANIM_DONE 01 00 00] */
+static void sins2_DoorOpened(void)
+{
+    sins2_Say(N_Mr_Spock, T_SIN2_010);
+    return;
+}
+
+/* Tick 40, once: Uhura has traced the virus to the moon's computers.
+ * [MSG_TICK 28 00 00] */
+static void sins2_UhuraFindsVirus(void)
+{
+    if (rv_virus_found != 0) {
+    } else {
+        room.busy = 0;
+        sins2_Say(N_Capt_Kirk, T_SIN2_005);
+        sins2_Say(N_Mr_Scott, T_SIN2_S05);
+        sins2_Say(N_Lt_Uhura, T_SIN2U085);
+        sins2_Say(N_Capt_Kirk, T_SIN2_008);
+        sins2_Say(N_Lt_Uhura, T_SIN2U097);
+        sins2_Say(N_Dr_McCoy, T_SIN2_F26);
+        sins2_Say(N_Lt_Uhura, T_SIN2U096);
+        sins2_Say(N_Dr_McCoy, T_SIN2_019);
+        sins2_Say(N_Capt_Kirk, T_SIN2_004);
+        rv_virus_found = 1;
+    }
+    return;
+}
+
+/* Looking and talking.
+ * [MSG_LOOK FF 00 00] */
+static void sins2_LookAtScene(void)
+{
+    sins2_Say(0, T_SIN2N006);
+    return;
+}
+
+/* [MSG_LOOK 08 00 00] */
+static void sins2_LookAtChamber(void)
+{
+    sins2_Say(0, T_SIN2N007);
+    return;
+}
+
+/* [MSG_LOOK 20 00 00] */
+static void sins2_LookAtTerminal(void)
+{
+    sins2_Say(0, T_SIN2N000);
+    return;
+}
+
+/* [MSG_LOOK 22 00 00] */
+static void sins2_LookAtKeypad(void)
+{
+    sins2_Say(0, T_SIN2N001);
+    return;
+}
+
+/* [MSG_LOOK 00 00 00] */
+static void sins2_LookAtKirk(void)
+{
+    sins2_Say(0, T_SIN2N003);
+    return;
+}
+
+/* [MSG_LOOK 01 00 00] */
+static void sins2_LookAtSpock(void)
+{
+    sins2_Say(0, T_SIN2N005);
+    return;
+}
+
+/* [MSG_LOOK 02 00 00] */
+static void sins2_LookAtMcCoy(void)
+{
+    sins2_Say(0, T_SIN2N004);
+    return;
+}
+
+/* [MSG_LOOK 03 00 00] */
+static void sins2_LookAtRedshirt(void)
+{
+    sins2_Say(0, T_SIN2N002);
+    return;
+}
+
+/* [MSG_TALK 00 00 00] */
+static void sins2_TalkToKirk(void)
+{
+    sins2_Say(N_Capt_Kirk, T_SIN2_003);
+    return;
+}
+
+/* [MSG_TALK 01 00 00] */
+static void sins2_TalkToSpock(void)
+{
+    sins2_Say(N_Mr_Spock, T_SIN2_039);
+    sins2_Say(N_Dr_McCoy, T_SIN2_016);
+    return;
+}
+
+/* [MSG_TALK 02 00 00] */
+static void sins2_TalkToMcCoy(void)
+{
+    sins2_Say(N_Dr_McCoy, T_SIN2_023);
+    sins2_Say(N_Ensign_Mosher, T_SIN2_049);
+    return;
+}
+
+/* [MSG_TALK 03 00 00] */
+static void sins2_TalkToRedshirt(void)
+{
+    sins2_Say(N_Ensign_Mosher, T_SIN2_047);
+    return;
+}
+
+/* [MSG_LOOK 21 00 00] */
+static void sins2_LookAtDoor(void)
+{
+    if (rv_door_open2 == 0) {
+        sins2_Say(0, T_SIN2N008);
+        goto L1D9C;
+    }
+L1D9C:;
+    return;
+}
+
+/* Spock reads the writing on the door.
+ * [MSG_USE 01 21 00] */
+static void sins2_SpockReadsDoor(void)
+{
+    if (rv_door_open2 != 0) {
+    } else {
+        sins2_Say(N_Mr_Spock, T_SIN2_F12);
+        sins2_Say(N_Ensign_Mosher, T_SIN2_048);
+        sins2_Say(N_Mr_Spock, T_SIN2_030);
+        goto L1F99;
+    }
+L1F99:;
+    return;
+}
+
+/* The communicator and the medkit.
+ * [MSG_USE 47 FF 00] */
+static void sins2_UseCommunicator(void)
+{
+    if (rv_virus_cured != 0) {
+    } else {
+        sins2_Say(N_Capt_Kirk, T_SIN2_006);
+        sins2_Say(N_Mr_Scott, T_SIN2_S16);
+        sins2_Say(N_Dr_McCoy, T_SIN2_017);
+        goto L20A1;
+    }
+L20A1:;
+    if (rv_virus_cured == 1) {
+        sins2_Say(N_Lt_Uhura, T_SIN1U070);
+        goto L20E0;
+    }
+L20E0:;
+    return;
+}
+
+/* [MSG_USE 7F 00 00] */
+static void sins2_E_20E7(void)
+{
+    { sins2_MedkitOnSpock(); return; }
+}
+
+/* [MSG_USE 7F 01 00] */
+static void sins2_MedkitOnSpock(void)
+{
+    { sins2_MedkitOnMcCoy(); return; }
+}
+
+/* [MSG_USE 7F 02 00] */
+static void sins2_MedkitOnMcCoy(void)
+{
+    { sins2_MedkitOnRedshirt(); return; }
+}
+
+/* [MSG_USE 7F 03 00] */
+static void sins2_MedkitOnRedshirt(void)
+{
+    sins2_Say(N_Dr_McCoy, T_SIN2_014);
+    return;
+}
+
+/* [MSG_USE 45 00 00] */
+static void sins2_E_214B(void)
+{
+    { sins2_McCoyScansRedshirt(); return; }
+}
+
+/* [MSG_USE 45 01 00] */
+static void sins2_E_2153(void)
+{
+    { sins2_McCoyScansRedshirt(); return; }
+}
+
+/* [MSG_USE 45 02 00] */
+static void sins2_E_215B(void)
+{
+    { sins2_McCoyScansRedshirt(); return; }
+}
+
+/* [MSG_USE 45 03 00] */
+static void sins2_McCoyScansRedshirt(void)
+{
+    svc_Anim(2, N_mscans, -1, -1, 0);
+    svc_BridgeSfx(4);
+    sins2_Say(N_Dr_McCoy, T_SIN3_008);
+    return;
+}
+
+/* [MSG_USE 02 22 00] */
+static void sins2_McCoyOnKeypad(void)
+{
+    if (rv_door_open2 != 1) {
+        sins2_Say(N_Dr_McCoy, T_SIN2_013);
+        goto L225C;
+    }
+L225C:;
+    return;
+}
+
+/* [MSG_USE 03 22 00] */
+static void sins2_MosherOnKeypad(void)
+{
+    if (rv_door_open2 != 1) {
+        sins2_Say(N_Ensign_Mosher, T_SIN2_046);
+        goto L22A5;
+    }
+L22A5:;
+    return;
+}
+
+/* Walking through the open door (room 4).
+ * [MSG_WALK 21 00 00] */
+static void sins2_WalkThrough(void)
+{
+    if (rv_door_open2 == 1) {
+        svc_Walk(0, 0x9C, 0x8B, 0);
+    }
+    return;
+}
+
+/* [MSG_WALK 08 00 00] */
+static void sins2_WalkThrough2(void)
+{
+    if (rv_door_open2 == 1) {
+        svc_Walk(0, 0x9C, 0x8B, 0);
+    }
+    return;
+}
+
+/* the scripts, by the offset of their code in the room file */
+const RoomScript sins2_scripts[] = {
+    { 0x01FE, sins2_StartRoom },    /* MSG_TICK 01 00 00 */
+    { 0x028B, sins2_E_028B },    /* MSG_USE 41 21 00 */
+    { 0x0293, sins2_PhaserDoor },    /* MSG_USE 40 21 00 */
+    { 0x02E9, sins2_SpockScans },    /* MSG_USE 44 FF 00 */
+    { 0x0371, sins2_KirkOnTerminal },    /* MSG_USE 00 20 00 */
+    { 0x03B9, sins2_SpockOnTerminal },    /* MSG_USE 01 20 00 */
+    { 0x03E0, sins2_SpockAtTerminal },    /* MSG_WALK_DONE 05 00 00 */
+    { 0x041D, sins2_BaseHistory },    /* MSG_ANIM_DONE 06 00 00 */
+    { 0x0DAF, sins2_McCoyOnTerminal },    /* MSG_USE 02 20 00 */
+    { 0x0E14, sins2_MosherOnTerminal },    /* MSG_USE 03 20 00 */
+    { 0x0E81, sins2_SpockScansTerminal },    /* MSG_USE 44 20 00 */
+    { 0x0F24, sins2_SpockScansKeypad },    /* MSG_USE 44 22 00 */
+    { 0x0FCB, sins2_SpockScansDoor },    /* MSG_USE 44 21 00 */
+    { 0x10D3, sins2_KirkOnKeypad },    /* MSG_USE 00 22 00 */
+    { 0x1127, sins2_SpockOnKeypad },    /* MSG_USE 01 22 00 */
+    { 0x1155, sins2_EnterCode },    /* MSG_WALK_DONE 02 00 00 */
+    { 0x11AB, sins2_DoorOpens },    /* MSG_ANIM_DONE 03 00 00 */
+    { 0x1240, sins2_WrongCode },    /* MSG_ANIM_DONE 04 00 00 */
+    { 0x12BF, sins2_DoorOpened },    /* MSG_ANIM_DONE 01 00 00 */
+    { 0x13A4, sins2_UhuraFindsVirus },    /* MSG_TICK 28 00 00 */
+    { 0x1731, sins2_LookAtScene },    /* MSG_LOOK FF 00 00 */
+    { 0x17A1, sins2_LookAtChamber },    /* MSG_LOOK 08 00 00 */
+    { 0x17DB, sins2_LookAtTerminal },    /* MSG_LOOK 20 00 00 */
+    { 0x1892, sins2_LookAtKeypad },    /* MSG_LOOK 22 00 00 */
+    { 0x18CC, sins2_LookAtKirk },    /* MSG_LOOK 00 00 00 */
+    { 0x1928, sins2_LookAtSpock },    /* MSG_LOOK 01 00 00 */
+    { 0x197D, sins2_LookAtMcCoy },    /* MSG_LOOK 02 00 00 */
+    { 0x19D1, sins2_LookAtRedshirt },    /* MSG_LOOK 03 00 00 */
+    { 0x1A38, sins2_TalkToKirk },    /* MSG_TALK 00 00 00 */
+    { 0x1A91, sins2_TalkToSpock },    /* MSG_TALK 01 00 00 */
+    { 0x1B8D, sins2_TalkToMcCoy },    /* MSG_TALK 02 00 00 */
+    { 0x1C94, sins2_TalkToRedshirt },    /* MSG_TALK 03 00 00 */
+    { 0x1D53, sins2_LookAtDoor },    /* MSG_LOOK 21 00 00 */
+    { 0x1DA3, sins2_SpockReadsDoor },    /* MSG_USE 01 21 00 */
+    { 0x1FA0, sins2_UseCommunicator },    /* MSG_USE 47 FF 00 */
+    { 0x20E7, sins2_E_20E7 },    /* MSG_USE 7F 00 00 */
+    { 0x20EF, sins2_MedkitOnSpock },    /* MSG_USE 7F 01 00 */
+    { 0x20F7, sins2_MedkitOnMcCoy },    /* MSG_USE 7F 02 00 */
+    { 0x20FF, sins2_MedkitOnRedshirt },    /* MSG_USE 7F 03 00 */
+    { 0x214B, sins2_E_214B },    /* MSG_USE 45 00 00 */
+    { 0x2153, sins2_E_2153 },    /* MSG_USE 45 01 00 */
+    { 0x215B, sins2_E_215B },    /* MSG_USE 45 02 00 */
+    { 0x2163, sins2_McCoyScansRedshirt },    /* MSG_USE 45 03 00 */
+    { 0x21FC, sins2_McCoyOnKeypad },    /* MSG_USE 02 22 00 */
+    { 0x2263, sins2_MosherOnKeypad },    /* MSG_USE 03 22 00 */
+    { 0x22AC, sins2_WalkThrough },    /* MSG_WALK 21 00 00 */
+    { 0x22D5, sins2_WalkThrough2 },    /* MSG_WALK 08 00 00 */
+    { 0, 0 }
+};

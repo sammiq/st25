@@ -1,0 +1,815 @@
+/* FEATHER3.RDF: the room's scripts, translated from the machine code in the room file
+ * (src/rdf/feather3.asm) by tools/rdf2c.py.  They run on the loaded file (CS_B/CS_W) and the
+ * room state (`room`), and call the game through the svc_ macros of rooms.h.
+ *
+ * FEATHER3.RDF - "The Feathered Serpent", the path to Quetzecoatl's grove,
+ * guarded by Tlaoxac, his priest. Only a man of courage who has shed his
+ * own blood may pass: the snake from the pit (room 1) shown to him, then
+ * biting Kirk or Stragey, opens the way. Two rocks knock him out instead
+ * (at a cost); a threat makes him kill Stragey. He drops a knife.
+ *
+ * Actors: 8 Tlaoxac, 9 the knife, 10 (0Ah) the thrown rock.
+ * Objects: 8 Tlaoxac, 9 the knife, 20h the path, 21h/22h the lamps.
+ * Exits: 2 room 2, 3 room 4. Region 0: the way past Tlaoxac.
+ *
+ * Labels: H_ script headers, L branch targets, C_ conversations,
+ * T_/N_/S_ strings; talk_buf: the conversation buffer of Say.
+ *
+ * Quirks of the original:
+ * - The script chain runs on into code at 09D7: the engine reads its bytes
+ * as key 50 6A 03 2E and next 1EFF (beyond rdf_scripts_end, so the search
+ * stops).
+ * - Code at 0699 runs on into the script header at 069C.
+ */
+
+#include "rooms.h"
+
+/* where the file keeps its strings, conversations and tables */
+enum {
+    N_s5r1kg = 0x00CC,
+    N_s5r3kt = 0x00D3,
+    N_s5r3rd = 0x00DA,
+    N_s5r3as = 0x00E1,
+    N_s5r3aj = 0x00E8,
+    N_s5r3ah = 0x00EF,
+    N_s5r3ad = 0x00F6,
+    N_s5r3nf = 0x00FD,
+    N_s5r3rt = 0x0104,
+    N_sscans = 0x010B,
+    N_sscanw = 0x0112,
+    N_mscann = 0x0119,
+    N_mscanw = 0x0120,
+    N_feather3 = 0x0127,
+    N_feath3b = 0x0130,
+    N_FEA3LOOP = 0x0140,
+    N_ROCKFACE = 0x049C,
+    N_ROCKFACE_2 = 0x04D1,
+    T_FEA3_012 = 0x0700,
+    T_FEA3_006 = 0x07C3,
+    N_Dr_McCoy = 0x0A84,
+    N_Mr_Spock = 0x0A8E,
+    N_Lt_Stragey = 0x0A98,
+    N_Tlaoxac = 0x0AA4,
+    S_0AAC = 0x0AAC,
+    T_FEA3_036 = 0x0AAD,
+    T_FEA3_008 = 0x0B1B,
+    T_FEA3N012 = 0x0B43,
+    T_FEA3N005 = 0x0B9B,
+    T_FEA3N001 = 0x0BD6,
+    T_FEA3N000 = 0x0C14,
+    T_FEA3N002 = 0x0C3F,
+    T_FEA3N007 = 0x0C7F,
+    T_FEA3N003 = 0x0D10,
+    T_FEA3N011 = 0x0D50,
+    T_FEA3_026 = 0x0D8E,
+    T_FEA3_018 = 0x0DDF,
+    T_FEA3_028 = 0x0E12,
+    T_FEA3_015 = 0x0E57,
+    T_FEA3_016 = 0x0E78,
+    T_FEA3_027 = 0x0EC4,
+    T_FEA3_017 = 0x0F09,
+    T_FEA3_029 = 0x0F32,
+    T_FEA3_035 = 0x0FC0,
+    T_FEA3_041 = 0x100B,
+    T_FEA3N004 = 0x103E,
+    T_FEA3_043 = 0x106F,
+    T_FEA3_020 = 0x1108,
+    T_FEA3_004 = 0x11A6,
+    T_FEA3_007 = 0x121F,
+    T_FEA3_031 = 0x124B,
+    T_FEA3_034 = 0x1295,
+    T_FEA3_044 = 0x1312,
+    T_FEA3_039 = 0x13F4,
+    T_FEA3N006 = 0x1469,
+    T_FEA3_009 = 0x14A1,
+    T_FEA3_025 = 0x14F7,
+    T_FEA3_011 = 0x152A,
+    T_FEA3_033 = 0x155E,
+    T_FEA3_019 = 0x1578,
+    T_FEA3_013 = 0x15F3,
+    T_FEA3_022 = 0x163F,
+    T_FEA3_005 = 0x16A7,
+    T_FEA3_032 = 0x16EF,
+    T_FEA3_038 = 0x171C,
+    T_FEA3_037 = 0x1886,
+    T_FEA3_042 = 0x18F3,
+    T_FEA3_040 = 0x195D,
+    T_FEA3_014 = 0x19D8,
+    T_FEA3_010 = 0x1A6A,
+    T_FEA3_030 = 0x1A90,
+    T_FEA3_021 = 0x1AB0,
+    T_FEA3N010 = 0x1ADE,
+    T_FEA3_023 = 0x1B18,
+    T_FEA3_024 = 0x1B43,
+    N_dialogue_error = 0x1B6E,
+    talk_buf = 0x1B7D,
+    KirkToTlaoxac = 0x1B83,
+};
+
+/* the room's variables: in the room state, and in the file itself */
+#define fv_snake_shown CS_B(0xCA)
+#define fv_talk_buf CS_W(0x1B7D)
+#define fv_tlaoxac_down CS_B(0xCB)
+#define rv_knocked_out ROOM_B(0x33)
+#define rv_may_pass ROOM_B(0x32)
+#define rv_rocks_thrown ROOM_B(0x2F)
+#define rv_score ROOM_W(0x36)
+#define rv_shed_blood ROOM_B(0x2E)
+#define rv_showed_snake ROOM_B(0x35)
+#define rv_took_knife ROOM_B(0x2D)
+
+/* functions */
+static void feather3_StartRoom(void);
+static void feather3_TlaoxacSpeaks(void);
+static void feather3_TlaoxacBlocks(void);
+static void feather3_SpockFightsTlaoxac(void);
+static void feather3_McCoyFightsTlaoxac(void);
+static void feather3_StrageyFightsTlaoxac(void);
+static void feather3_SpockOnPath(void);
+static void feather3_McCoyOnPath(void);
+static void feather3_StrageyOnPath(void);
+static void feather3_part_0256(void);
+static void feather3_CommOnKirk(void);
+static void feather3_SnakeBitesKirk(void);
+static void feather3_SnakeOnSpock(void);
+static void feather3_SnakeBitesStragey(void);
+static void feather3_StrageyBitten(void);
+static void feather3_SnakeOnMcCoy(void);
+static void feather3_ShowSnake(void);
+static void feather3_KnifeOnSpock(void);
+static void feather3_KnifeOnMcCoy(void);
+static void feather3_KnifeOnStragey(void);
+static void feather3_RockAtTlaoxac(void);
+static void feather3_KirkThrows(void);
+static void feather3_Timer4Sound(void);
+static void feather3_KnifeShows(void);
+static void feather3_ThrowDone(void);
+static void feather3_TlaoxacFalls(void);
+static void feather3_StunAnything(void);
+static void feather3_KillAnything(void);
+static void feather3_TalkToMcCoy(void);
+static void feather3_TalkToSpock(void);
+static void feather3_TalkToRedshirt(void);
+static void feather3_TalkToTlaoxac(void);
+static void feather3_TlaoxacStrikes(void);
+static void feather3_McCoyScansTlaoxac(void);
+static void feather3_MedkitOnTlaoxac(void);
+static void feather3_MedkitOnStragey(void);
+static void feather3_UseMedkit(void);
+static void feather3_E_081C(void);
+static void feather3_McCoyScansLamps(void);
+static void feather3_E_0855(void);
+static void feather3_SpockScansLamps(void);
+static void feather3_SpockScans(void);
+static void feather3_GetKnife(void);
+static void feather3_KirkAtKnife(void);
+static void feather3_TookKnife(void);
+static void feather3_KnifeTaken(void);
+static void feather3_LookAtSpock(void);
+static void feather3_LookAtRedshirt(void);
+static void feather3_LookAtTlaoxac(void);
+static void feather3_LookAtLamp1(void);
+static void feather3_LookAtLamp2(void);
+static void feather3_LookAtMcCoy(void);
+static void feather3_LookAtKnife(void);
+static uint16_t feather3_Talk(uint16_t ax);
+static void feather3_Say(uint16_t ax, uint16_t bx);
+
+/* The room starts: Tlaoxac blocking the path, the knife if dropped.
+ * [MSG_TICK 01 00 00] */
+static void feather3_StartRoom(void)
+{
+    svc_Sfx(N_FEA3LOOP);
+    svc_Music(0x1D, STALE_ARG);
+    if (rv_may_pass == 0) {
+        svc_Anim0(8, N_s5r3as, 0x2E, 0xAB, 0);
+        svc_LoadMap(N_feath3b);
+        return;
+    }
+    if (rv_took_knife == 0) {
+        svc_Anim0(9, N_s5r3nf, 0x64, 0xB4, 0);
+    }
+    return;
+}
+
+/* Tick 40, region 0: Tlaoxac challenges the party and blocks the way.
+ * [MSG_TICK 28 00 00] */
+static void feather3_TlaoxacSpeaks(void)
+{
+    if (rv_may_pass == 0) {
+        feather3_Say(N_Tlaoxac, T_FEA3_036);
+    }
+    return;
+}
+
+/* [MSG_REGION 00 00 00] */
+static void feather3_TlaoxacBlocks(void)
+{
+    if (rv_may_pass == 0) {
+        feather3_Say(N_Tlaoxac, T_FEA3_035);
+    }
+    return;
+}
+
+/* The crew on Tlaoxac and on the path: none will fight him.
+ * [MSG_USE 01 08 00] */
+static void feather3_SpockFightsTlaoxac(void)
+{
+    feather3_Say(N_Mr_Spock, T_FEA3_026);
+    feather3_Say(N_Dr_McCoy, T_FEA3_018);
+    feather3_Say(N_Mr_Spock, T_FEA3_028);
+    feather3_Say(N_Dr_McCoy, T_FEA3_015);
+    return;
+}
+
+/* [MSG_USE 02 08 00] */
+static void feather3_McCoyFightsTlaoxac(void)
+{
+    feather3_Say(N_Dr_McCoy, T_FEA3_016);
+    feather3_Say(N_Mr_Spock, T_FEA3_027);
+    feather3_Say(N_Dr_McCoy, T_FEA3_017);
+    return;
+}
+
+/* [MSG_USE 03 08 00] */
+static void feather3_StrageyFightsTlaoxac(void)
+{
+    if (room.redshirt_dead != 1) {
+        feather3_Say(N_Lt_Stragey, T_FEA3_029);
+    }
+    return;
+}
+
+/* [MSG_USE 01 20 00] */
+static void feather3_SpockOnPath(void)
+{
+    { feather3_part_0256(); return; }
+}
+
+/* [MSG_USE 02 20 00] */
+static void feather3_McCoyOnPath(void)
+{
+    { feather3_part_0256(); return; }
+}
+
+/* [MSG_USE 03 20 00] */
+static void feather3_StrageyOnPath(void)
+{
+    if (room.redshirt_dead == 1)
+        { feather3_part_0256(); return; }
+    { feather3_part_0256(); return; }
+}
+
+static void feather3_part_0256(void)
+{
+    if (rv_may_pass == 0) {
+        feather3_Say(N_Tlaoxac, T_FEA3_041);
+    }
+    return;
+}
+
+/* The communicator.
+ * [MSG_USE 47 00 00] */
+static void feather3_CommOnKirk(void)
+{
+    feather3_Say(N_Mr_Spock, T_FEA3_024);
+    return;
+}
+
+/* The snake: shown to Tlaoxac (+1 once), then bitten by it Kirk (+2) or
+ * Stragey (+1, msg 2) has shed blood and the way is open.
+ * [MSG_USE 76 00 00] */
+static void feather3_SnakeBitesKirk(void)
+{
+    if (rv_may_pass == 0) {
+        if (room.redshirt_dead == 0) {
+            if (fv_snake_shown != 1)
+                goto L02CF;
+            if (rv_rocks_thrown != 0)
+                goto L02CF;
+            feather3_Say(N_Tlaoxac, T_FEA3_043);
+            rv_may_pass = 1;
+            rv_score += 2;
+            svc_LoadMap(N_feather3);
+            svc_Anim0(9, N_s5r3nf, 0x64, 0xB4, 0);
+            rv_shed_blood = 1;
+        }
+    }
+    return;
+L02CF:;
+    feather3_Say(S_0AAC, T_FEA3N004);
+    return;
+}
+
+/* [MSG_USE 76 01 00] */
+static void feather3_SnakeOnSpock(void)
+{
+    if (fv_snake_shown == 1) {
+        feather3_Say(N_Mr_Spock, T_FEA3_004);
+        return;
+    }
+    feather3_Say(N_Mr_Spock, T_FEA3_020);
+    return;
+}
+
+/* [MSG_USE 76 03 00] */
+static void feather3_SnakeBitesStragey(void)
+{
+    if (room.redshirt_dead != 1) {
+        if (rv_may_pass == 0) {
+            if (fv_snake_shown != 1)
+                goto L0333;
+            if (rv_rocks_thrown != 0)
+                goto L0333;
+            svc_Walk(0, 0x7C, 0xBC, 2);
+            room.busy = 1;
+        }
+    }
+    return;
+L0333:;
+    feather3_Say(N_Lt_Stragey, T_FEA3_031);
+    return;
+}
+
+/* [MSG_WALK_DONE 02 00 00] */
+static void feather3_StrageyBitten(void)
+{
+    room.busy = 0;
+    feather3_Say(N_Lt_Stragey, T_FEA3_034);
+    feather3_Say(N_Tlaoxac, T_FEA3_044);
+    rv_may_pass = 1;
+    rv_score += 1;
+    svc_LoadMap(N_feather3);
+    svc_Anim0(9, N_s5r3nf, 0x64, 0xB4, 0);
+    rv_shed_blood = 1;
+    return;
+}
+
+/* [MSG_USE 76 02 00] */
+static void feather3_SnakeOnMcCoy(void)
+{
+    feather3_Say(N_Dr_McCoy, T_FEA3_007);
+    return;
+}
+
+/* [MSG_USE 76 08 00] */
+static void feather3_ShowSnake(void)
+{
+    if (rv_may_pass == 0) {
+        if (rv_rocks_thrown == 0) {
+            feather3_Say(N_Tlaoxac, T_FEA3_039);
+            fv_snake_shown = 1;
+            if (rv_showed_snake != 1) {
+                rv_showed_snake = 1;
+                rv_score += 1;
+            }
+        }
+    }
+    return;
+}
+
+/* The knife on the crew.
+ * [MSG_USE 79 01 00] */
+static void feather3_KnifeOnSpock(void)
+{
+    feather3_Say(N_Mr_Spock, T_FEA3_025);
+    return;
+}
+
+/* [MSG_USE 79 02 00] */
+static void feather3_KnifeOnMcCoy(void)
+{
+    feather3_Say(N_Mr_Spock, T_FEA3_011);
+    return;
+}
+
+/* [MSG_USE 79 03 00] */
+static void feather3_KnifeOnStragey(void)
+{
+    if (room.redshirt_dead != 1) {
+        feather3_Say(N_Mr_Spock, T_FEA3_033);
+    }
+    return;
+}
+
+/* Rocks at Tlaoxac (msgs 3, timers 2-4): the second knocks him out (-2)
+ * and he drops his knife (anim msg 4).
+ * [MSG_USE 43 08 00] */
+static void feather3_RockAtTlaoxac(void)
+{
+    if (fv_tlaoxac_down == 0) {
+        rv_rocks_thrown++;
+        room.busy = 1;
+        svc_Walk(0, 0xAC, 0xB4, 3);
+        return;
+    }
+    feather3_Say(N_Dr_McCoy, T_FEA3_009);
+    return;
+}
+
+/* [MSG_WALK_DONE 03 00 00] */
+static void feather3_KirkThrows(void)
+{
+    room.fall[0] = 3;
+    svc_Anim(0, N_s5r3kt, -1, -1, 0);
+    svc_Anim0(0xA, N_s5r3rt, 0x80, 0x7E, 0);
+    room.timers[4] = 0x15;
+    if (rv_rocks_thrown == 2) {
+        rv_knocked_out = 1;
+        rv_score += 0xFFFE;
+        svc_Anim(8, N_s5r3ad, -1, -1, 4);
+        svc_Sfx(N_ROCKFACE);
+        room.timers[2] = 0x18;
+        return;
+    }
+    svc_Anim(8, N_s5r3ah, -1, -1, 0);
+    svc_Sfx(N_ROCKFACE_2);
+    room.timers[3] = 0x61;
+    return;
+}
+
+/* [MSG_TIMER 04 00 00] */
+static void feather3_Timer4Sound(void)
+{
+    svc_BridgeSfx(0xB);
+    return;
+}
+
+/* [MSG_TIMER 02 00 00] */
+static void feather3_KnifeShows(void)
+{
+    if (rv_took_knife == 0) {
+        svc_Anim0(9, N_s5r3nf, 0x64, 0xB4, 0);
+    }
+    return;
+}
+
+/* [MSG_TIMER 03 00 00] */
+static void feather3_ThrowDone(void)
+{
+    room.busy = 0;
+    svc_StopAnim(0);
+    return;
+}
+
+/* [MSG_ANIM_DONE 04 00 00] */
+static void feather3_TlaoxacFalls(void)
+{
+    room.busy = 0;
+    svc_StopAnim(0);
+    feather3_Say(S_0AAC, T_FEA3N006);
+    if (rv_took_knife == 0) {
+        if (rv_shed_blood == 0) {
+            feather3_Say(N_Dr_McCoy, T_FEA3_008);
+        }
+    }
+    rv_may_pass = 1;
+    fv_tlaoxac_down = 1;
+    svc_LoadMap(N_feather3);
+    return;
+}
+
+/* [MSG_USE 40 FF 00] */
+static void feather3_StunAnything(void)
+{
+    feather3_Say(N_Mr_Spock, T_FEA3_023);
+    return;
+}
+
+/* [MSG_USE 41 FF 00] */
+static void feather3_KillAnything(void)
+{
+    feather3_Say(N_Mr_Spock, T_FEA3_023);
+    return;
+}
+
+/* [MSG_TALK 02 00 00] */
+static void feather3_TalkToMcCoy(void)
+{
+    feather3_Say(N_Dr_McCoy, T_FEA3_005);
+    return;
+}
+
+/* [MSG_TALK 01 00 00] */
+static void feather3_TalkToSpock(void)
+{
+    feather3_Say(N_Mr_Spock, T_FEA3_022);
+    return;
+}
+
+/* [MSG_TALK 03 00 00] */
+static void feather3_TalkToRedshirt(void)
+{
+    if (room.redshirt_dead != 1) {
+        feather3_Say(N_Lt_Stragey, T_FEA3_032);
+    }
+    return;
+}
+
+/* Talking to Tlaoxac: a threat makes him strike Stragey down (anim msg
+ * 2).
+ * [MSG_TALK 08 00 00] */
+static void feather3_TalkToTlaoxac(void)
+{
+    uint16_t ax = 0;
+    if (rv_may_pass == 0) {
+        if (room.redshirt_dead == 0) {
+            if (fv_tlaoxac_down == 0) {
+                if (fv_snake_shown != 0)
+                    goto L060A;
+                feather3_Say(N_Tlaoxac, T_FEA3_038);
+            }
+        }
+    }
+    return;
+L060A:;
+    if (rv_rocks_thrown != 0) {
+        feather3_Say(N_Tlaoxac, T_FEA3_038);
+        return;
+    }
+    ax = (uint16_t)feather3_Talk(KirkToTlaoxac);
+    if (ax == 0) {
+    } else {
+        if (ax == 1) {
+            goto L0641;
+        }
+        if (ax == 2) {
+            goto L064B;
+        }
+        goto L0693;
+    }
+    feather3_Say(N_Tlaoxac, T_FEA3_037);
+    return;
+L0641:;
+    feather3_Say(N_Tlaoxac, T_FEA3_042);
+    return;
+L064B:;
+    feather3_Say(N_Tlaoxac, T_FEA3_040);
+    room.busy = 1;
+    svc_Anim(8, N_s5r3aj, -1, -1, 2);
+    svc_Music(2, STALE_ARG);
+    svc_Anim(3, N_s5r3rd, -1, -1, 0);
+    room.redshirt_dead = 1;
+    return;
+L0693:;
+    feather3_Say(S_0AAC, N_dialogue_error);
+    { feather3_TlaoxacStrikes(); return; }
+}
+
+/* [MSG_ANIM_DONE 02 00 00] */
+static void feather3_TlaoxacStrikes(void)
+{
+    room.busy = 0;
+    return;
+}
+
+/* Tricorders and the medkit.
+ * [MSG_USE 45 08 00] */
+static void feather3_McCoyScansTlaoxac(void)
+{
+    svc_Anim(2, N_mscanw, -1, -1, 0);
+    svc_BridgeSfx(4);
+    if (fv_tlaoxac_down == 1) {
+        feather3_Say(N_Dr_McCoy, T_FEA3_010);
+        return;
+    }
+    feather3_Say(N_Dr_McCoy, T_FEA3_014);
+    return;
+}
+
+/* [MSG_USE 7F 08 00] */
+static void feather3_MedkitOnTlaoxac(void)
+{
+    if (rv_knocked_out != 0) {
+        feather3_Say(N_Dr_McCoy, T_FEA3_012);
+    }
+    return;
+}
+
+/* [MSG_USE 7F 03 00] */
+static void feather3_MedkitOnStragey(void)
+{
+    if (room.redshirt_dead == 1) {
+        svc_Anim(2, N_mscann, -1, -1, 0);
+        svc_BridgeSfx(4);
+        feather3_Say(N_Dr_McCoy, T_FEA3_030);
+    }
+    return;
+}
+
+/* [MSG_USE 7F FF 00] */
+static void feather3_UseMedkit(void)
+{
+    feather3_Say(N_Dr_McCoy, T_FEA3_006);
+    return;
+}
+
+/* [MSG_USE 45 21 00] */
+static void feather3_E_081C(void)
+{
+    { feather3_McCoyScansLamps(); return; }
+}
+
+/* [MSG_USE 45 22 00] */
+static void feather3_McCoyScansLamps(void)
+{
+    svc_Anim(2, N_mscanw, -1, -1, 0);
+    svc_BridgeSfx(4);
+    feather3_Say(N_Dr_McCoy, T_FEA3_013);
+    return;
+}
+
+/* [MSG_USE 44 21 00] */
+static void feather3_E_0855(void)
+{
+    { feather3_SpockScansLamps(); return; }
+}
+
+/* [MSG_USE 44 22 00] */
+static void feather3_SpockScansLamps(void)
+{
+    svc_Anim(1, N_sscanw, -1, -1, 0);
+    svc_BridgeSfx(4);
+    feather3_Say(N_Mr_Spock, T_FEA3_019);
+    return;
+}
+
+/* [MSG_USE 44 FF 00] */
+static void feather3_SpockScans(void)
+{
+    svc_Anim(1, N_sscans, -1, -1, 0);
+    svc_BridgeSfx(4);
+    feather3_Say(N_Mr_Spock, T_FEA3_021);
+    return;
+}
+
+/* The knife (+1, msg 1, timer 1).
+ * [MSG_GET 09 00 00] */
+static void feather3_GetKnife(void)
+{
+    rv_score += 1;
+    svc_Walk(0, 0x57, 0xB4, 1);
+    room.busy = 1;
+    return;
+}
+
+/* [MSG_WALK_DONE 01 00 00] */
+static void feather3_KirkAtKnife(void)
+{
+    svc_Anim(0, N_s5r1kg, -1, -1, 1);
+    room.timers[1] = 0x14;
+    return;
+}
+
+/* [MSG_TIMER 01 00 00] */
+static void feather3_TookKnife(void)
+{
+    rv_took_knife = 1;
+    svc_GiveItem(IT_KNIFE);
+    svc_StopAnim(9);
+    return;
+}
+
+/* [MSG_ANIM_DONE 01 00 00] */
+static void feather3_KnifeTaken(void)
+{
+    room.busy = 0;
+    svc_StopAnim(0);
+    feather3_Say(S_0AAC, T_FEA3N010);
+    return;
+}
+
+/* [MSG_LOOK 01 00 00] */
+static void feather3_LookAtSpock(void)
+{
+    if (rv_knocked_out == 0) {
+        if (rv_may_pass == 0) {
+            feather3_Say(S_0AAC, T_FEA3N002);
+        }
+    }
+    return;
+}
+
+/* [MSG_LOOK 03 00 00] */
+static void feather3_LookAtRedshirt(void)
+{
+    if (room.redshirt_dead == 0) {
+        feather3_Say(S_0AAC, T_FEA3N012);
+        return;
+    }
+    feather3_Say(S_0AAC, T_FEA3N005);
+    return;
+}
+
+/* Looking.
+ * [MSG_LOOK 08 00 00] */
+static void feather3_LookAtTlaoxac(void)
+{
+    if (rv_knocked_out == 1) {
+        feather3_Say(S_0AAC, T_FEA3N003);
+        return;
+    }
+    feather3_Say(S_0AAC, T_FEA3N007);
+    return;
+}
+
+/* [MSG_LOOK 21 00 00] */
+static void feather3_LookAtLamp1(void)
+{
+    feather3_Say(0, T_FEA3N001);
+    return;
+}
+
+/* [MSG_LOOK 22 00 00] */
+static void feather3_LookAtLamp2(void)
+{
+    feather3_Say(0, T_FEA3N001);
+    return;
+}
+
+/* [MSG_LOOK 02 00 00] */
+static void feather3_LookAtMcCoy(void)
+{
+    feather3_Say(0, T_FEA3N000);
+    return;
+}
+
+/* [MSG_LOOK 09 00 00] */
+static void feather3_LookAtKnife(void)
+{
+    feather3_Say(0, T_FEA3N011);
+    return;
+}
+
+/* Talk: conversation AX (speaker, choices, 0); returns the choice. */
+static uint16_t feather3_Talk(uint16_t ax)
+{
+    ax = (uint16_t)svc_Talk(ax);
+    return ax;
+}
+
+/* Say: one line, BX, said by AX (0: narration). */
+static void feather3_Say(uint16_t ax, uint16_t bx)
+{
+    fv_talk_buf = ax;
+    CS_W(0x1B7F) = bx;
+    feather3_Talk(talk_buf);
+    return;
+}
+
+/* the scripts, by the offset of their code in the room file */
+const RoomScript feather3_scripts[] = {
+    { 0x013E, feather3_StartRoom },    /* MSG_TICK 01 00 00 */
+    { 0x01B1, feather3_TlaoxacSpeaks },    /* MSG_TICK 28 00 00 */
+    { 0x01C7, feather3_TlaoxacBlocks },    /* MSG_REGION 00 00 00 */
+    { 0x01DD, feather3_SpockFightsTlaoxac },    /* MSG_USE 01 08 00 */
+    { 0x0208, feather3_McCoyFightsTlaoxac },    /* MSG_USE 02 08 00 */
+    { 0x022A, feather3_StrageyFightsTlaoxac },    /* MSG_USE 03 08 00 */
+    { 0x0240, feather3_SpockOnPath },    /* MSG_USE 01 20 00 */
+    { 0x0248, feather3_McCoyOnPath },    /* MSG_USE 02 20 00 */
+    { 0x0250, feather3_StrageyOnPath },    /* MSG_USE 03 20 00 */
+    { 0x026C, feather3_CommOnKirk },    /* MSG_USE 47 00 00 */
+    { 0x027C, feather3_SnakeBitesKirk },    /* MSG_USE 76 00 00 */
+    { 0x02DF, feather3_SnakeOnSpock },    /* MSG_USE 76 01 00 */
+    { 0x0301, feather3_SnakeBitesStragey },    /* MSG_USE 76 03 00 */
+    { 0x0343, feather3_StrageyBitten },    /* MSG_WALK_DONE 02 00 00 */
+    { 0x038F, feather3_SnakeOnMcCoy },    /* MSG_USE 76 02 00 */
+    { 0x039F, feather3_ShowSnake },    /* MSG_USE 76 08 00 */
+    { 0x03D9, feather3_KnifeOnSpock },    /* MSG_USE 79 01 00 */
+    { 0x03E9, feather3_KnifeOnMcCoy },    /* MSG_USE 79 02 00 */
+    { 0x03F9, feather3_KnifeOnStragey },    /* MSG_USE 79 03 00 */
+    { 0x040F, feather3_RockAtTlaoxac },    /* MSG_USE 43 08 00 */
+    { 0x0443, feather3_KirkThrows },    /* MSG_WALK_DONE 03 00 00 */
+    { 0x04F5, feather3_Timer4Sound },    /* MSG_TIMER 04 00 00 */
+    { 0x0508, feather3_KnifeShows },    /* MSG_TIMER 02 00 00 */
+    { 0x052B, feather3_ThrowDone },    /* MSG_TIMER 03 00 00 */
+    { 0x0542, feather3_TlaoxacFalls },    /* MSG_ANIM_DONE 04 00 00 */
+    { 0x058E, feather3_StunAnything },    /* MSG_USE 40 FF 00 */
+    { 0x059E, feather3_KillAnything },    /* MSG_USE 41 FF 00 */
+    { 0x05AE, feather3_TalkToMcCoy },    /* MSG_TALK 02 00 00 */
+    { 0x05BE, feather3_TalkToSpock },    /* MSG_TALK 01 00 00 */
+    { 0x05CE, feather3_TalkToRedshirt },    /* MSG_TALK 03 00 00 */
+    { 0x05E4, feather3_TalkToTlaoxac },    /* MSG_TALK 08 00 00 */
+    { 0x06A2, feather3_TlaoxacStrikes },    /* MSG_ANIM_DONE 02 00 00 */
+    { 0x06AD, feather3_McCoyScansTlaoxac },    /* MSG_USE 45 08 00 */
+    { 0x06F0, feather3_MedkitOnTlaoxac },    /* MSG_USE 7F 08 00 */
+    { 0x0782, feather3_MedkitOnStragey },    /* MSG_USE 7F 03 00 */
+    { 0x07B9, feather3_UseMedkit },    /* MSG_USE 7F FF 00 */
+    { 0x081C, feather3_E_081C },    /* MSG_USE 45 21 00 */
+    { 0x0824, feather3_McCoyScansLamps },    /* MSG_USE 45 22 00 */
+    { 0x0855, feather3_E_0855 },    /* MSG_USE 44 21 00 */
+    { 0x085D, feather3_SpockScansLamps },    /* MSG_USE 44 22 00 */
+    { 0x088E, feather3_SpockScans },    /* MSG_USE 44 FF 00 */
+    { 0x08BF, feather3_GetKnife },    /* MSG_GET 09 00 00 */
+    { 0x08E1, feather3_KirkAtKnife },    /* MSG_WALK_DONE 01 00 00 */
+    { 0x0902, feather3_TookKnife },    /* MSG_TIMER 01 00 00 */
+    { 0x0925, feather3_KnifeTaken },    /* MSG_ANIM_DONE 01 00 00 */
+    { 0x0945, feather3_LookAtSpock },    /* MSG_LOOK 01 00 00 */
+    { 0x0961, feather3_LookAtRedshirt },    /* MSG_LOOK 03 00 00 */
+    { 0x0981, feather3_LookAtTlaoxac },    /* MSG_LOOK 08 00 00 */
+    { 0x09A1, feather3_LookAtLamp1 },    /* MSG_LOOK 21 00 00 */
+    { 0x09B0, feather3_LookAtLamp2 },    /* MSG_LOOK 22 00 00 */
+    { 0x09BF, feather3_LookAtMcCoy },    /* MSG_LOOK 02 00 00 */
+    { 0x09CE, feather3_LookAtKnife },    /* MSG_LOOK 09 00 00 */
+    { 0, 0 }
+};

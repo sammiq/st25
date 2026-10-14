@@ -55,8 +55,11 @@ void plat_quit(void)
 {
 }
 
+void audio_poll(void);
+
 void plat_pump(void)
 {
+    audio_poll();
     if (shot_file && plat_msec() - start_ms >= shot_ms) {
         write_shot();
         exit(0);

@@ -1,0 +1,1414 @@
+/* TRIAL1.RDF: the room's scripts, translated from the machine code in the room file
+ * (src/rdf/trial1.asm) by tools/rdf2c.py.  They run on the loaded file (CS_B/CS_W) and the
+ * room state (`room`), and call the game through the svc_ macros of rooms.h.
+ *
+ * TRIAL1.RDF - "The Feathered Serpent", the trial's Test of Life, first
+ * chamber, deep under Hrakkour. An electrical entity guards a door with a
+ * keypad: an iron rod, made by dipping a wooden rod in rock melted by a
+ * phaser, puts it in stasis; Spock scans the keypad and Uhura works out
+ * the codes. One opens the door (room 2); another, found through an
+ * anomaly, leads elsewhere (room 5).
+ *
+ * Actors: 8 the entity, 9 the molten rock, 10 (0Ah) the door, 11 (0Bh) the
+ * iron rod.
+ * Objects: 8 the entity, 9 the molten rock, 0Bh the iron rod, 20h the
+ * door, 21h the coder, 22h the rods, 23h the wall, 24h the floor.
+ * Regions 0 the entity's path, 1 the door.
+ *
+ * Labels: H_ script headers, L branch targets, C_ conversations,
+ * T_/N_/S_ strings; talk_buf: the conversation buffer of Say.
+ *
+ * Quirks of the original:
+ * - The conversation at 00CA is built at run time.
+ */
+
+#include "rooms.h"
+
+/* where the file keeps its strings, conversations and tables */
+enum {
+    talk_buf = 0x00CA,
+    N_Capt_Kirk = 0x0113,
+    N_Dr_McCoy = 0x011E,
+    N_Mr_Spock = 0x0128,
+    N_Ensign_Bennie = 0x0132,
+    N_Lt_Uhura = 0x0140,
+    N_Entity = 0x014A,
+    N_t1drc = 0x0205,
+    N_ec = 0x022D,
+    N_TRI1LOOP = 0x0248,
+    T_TRI1_056 = 0x0288,
+    T_TRI1_047 = 0x02B7,
+    T_TRI1_032 = 0x0361,
+    T_TRI1_007 = 0x03A8,
+    T_TRI1_057 = 0x0474,
+    T_TRI1_010 = 0x04FC,
+    T_TRI1_055 = 0x05DE,
+    N_kkills = 0x065B,
+    S_0693 = 0x0693,
+    N_t1pkup = 0x06F9,
+    T_TRI1N003 = 0x074E,
+    T_TRI1N017 = 0x0792,
+    T_TRI1N016 = 0x07D4,
+    T_TRI1N015 = 0x081C,
+    T_TRI1N011 = 0x086A,
+    T_TRI1N006 = 0x08C9,
+    T_TRI1N009 = 0x0924,
+    T_TRI1N001 = 0x097F,
+    T_TRI1N002 = 0x09DF,
+    T_TRI1N000 = 0x0A2E,
+    T_TRI1N007 = 0x0A9A,
+    T_TRI1_J00 = 0x0AFC,
+    T_TRI1_046 = 0x0B59,
+    T_TRI1_034 = 0x0BAF,
+    T_TRI1_019 = 0x0BE0,
+    T_TRI1_053 = 0x0C79,
+    S_0CDF = 0x0CDF,
+    T_TRI1_048 = 0x0D46,
+    T_TRI1N004 = 0x0DF9,
+    T_TRI1N008 = 0x0E2D,
+    N_t1mlts = 0x0EA6,
+    N_t1mltk = 0x0F2C,
+    T_TRI1N014 = 0x0F5C,
+    N_t1mltd = 0x0F88,
+    T_TRI1N012 = 0x0FE1,
+    T_TRI1_040 = 0x1024,
+    T_TRI1_021 = 0x10A5,
+    N_mscans = 0x10EC,
+    T_TRI1_024 = 0x1123,
+    T_TRI1_025 = 0x1169,
+    N_mscans_2 = 0x11BD,
+    T_TRI1_022 = 0x11F4,
+    N_mscans_3 = 0x123C,
+    T_TRI1_023 = 0x1273,
+    N_mscans_4 = 0x12C0,
+    T_TRI1_017 = 0x12F7,
+    N_sscans = 0x133B,
+    T_TRI1_043 = 0x1372,
+    N_sscans_2 = 0x13BA,
+    T_TRI1_012 = 0x13F2,
+    N_sscans_3 = 0x14AC,
+    T_TRI1_041 = 0x14E3,
+    N_sscans_4 = 0x1539,
+    T_TRI1_042 = 0x1570,
+    N_sscans_5 = 0x15B3,
+    T_TRI1_013 = 0x15EA,
+    N_sscans_6 = 0x1631,
+    T_TRI1_014 = 0x1669,
+    T_TRI1U080 = 0x1730,
+    T_TRI1U090 = 0x177B,
+    T_TRI1_005 = 0x17BC,
+    T_TRI1_004 = 0x1805,
+    T_TRI1_009 = 0x1841,
+    T_TRI1U068 = 0x189B,
+    T_TRI1U086 = 0x18D6,
+    T_TRI1U106 = 0x192C,
+    T_TRI1U098 = 0x19D5,
+    T_TRI1_011 = 0x1A69,
+    T_TRI1U101 = 0x1B23,
+    T_TRI1_006 = 0x1BBC,
+    T_TRI1_002 = 0x1BF2,
+    T_TRI1U079 = 0x1C50,
+    T_TRI1U102 = 0x1CD3,
+    T_TRI1_003 = 0x1D97,
+    T_TRI1_008 = 0x1DC3,
+    T_TRI1U095 = 0x1E3A,
+    T_TRI1_016 = 0x1E80,
+    T_TRI1_018 = 0x1F00,
+    T_TRI1_020 = 0x1F59,
+    T_TRI1_029 = 0x1F8B,
+    T_TRI1_031 = 0x2013,
+    T_TRI1_039 = 0x2064,
+    T_TRI1_038 = 0x20DC,
+    T_TRI1_036 = 0x2128,
+    T_TRI1_044 = 0x21CB,
+    N_susemw = 0x225A,
+    N_t1drco = 0x22A3,
+    N_susemw_2 = 0x22E1,
+    T_TRI1_035 = 0x2339,
+    T_TRI1_050 = 0x238C,
+    T_TRI1_051 = 0x2402,
+    T_TRI1_054 = 0x2466,
+    N_rusemw = 0x2511,
+    N_t1drco_2 = 0x255A,
+    N_rusemw_2 = 0x2598,
+    T_TRI1_049 = 0x25F0,
+    T_TRI1_027 = 0x2656,
+    T_TRI1_037 = 0x267D,
+    T_TRI1_052 = 0x26A4,
+    N_Clunk = 0x26CB,
+    N_Clunk_2 = 0x26E4,
+    N_kthrwr = 0x2727,
+    T_TRI1N005 = 0x2762,
+    N_t1dip = 0x27AC,
+    T_TRI1N013 = 0x27DF,
+    S_285D = 0x285D,
+    S_2875 = 0x2875,
+    S_288D = 0x288D,
+    N_Clunk_3 = 0x28A5,
+    N_Clunk_4 = 0x28BE,
+    N_kthri = 0x290A,
+    N_t1irod = 0x2940,
+    T_TRI1_045 = 0x2992,
+    T_TRI1_033 = 0x29FF,
+    T_TRI1N004_2 = 0x2A3B,
+    T_TRI1_015 = 0x2A68,
+    T_TRI1_026 = 0x2B3B,
+};
+
+/* the room's variables: in the room state, and in the file itself */
+#define fv_choice_jumps CS_W(0xDE)
+#define fv_talk_buf CS_W(0xCA)
+#define rv_can_leave ROOM_B(0x5D)
+#define rv_code ROOM_B(0x34)
+#define rv_door_open ROOM_B(0x32)
+#define rv_ending ROOM_W(0x5F)
+#define rv_entity_stopped ROOM_B(0x31)
+#define rv_made_iron_rod ROOM_B(0x62)
+#define rv_scanned_coder ROOM_B(0x33)
+#define rv_score ROOM_W(0x29)
+#define rv_took_rod ROOM_B(0x61)
+#define rv_uhura_analysed ROOM_B(0x5E)
+
+/* functions */
+static void trial1_Talk(uint16_t ax);
+static void trial1_Say(uint16_t ax, uint16_t bx);
+static void trial1_StartRoom(void);
+static void trial1_CrewArrive(void);
+static void trial1_DoorOpened(void);
+static void trial1_IntoTheEntity(void);
+static void trial1_KirkKilled(void);
+static void trial1_ThroughDoor(void);
+static void trial1_GetRod(void);
+static void trial1_KirkAtRods(void);
+static void trial1_TookRod(void);
+static void trial1_LookAtKirk(void);
+static void trial1_LookAtSpock(void);
+static void trial1_LookAtMcCoy(void);
+static void trial1_LookAtRedshirt(void);
+static void trial1_LookAtWall(void);
+static void trial1_LookAtFloor(void);
+static void trial1_LookAtRods(void);
+static void trial1_LookAtDoor(void);
+static void trial1_LookAtCoder(void);
+static void trial1_LookAtEntity(void);
+static void trial1_LookAtMoltenRock(void);
+static void trial1_TalkToKirk(void);
+static void trial1_TalkToSpock(void);
+static void trial1_TalkToMcCoy(void);
+static void trial1_TalkToRedshirt(void);
+static void trial1_TalkToEntity(void);
+static void trial1_StunKirk(void);
+static void trial1_KillKirk(void);
+static void trial1_StunSpock(void);
+static void trial1_KillSpock(void);
+static void trial1_StunMcCoy(void);
+static void trial1_KillMcCoy(void);
+static void trial1_StunBennie(void);
+static void trial1_KillBennie(void);
+static void trial1_part_0D3A(void);
+static void trial1_E_0DE6(void);
+static void trial1_PhaserEntity(void);
+static void trial1_E_0E1A(void);
+static void trial1_PhaserWall(void);
+static void trial1_StunFloor(void);
+static void trial1_KirkStunsFloor(void);
+static void trial1_FloorStunned(void);
+static void trial1_KillFloor(void);
+static void trial1_KirkMeltsFloor(void);
+static void trial1_RockMelted(void);
+static void trial1_E_0FCE(void);
+static void trial1_PhaserRods(void);
+static void trial1_E_1011(void);
+static void trial1_PhaserDoor(void);
+static void trial1_E_1092(void);
+static void trial1_PhaserCoder(void);
+static void trial1_McCoyScansKirk(void);
+static void trial1_McCoyScansSpock(void);
+static void trial1_McCoyScansMcCoy(void);
+static void trial1_McCoyScansBennie(void);
+static void trial1_McCoyScansEntity(void);
+static void trial1_SpockScansWall(void);
+static void trial1_SpockScansEntity(void);
+static void trial1_SpockScansRods(void);
+static void trial1_SpockScansFloor(void);
+static void trial1_SpockScansDoor(void);
+static void trial1_SpockScansCoder(void);
+static void trial1_CallUhura(void);
+static void trial1_McCoyOnEntity(void);
+static void trial1_McCoyOnCoder(void);
+static void trial1_McCoyOnFloor(void);
+static void trial1_SpockOnEntity(void);
+static void trial1_SpockOnCoder(void);
+static void trial1_SpockAtCoder(void);
+static void trial1_SpockOpensDoor(void);
+static void trial1_SpockAtCoder2(void);
+static void trial1_SpockOpensOtherWay(void);
+static void trial1_SpockOnFloor(void);
+static void trial1_BennieOnEntity(void);
+static void trial1_BennieOnCoder(void);
+static void trial1_BennieAtCoder(void);
+static void trial1_BennieOpensDoor(void);
+static void trial1_BennieAtCoder2(void);
+static void trial1_BennieOpensOtherWay(void);
+static void trial1_BennieOnFloor(void);
+static void trial1_RodOnMcCoy(void);
+static void trial1_RodOnSpock(void);
+static void trial1_RodOnBennie(void);
+static void trial1_RodOnFloor(void);
+static void trial1_RodOnWall(void);
+static void trial1_RodAtEntity(void);
+static void trial1_KirkThrowsRod(void);
+static void trial1_RodThrown(void);
+static void trial1_RodOnCoder(void);
+static void trial1_RodInMoltenRock(void);
+static void trial1_KirkDipsRod(void);
+static void trial1_IronRod(void);
+static void trial1_IronRodOnMcCoy(void);
+static void trial1_IronRodOnSpock(void);
+static void trial1_IronRodOnBennie(void);
+static void trial1_IronRodOnFloor(void);
+static void trial1_IronRodOnWall(void);
+static void trial1_IronRodAtEntity(void);
+static void trial1_KirkThrowsIronRod(void);
+static void trial1_EntityStopped(void);
+static void trial1_IronRodOnCoder(void);
+static void trial1_GetIronRod(void);
+static void trial1_WalkToDoor(void);
+static void trial1_UseMedkit(void);
+
+/* Talk: conversation AX (speaker, choices, 0); returns the choice. */
+static void trial1_Talk(uint16_t ax)
+{
+    svc_Talk(ax);
+    return;
+}
+
+/* Say: one line, BX, said by AX (0: narration). */
+static void trial1_Say(uint16_t ax, uint16_t bx)
+{
+    fv_talk_buf = ax;
+    CS_W(0xCC) = bx;
+    CS_W(0xCE) = 0;
+    trial1_Talk(talk_buf);
+    return;
+}
+
+/* The room starts: the door, the entity unless stopped.
+ * [MSG_TICK 01 00 00] */
+static void trial1_StartRoom(void)
+{
+    if (rv_door_open == 0) {
+        room.busy = 2;
+    }
+    if (rv_door_open != 1) {
+        svc_Anim(0xA, N_t1drc, 0, 0, 0);
+    }
+    if (rv_entity_stopped != 1) {
+        svc_Anim(8, N_ec, 0x5F, 0xB1, 3);
+        svc_Sfx(N_TRI1LOOP);
+    }
+    return;
+}
+
+/* Tick 50, the first time: the crew take stock of the Test of Life.
+ * [MSG_TICK 32 00 00] */
+static void trial1_CrewArrive(void)
+{
+    if (rv_door_open == 0) {
+        room.busy = 0;
+    }
+    if (rv_entity_stopped != 0) {
+        return;
+    }
+    trial1_Say(N_Ensign_Bennie, T_TRI1_056);
+    trial1_Say(N_Mr_Spock, T_TRI1_047);
+    trial1_Say(N_Dr_McCoy, T_TRI1_032);
+    trial1_Say(N_Capt_Kirk, T_TRI1_007);
+    trial1_Say(N_Ensign_Bennie, T_TRI1_057);
+    trial1_Say(N_Capt_Kirk, T_TRI1_010);
+    trial1_Say(N_Ensign_Bennie, T_TRI1_055);
+    return;
+}
+
+/* The door has opened (anim msg 9).
+ * [MSG_ANIM_DONE 09 00 00] */
+static void trial1_DoorOpened(void)
+{
+    rv_door_open = 1;
+    svc_StopAnim(0xA);
+    return;
+}
+
+/* Region 0: walking into the active entity kills Kirk (anim msg 1).
+ * [MSG_REGION 00 00 00] */
+static void trial1_IntoTheEntity(void)
+{
+    if (rv_entity_stopped != 1) {
+        svc_Anim(0, N_kkills, -1, -1, 1);
+    }
+    return;
+}
+
+/* [MSG_ANIM_DONE 01 00 00] */
+static void trial1_KirkKilled(void)
+{
+    svc_GameOver();
+    trial1_Say(0, S_0693);
+    return;
+}
+
+/* Region 1, the door open: on to room 2.
+ * [MSG_REGION 01 00 00] */
+static void trial1_ThroughDoor(void)
+{
+    uint16_t stk[32 + 8] = { 0 };       /* the top 8 are what a service call reads past the stack */
+    int sp_ = 32;
+    if (rv_door_open == 1) {
+        room.busy = 1;
+        stk[--sp_] = 2;
+        stk[--sp_] = 2;
+        stk[--sp_] = 6;
+        ScriptService(stk[sp_], stk[sp_ + 1], stk[sp_ + 2], stk[sp_ + 3], stk[sp_ + 4], stk[sp_ + 5]);
+    }
+    return;
+}
+
+/* The wooden rods (msgs 4, 5): +1 once.
+ * [MSG_GET 22 00 00] */
+static void trial1_GetRod(void)
+{
+    room.busy = 1;
+    svc_Walk(0, 0xE9, 0xA9, 4);
+    return;
+}
+
+/* [MSG_WALK_DONE 04 00 00] */
+static void trial1_KirkAtRods(void)
+{
+    svc_Anim(0, N_t1pkup, 0xE9, 0xA9, 5);
+    svc_GiveItem(IT_WROD);
+    if (rv_took_rod == 0) {
+        rv_took_rod = 1;
+        rv_score += 1;
+    }
+    return;
+}
+
+/* [MSG_ANIM_DONE 05 00 00] */
+static void trial1_TookRod(void)
+{
+    room.busy = 0;
+    return;
+}
+
+/* [MSG_LOOK 00 00 00] */
+static void trial1_LookAtKirk(void)
+{
+    trial1_Say(0, T_TRI1N003);
+    return;
+}
+
+/* [MSG_LOOK 01 00 00] */
+static void trial1_LookAtSpock(void)
+{
+    trial1_Say(0, T_TRI1N017);
+    return;
+}
+
+/* [MSG_LOOK 02 00 00] */
+static void trial1_LookAtMcCoy(void)
+{
+    trial1_Say(0, T_TRI1N016);
+    return;
+}
+
+/* [MSG_LOOK 03 00 00] */
+static void trial1_LookAtRedshirt(void)
+{
+    trial1_Say(0, T_TRI1N015);
+    return;
+}
+
+/* Looking and talking.
+ * [MSG_LOOK 23 00 00] */
+static void trial1_LookAtWall(void)
+{
+    trial1_Say(0, T_TRI1N011);
+    return;
+}
+
+/* [MSG_LOOK 24 00 00] */
+static void trial1_LookAtFloor(void)
+{
+    trial1_Say(0, T_TRI1N006);
+    return;
+}
+
+/* [MSG_LOOK 22 00 00] */
+static void trial1_LookAtRods(void)
+{
+    trial1_Say(0, T_TRI1N009);
+    return;
+}
+
+/* [MSG_LOOK 20 00 00] */
+static void trial1_LookAtDoor(void)
+{
+    trial1_Say(0, T_TRI1N001);
+    return;
+}
+
+/* [MSG_LOOK 21 00 00] */
+static void trial1_LookAtCoder(void)
+{
+    trial1_Say(0, T_TRI1N002);
+    return;
+}
+
+/* [MSG_LOOK 08 00 00] */
+static void trial1_LookAtEntity(void)
+{
+    trial1_Say(0, T_TRI1N000);
+    return;
+}
+
+/* [MSG_LOOK 09 00 00] */
+static void trial1_LookAtMoltenRock(void)
+{
+    trial1_Say(0, T_TRI1N007);
+    return;
+}
+
+/* [MSG_TALK 00 00 00] */
+static void trial1_TalkToKirk(void)
+{
+    trial1_Say(N_Capt_Kirk, T_TRI1_J00);
+    return;
+}
+
+/* [MSG_TALK 01 00 00] */
+static void trial1_TalkToSpock(void)
+{
+    trial1_Say(N_Mr_Spock, T_TRI1_046);
+    trial1_Say(N_Dr_McCoy, T_TRI1_034);
+    return;
+}
+
+/* [MSG_TALK 02 00 00] */
+static void trial1_TalkToMcCoy(void)
+{
+    trial1_Say(N_Dr_McCoy, T_TRI1_019);
+    return;
+}
+
+/* [MSG_TALK 03 00 00] */
+static void trial1_TalkToRedshirt(void)
+{
+    trial1_Say(N_Ensign_Bennie, T_TRI1_053);
+    return;
+}
+
+/* [MSG_TALK 08 00 00] */
+static void trial1_TalkToEntity(void)
+{
+    trial1_Say(N_Entity, S_0CDF);
+    return;
+}
+
+/* Phasers on the crew, the entity, the walls, the door.
+ * [MSG_USE 40 00 00] */
+static void trial1_StunKirk(void)
+{
+    { trial1_part_0D3A(); return; }
+}
+
+/* [MSG_USE 41 00 00] */
+static void trial1_KillKirk(void)
+{
+    { trial1_part_0D3A(); return; }
+}
+
+/* [MSG_USE 40 01 00] */
+static void trial1_StunSpock(void)
+{
+    { trial1_part_0D3A(); return; }
+}
+
+/* [MSG_USE 41 01 00] */
+static void trial1_KillSpock(void)
+{
+    { trial1_part_0D3A(); return; }
+}
+
+/* [MSG_USE 40 02 00] */
+static void trial1_StunMcCoy(void)
+{
+    { trial1_part_0D3A(); return; }
+}
+
+/* [MSG_USE 41 02 00] */
+static void trial1_KillMcCoy(void)
+{
+    { trial1_part_0D3A(); return; }
+}
+
+/* [MSG_USE 40 03 00] */
+static void trial1_StunBennie(void)
+{
+    { trial1_part_0D3A(); return; }
+}
+
+/* [MSG_USE 41 03 00] */
+static void trial1_KillBennie(void)
+{
+    { trial1_part_0D3A(); return; }
+}
+
+static void trial1_part_0D3A(void)
+{
+    trial1_Say(N_Ensign_Bennie, T_TRI1_048);
+    return;
+}
+
+/* [MSG_USE 40 08 00] */
+static void trial1_E_0DE6(void)
+{
+    { trial1_PhaserEntity(); return; }
+}
+
+/* [MSG_USE 41 08 00] */
+static void trial1_PhaserEntity(void)
+{
+    trial1_Say(0, T_TRI1N004);
+    return;
+}
+
+/* [MSG_USE 40 23 00] */
+static void trial1_E_0E1A(void)
+{
+    { trial1_PhaserWall(); return; }
+}
+
+/* [MSG_USE 41 23 00] */
+static void trial1_PhaserWall(void)
+{
+    trial1_Say(0, T_TRI1N008);
+    return;
+}
+
+/* Phasers on the floor: stun does nothing, kill melts the rock (+1).
+ * [MSG_USE 40 24 00] */
+static void trial1_StunFloor(void)
+{
+    room.busy = 1;
+    room.fall[0] = 2;
+    svc_Walk(0, 0xCA, 0xBC, 0xC);
+    return;
+}
+
+/* [MSG_WALK_DONE 0C 00 00] */
+static void trial1_KirkStunsFloor(void)
+{
+    svc_BridgeSfx(6);
+    svc_Anim(0, N_t1mlts, 0xCA, 0xBC, 0xD);
+    return;
+}
+
+/* [MSG_ANIM_DONE 0D 00 00] */
+static void trial1_FloorStunned(void)
+{
+    room.busy = 0;
+    room.fall[0] = 2;
+    svc_StopAnim(0);
+    return;
+}
+
+/* [MSG_USE 41 24 00] */
+static void trial1_KillFloor(void)
+{
+    room.busy = 1;
+    room.fall[0] = 2;
+    svc_Walk(0, 0xCA, 0xBC, 0xE);
+    return;
+}
+
+/* [MSG_WALK_DONE 0E 00 00] */
+static void trial1_KirkMeltsFloor(void)
+{
+    svc_BridgeSfx(6);
+    svc_Anim(0, N_t1mltk, 0xCA, 0xBC, 0xF);
+    return;
+}
+
+/* [MSG_ANIM_DONE 0F 00 00] */
+static void trial1_RockMelted(void)
+{
+    trial1_Say(0, T_TRI1N014);
+    svc_Anim(9, N_t1mltd, 0xCA, 0xBC, 0);
+    room.fall[0] = 2;
+    svc_StopAnim(0);
+    rv_score += 1;
+    room.busy = 0;
+    return;
+}
+
+/* [MSG_USE 40 22 00] */
+static void trial1_E_0FCE(void)
+{
+    { trial1_PhaserRods(); return; }
+}
+
+/* [MSG_USE 41 22 00] */
+static void trial1_PhaserRods(void)
+{
+    trial1_Say(0, T_TRI1N012);
+    return;
+}
+
+/* [MSG_USE 40 20 00] */
+static void trial1_E_1011(void)
+{
+    { trial1_PhaserDoor(); return; }
+}
+
+/* [MSG_USE 41 20 00] */
+static void trial1_PhaserDoor(void)
+{
+    trial1_Say(N_Mr_Spock, T_TRI1_040);
+    return;
+}
+
+/* [MSG_USE 40 21 00] */
+static void trial1_E_1092(void)
+{
+    { trial1_PhaserCoder(); return; }
+}
+
+/* [MSG_USE 41 21 00] */
+static void trial1_PhaserCoder(void)
+{
+    trial1_Say(N_Dr_McCoy, T_TRI1_021);
+    return;
+}
+
+/* Tricorders: scanning the entity and the floor is +1 each.
+ * [MSG_USE 45 00 00] */
+static void trial1_McCoyScansKirk(void)
+{
+    room.fall[2] = 1;
+    svc_Anim(2, N_mscans, -1, -1, 0);
+    svc_BridgeSfx(4);
+    trial1_Say(N_Dr_McCoy, T_TRI1_024);
+    return;
+}
+
+/* [MSG_USE 45 01 00] */
+static void trial1_McCoyScansSpock(void)
+{
+    trial1_Say(N_Dr_McCoy, T_TRI1_025);
+    return;
+}
+
+/* [MSG_USE 45 02 00] */
+static void trial1_McCoyScansMcCoy(void)
+{
+    room.fall[2] = 1;
+    svc_Anim(2, N_mscans_2, -1, -1, 0);
+    svc_BridgeSfx(4);
+    trial1_Say(N_Dr_McCoy, T_TRI1_022);
+    return;
+}
+
+/* [MSG_USE 45 03 00] */
+static void trial1_McCoyScansBennie(void)
+{
+    room.fall[2] = 1;
+    svc_Anim(2, N_mscans_3, -1, -1, 0);
+    svc_BridgeSfx(4);
+    trial1_Say(N_Dr_McCoy, T_TRI1_023);
+    return;
+}
+
+/* [MSG_USE 45 08 00] */
+static void trial1_McCoyScansEntity(void)
+{
+    room.fall[2] = 1;
+    svc_Anim(2, N_mscans_4, -1, -1, 0);
+    svc_BridgeSfx(4);
+    trial1_Say(N_Dr_McCoy, T_TRI1_017);
+    return;
+}
+
+/* [MSG_USE 44 23 00] */
+static void trial1_SpockScansWall(void)
+{
+    room.fall[1] = 1;
+    svc_Anim(1, N_sscans, -1, -1, 0);
+    svc_BridgeSfx(4);
+    trial1_Say(N_Mr_Spock, T_TRI1_043);
+    return;
+}
+
+/* [MSG_USE 44 08 00] */
+static void trial1_SpockScansEntity(void)
+{
+    room.fall[1] = 1;
+    svc_Anim(1, N_sscans_2, -1, -1, 0);
+    svc_BridgeSfx(4);
+    trial1_Say(N_Mr_Spock, T_TRI1_012);
+    rv_score += 1;
+    return;
+}
+
+/* [MSG_USE 44 22 00] */
+static void trial1_SpockScansRods(void)
+{
+    room.fall[1] = 1;
+    svc_Anim(1, N_sscans_3, -1, -1, 0);
+    svc_BridgeSfx(4);
+    trial1_Say(N_Mr_Spock, T_TRI1_041);
+    return;
+}
+
+/* [MSG_USE 44 24 00] */
+static void trial1_SpockScansFloor(void)
+{
+    room.fall[1] = 1;
+    svc_Anim(1, N_sscans_4, -1, -1, 0);
+    svc_BridgeSfx(4);
+    trial1_Say(N_Mr_Spock, T_TRI1_042);
+    rv_score += 1;
+    return;
+}
+
+/* [MSG_USE 44 20 00] */
+static void trial1_SpockScansDoor(void)
+{
+    room.fall[1] = 1;
+    svc_Anim(1, N_sscans_5, -1, -1, 0);
+    svc_BridgeSfx(4);
+    trial1_Say(N_Mr_Spock, T_TRI1_013);
+    return;
+}
+
+/* Spock scans the coder: Uhura can now work on it.
+ * [MSG_USE 44 21 00] */
+static void trial1_SpockScansCoder(void)
+{
+    room.fall[1] = 1;
+    svc_Anim(1, N_sscans_6, -1, -1, 0);
+    svc_BridgeSfx(4);
+    trial1_Say(N_Mr_Spock, T_TRI1_014);
+    rv_scanned_coder = 1;
+    rv_score += 1;
+    return;
+}
+
+/* The communicator: once room 3 is done, Uhura offers to beam the party
+ * up (ending 1). Otherwise, with the coder scanned, Uhura finds its code
+ * (2, +1) and an anomaly that offers another code (5, +3).
+ * [MSG_USE 47 FF 00] */
+static void trial1_CallUhura(void)
+{
+    uint16_t ax = 0, si = 0;
+    uint16_t stk[32 + 8] = { 0 };       /* the top 8 are what a service call reads past the stack */
+    int sp_ = 32;
+    if (rv_can_leave != 1) {
+        goto L1885;
+    }
+    trial1_Say(N_Lt_Uhura, T_TRI1U090);
+    goto L17B3;
+L170A:;
+    rv_ending = 1;
+    stk[--sp_] = 1;
+    stk[--sp_] = 1;
+    stk[--sp_] = 1;
+    stk[--sp_] = 0x11;
+    ScriptService(stk[sp_], stk[sp_ + 1], stk[sp_ + 2], stk[sp_ + 3], stk[sp_ + 4], stk[sp_ + 5]);
+    sp_ += 4;
+    return;
+L1725:;
+    trial1_Say(N_Lt_Uhura, T_TRI1U080);
+    STRAY_B(0x1D + si) = 1;
+    stk[--sp_] = 4;
+    stk[--sp_] = 4;
+    stk[--sp_] = 6;
+    ScriptService(stk[sp_], stk[sp_ + 1], stk[sp_ + 2], stk[sp_ + 3], stk[sp_ + 4], stk[sp_ + 5]);
+L1760:;
+    return;
+L17B3:;
+    fv_talk_buf = N_Capt_Kirk;
+    CS_W(0xCC) = T_TRI1_005;
+    fv_choice_jumps = 0x170A;
+    CS_W(0xCE) = T_TRI1_004;
+    CS_W(0xE0) = 0x1725;
+    CS_W(0xD0) = T_TRI1_009;
+    CS_W(0xE2) = 0x1760;
+    CS_W(0xD2) = 0;
+    stk[--sp_] = talk_buf;
+    stk[--sp_] = 3;
+    ax = (uint16_t)ScriptService(stk[sp_], stk[sp_ + 1], stk[sp_ + 2], stk[sp_ + 3], stk[sp_ + 4], stk[sp_ + 5]);
+    sp_ += 2;
+    ax = ax << 1;
+    si = ax;
+    switch (CS_W(0xDE + si)) {
+    case 0x170A: goto L170A;
+    case 0x1725: goto L1725;
+    case 0x1760: goto L1760;
+    case 0x1C40: goto L1C40;
+    case 0x1CC2: goto L1CC2;
+    case 0x1E2A: goto L1E2A;
+    default: return;
+    }
+L1885:;
+    if (rv_uhura_analysed == 1) {
+        trial1_Say(N_Lt_Uhura, T_TRI1U068);
+        return;
+    }
+    trial1_Say(N_Lt_Uhura, T_TRI1U086);
+    trial1_Say(N_Lt_Uhura, T_TRI1U106);
+    trial1_Say(N_Lt_Uhura, T_TRI1U098);
+    if (rv_scanned_coder != 1) {
+        goto L1CC1;
+    }
+    trial1_Say(N_Capt_Kirk, T_TRI1_011);
+    trial1_Say(N_Lt_Uhura, T_TRI1U101);
+    fv_talk_buf = N_Capt_Kirk;
+    CS_W(0xCC) = T_TRI1_006;
+    fv_choice_jumps = 0x1C40;
+    CS_W(0xCE) = T_TRI1_002;
+    CS_W(0xE0) = 0x1CC2;
+    CS_W(0xD0) = 0;
+    stk[--sp_] = talk_buf;
+    stk[--sp_] = 3;
+    ax = (uint16_t)ScriptService(stk[sp_], stk[sp_ + 1], stk[sp_ + 2], stk[sp_ + 3], stk[sp_ + 4], stk[sp_ + 5]);
+    sp_ += 2;
+    ax = ax << 1;
+    si = ax;
+    switch (CS_W(0xDE + si)) {
+    case 0x170A: goto L170A;
+    case 0x1725: goto L1725;
+    case 0x1760: goto L1760;
+    case 0x1C40: goto L1C40;
+    case 0x1CC2: goto L1CC2;
+    case 0x1E2A: goto L1E2A;
+    default: return;
+    }
+L1C40:;
+    trial1_Say(N_Lt_Uhura, T_TRI1U079);
+    rv_code = 2;
+    rv_uhura_analysed = 1;
+    rv_score += 1;
+L1CC1:;
+    return;
+L1CC2:;
+    trial1_Say(N_Lt_Uhura, T_TRI1U102);
+    fv_talk_buf = N_Capt_Kirk;
+    CS_W(0xCC) = T_TRI1_003;
+    fv_choice_jumps = 0x1E2A;
+    CS_W(0xCE) = T_TRI1_008;
+    CS_W(0xE0) = 0x1C40;
+    CS_W(0xD0) = 0;
+    stk[--sp_] = talk_buf;
+    stk[--sp_] = 3;
+    ax = (uint16_t)ScriptService(stk[sp_], stk[sp_ + 1], stk[sp_ + 2], stk[sp_ + 3], stk[sp_ + 4], stk[sp_ + 5]);
+    sp_ += 2;
+    ax = ax << 1;
+    si = ax;
+    switch (CS_W(0xDE + si)) {
+    case 0x170A: goto L170A;
+    case 0x1725: goto L1725;
+    case 0x1760: goto L1760;
+    case 0x1C40: goto L1C40;
+    case 0x1CC2: goto L1CC2;
+    case 0x1E2A: goto L1E2A;
+    default: return;
+    }
+L1E2A:;
+    trial1_Say(N_Lt_Uhura, T_TRI1U095);
+    rv_code = 5;
+    rv_uhura_analysed = 1;
+    rv_score += 3;
+    return;
+}
+
+/* The crew on the coder: Spock or Bennie keys in the code once the entity
+ * is stopped: the door's code opens it (msgs 18/24, 19/25); the other
+ * code takes the party to room 5 (msgs 20/26, 21/27).
+ * [MSG_USE 02 08 00] */
+static void trial1_McCoyOnEntity(void)
+{
+    trial1_Say(N_Dr_McCoy, T_TRI1_016);
+    return;
+}
+
+/* [MSG_USE 02 21 00] */
+static void trial1_McCoyOnCoder(void)
+{
+    if (rv_entity_stopped != 1) {
+        trial1_Say(N_Dr_McCoy, T_TRI1_018);
+        return;
+    }
+    if (rv_code == 0) {
+        trial1_Say(N_Dr_McCoy, T_TRI1_020);
+        return;
+    }
+    trial1_Say(N_Dr_McCoy, T_TRI1_029);
+    return;
+}
+
+/* [MSG_USE 02 24 00] */
+static void trial1_McCoyOnFloor(void)
+{
+    trial1_Say(N_Dr_McCoy, T_TRI1_031);
+    return;
+}
+
+/* [MSG_USE 01 08 00] */
+static void trial1_SpockOnEntity(void)
+{
+    trial1_Say(N_Mr_Spock, T_TRI1_039);
+    return;
+}
+
+/* [MSG_USE 01 21 00] */
+static void trial1_SpockOnCoder(void)
+{
+    if (rv_door_open == 1) {
+        trial1_Say(N_Mr_Spock, T_TRI1_038);
+        return;
+    }
+    if (rv_entity_stopped != 0) {
+    } else {
+        trial1_Say(N_Mr_Spock, T_TRI1_036);
+        return;
+    }
+    if (rv_code == 0) {
+        trial1_Say(N_Mr_Spock, T_TRI1_044);
+        return;
+    }
+    if (rv_code == 2) {
+        svc_Walk(1, 0x1F, 0xB8, 0x12);
+        return;
+    }
+    svc_Walk(1, 0x1F, 0xB8, 0x14);
+    return;
+}
+
+/* [MSG_WALK_DONE 12 00 00] */
+static void trial1_SpockAtCoder(void)
+{
+    svc_BridgeSfx(7);
+    svc_Anim(1, N_susemw, -1, -1, 0x13);
+    return;
+}
+
+/* [MSG_ANIM_DONE 13 00 00] */
+static void trial1_SpockOpensDoor(void)
+{
+    room.fall[1] = 3;
+    svc_StopAnim(1);
+    svc_BridgeSfx(5);
+    svc_Anim(0xA, N_t1drco, -1, -1, 9);
+    rv_door_open = 1;
+    return;
+}
+
+/* [MSG_WALK_DONE 14 00 00] */
+static void trial1_SpockAtCoder2(void)
+{
+    svc_BridgeSfx(7);
+    svc_Anim(1, N_susemw_2, -1, -1, 0x15);
+    return;
+}
+
+/* [MSG_ANIM_DONE 15 00 00] */
+static void trial1_SpockOpensOtherWay(void)
+{
+    room.fall[1] = 3;
+    svc_StopAnim(1);
+    room.busy = 1;
+    svc_GotoRoom(5, 5);
+    return;
+}
+
+/* [MSG_USE 01 24 00] */
+static void trial1_SpockOnFloor(void)
+{
+    trial1_Say(N_Mr_Spock, T_TRI1_035);
+    return;
+}
+
+/* [MSG_USE 03 08 00] */
+static void trial1_BennieOnEntity(void)
+{
+    trial1_Say(N_Ensign_Bennie, T_TRI1_050);
+    return;
+}
+
+/* [MSG_USE 03 21 00] */
+static void trial1_BennieOnCoder(void)
+{
+    if (rv_door_open == 1) {
+        return;
+    }
+    if (rv_entity_stopped == 0) {
+        trial1_Say(N_Ensign_Bennie, T_TRI1_051);
+        return;
+    }
+    if (rv_code == 0) {
+        trial1_Say(N_Ensign_Bennie, T_TRI1_054);
+        return;
+    }
+    if (rv_code == 2) {
+        svc_Walk(3, 0x1F, 0xB8, 0x18);
+        return;
+    }
+    svc_Walk(3, 0x1F, 0xB8, 0x1A);
+    return;
+}
+
+/* [MSG_WALK_DONE 18 00 00] */
+static void trial1_BennieAtCoder(void)
+{
+    svc_BridgeSfx(7);
+    svc_Anim(3, N_rusemw, -1, -1, 0x19);
+    return;
+}
+
+/* [MSG_ANIM_DONE 19 00 00] */
+static void trial1_BennieOpensDoor(void)
+{
+    room.fall[3] = 3;
+    svc_StopAnim(3);
+    svc_BridgeSfx(5);
+    svc_Anim(0xA, N_t1drco_2, -1, -1, 9);
+    rv_door_open = 1;
+    return;
+}
+
+/* [MSG_WALK_DONE 1A 00 00] */
+static void trial1_BennieAtCoder2(void)
+{
+    svc_BridgeSfx(7);
+    svc_Anim(3, N_rusemw_2, -1, -1, 0x1B);
+    return;
+}
+
+/* [MSG_ANIM_DONE 1B 00 00] */
+static void trial1_BennieOpensOtherWay(void)
+{
+    room.fall[3] = 3;
+    svc_StopAnim(3);
+    room.busy = 1;
+    svc_GotoRoom(5, 5);
+    return;
+}
+
+/* [MSG_USE 03 24 00] */
+static void trial1_BennieOnFloor(void)
+{
+    trial1_Say(N_Ensign_Bennie, T_TRI1_049);
+    return;
+}
+
+/* The rods: the wooden one dipped in the molten rock (msgs 16, 17, +1)
+ * becomes an iron rod; thrown at the entity (msgs 11, 7) it freezes it
+ * (+1).
+ * [MSG_USE 68 02 00] */
+static void trial1_RodOnMcCoy(void)
+{
+    trial1_Say(N_Dr_McCoy, T_TRI1_027);
+    return;
+}
+
+/* [MSG_USE 68 01 00] */
+static void trial1_RodOnSpock(void)
+{
+    trial1_Say(N_Mr_Spock, T_TRI1_037);
+    return;
+}
+
+/* [MSG_USE 68 03 00] */
+static void trial1_RodOnBennie(void)
+{
+    trial1_Say(N_Ensign_Bennie, T_TRI1_052);
+    return;
+}
+
+/* [MSG_USE 68 24 00] */
+static void trial1_RodOnFloor(void)
+{
+    trial1_Say(0, N_Clunk);
+    return;
+}
+
+/* [MSG_USE 68 23 00] */
+static void trial1_RodOnWall(void)
+{
+    trial1_Say(0, N_Clunk_2);
+    return;
+}
+
+/* [MSG_USE 68 08 00] */
+static void trial1_RodAtEntity(void)
+{
+    room.busy = 1;
+    svc_Walk(0, 0xE9, 0xAD, 0xA);
+    svc_TakeItem(IT_WROD);
+    return;
+}
+
+/* [MSG_WALK_DONE 0A 00 00] */
+static void trial1_KirkThrowsRod(void)
+{
+    svc_Anim(0, N_kthrwr, 0xE9, 0xAD, 6);
+    return;
+}
+
+/* [MSG_ANIM_DONE 06 00 00] */
+static void trial1_RodThrown(void)
+{
+    room.busy = 0;
+    return;
+}
+
+/* [MSG_USE 68 21 00] */
+static void trial1_RodOnCoder(void)
+{
+    trial1_Say(0, T_TRI1N005);
+    return;
+}
+
+/* [MSG_USE 68 09 00] */
+static void trial1_RodInMoltenRock(void)
+{
+    room.busy = 1;
+    svc_Walk(0, 0xE4, 0xC4, 0x10);
+    return;
+}
+
+/* [MSG_WALK_DONE 10 00 00] */
+static void trial1_KirkDipsRod(void)
+{
+    svc_Anim(0, N_t1dip, 0xE4, 0xC4, 0x11);
+    return;
+}
+
+/* [MSG_ANIM_DONE 11 00 00] */
+static void trial1_IronRod(void)
+{
+    room.busy = 0;
+    trial1_Say(0, T_TRI1N013);
+    svc_TakeItem(IT_WROD);
+    svc_GiveItem(IT_IROD);
+    if (rv_made_iron_rod == 0) {
+        rv_made_iron_rod = 1;
+        rv_score += 1;
+    }
+    return;
+}
+
+/* [MSG_USE 69 02 00] */
+static void trial1_IronRodOnMcCoy(void)
+{
+    trial1_Say(N_Dr_McCoy, S_285D);
+    return;
+}
+
+/* [MSG_USE 69 01 00] */
+static void trial1_IronRodOnSpock(void)
+{
+    trial1_Say(N_Mr_Spock, S_2875);
+    return;
+}
+
+/* [MSG_USE 69 03 00] */
+static void trial1_IronRodOnBennie(void)
+{
+    trial1_Say(N_Ensign_Bennie, S_288D);
+    return;
+}
+
+/* [MSG_USE 69 24 00] */
+static void trial1_IronRodOnFloor(void)
+{
+    trial1_Say(0, N_Clunk_3);
+    return;
+}
+
+/* [MSG_USE 69 23 00] */
+static void trial1_IronRodOnWall(void)
+{
+    trial1_Say(0, N_Clunk_4);
+    return;
+}
+
+/* [MSG_USE 69 08 00] */
+static void trial1_IronRodAtEntity(void)
+{
+    room.busy = 1;
+    svc_Walk(0, 0xE9, 0xAC, 0xB);
+    rv_entity_stopped = 1;
+    svc_TakeItem(IT_IROD);
+    return;
+}
+
+/* [MSG_WALK_DONE 0B 00 00] */
+static void trial1_KirkThrowsIronRod(void)
+{
+    svc_Anim(0, N_kthri, 0xE9, 0xAC, 7);
+    svc_StopAnim(8);
+    return;
+}
+
+/* [MSG_ANIM_DONE 07 00 00] */
+static void trial1_EntityStopped(void)
+{
+    svc_Anim(0xB, N_t1irod, 0xE9, 0xAC, 8);
+    room.fall[0] = 3;
+    svc_StopAnim(0);
+    room.busy = 0;
+    svc_DigiOff();
+    trial1_Say(N_Mr_Spock, T_TRI1_045);
+    trial1_Say(N_Dr_McCoy, T_TRI1_033);
+    rv_score += 1;
+    return;
+}
+
+/* [MSG_USE 69 21 00] */
+static void trial1_IronRodOnCoder(void)
+{
+    trial1_Say(0, T_TRI1N004_2);
+    return;
+}
+
+/* [MSG_GET 0B 00 00] */
+static void trial1_GetIronRod(void)
+{
+    trial1_Say(N_Mr_Spock, T_TRI1_015);
+    return;
+}
+
+/* [MSG_WALK 20 00 00] */
+static void trial1_WalkToDoor(void)
+{
+    if (rv_door_open == 1) {
+        svc_Walk(0, 0x1A, 0xAC, 0x1C);
+    }
+    return;
+}
+
+/* [MSG_USE 7F FF 00] */
+static void trial1_UseMedkit(void)
+{
+    trial1_Say(N_Dr_McCoy, T_TRI1_026);
+    return;
+}
+
+/* the scripts, by the offset of their code in the room file */
+const RoomScript trial1_scripts[] = {
+    { 0x01F3, trial1_StartRoom },    /* MSG_TICK 01 00 00 */
+    { 0x0267, trial1_CrewArrive },    /* MSG_TICK 32 00 00 */
+    { 0x062E, trial1_DoorOpened },    /* MSG_ANIM_DONE 09 00 00 */
+    { 0x064E, trial1_IntoTheEntity },    /* MSG_REGION 00 00 00 */
+    { 0x067E, trial1_KirkKilled },    /* MSG_ANIM_DONE 01 00 00 */
+    { 0x06AF, trial1_ThroughDoor },    /* MSG_REGION 01 00 00 */
+    { 0x06D0, trial1_GetRod },    /* MSG_GET 22 00 00 */
+    { 0x06F7, trial1_KirkAtRods },    /* MSG_WALK_DONE 04 00 00 */
+    { 0x0738, trial1_TookRod },    /* MSG_ANIM_DONE 05 00 00 */
+    { 0x0743, trial1_LookAtKirk },    /* MSG_LOOK 00 00 00 */
+    { 0x0787, trial1_LookAtSpock },    /* MSG_LOOK 01 00 00 */
+    { 0x07C9, trial1_LookAtMcCoy },    /* MSG_LOOK 02 00 00 */
+    { 0x0811, trial1_LookAtRedshirt },    /* MSG_LOOK 03 00 00 */
+    { 0x085F, trial1_LookAtWall },    /* MSG_LOOK 23 00 00 */
+    { 0x08BE, trial1_LookAtFloor },    /* MSG_LOOK 24 00 00 */
+    { 0x0919, trial1_LookAtRods },    /* MSG_LOOK 22 00 00 */
+    { 0x0974, trial1_LookAtDoor },    /* MSG_LOOK 20 00 00 */
+    { 0x09D4, trial1_LookAtCoder },    /* MSG_LOOK 21 00 00 */
+    { 0x0A23, trial1_LookAtEntity },    /* MSG_LOOK 08 00 00 */
+    { 0x0A8F, trial1_LookAtMoltenRock },    /* MSG_LOOK 09 00 00 */
+    { 0x0AF1, trial1_TalkToKirk },    /* MSG_TALK 00 00 00 */
+    { 0x0B4E, trial1_TalkToSpock },    /* MSG_TALK 01 00 00 */
+    { 0x0BD4, trial1_TalkToMcCoy },    /* MSG_TALK 02 00 00 */
+    { 0x0C6E, trial1_TalkToRedshirt },    /* MSG_TALK 03 00 00 */
+    { 0x0CD4, trial1_TalkToEntity },    /* MSG_TALK 08 00 00 */
+    { 0x0D00, trial1_StunKirk },    /* MSG_USE 40 00 00 */
+    { 0x0D08, trial1_KillKirk },    /* MSG_USE 41 00 00 */
+    { 0x0D10, trial1_StunSpock },    /* MSG_USE 40 01 00 */
+    { 0x0D18, trial1_KillSpock },    /* MSG_USE 41 01 00 */
+    { 0x0D20, trial1_StunMcCoy },    /* MSG_USE 40 02 00 */
+    { 0x0D28, trial1_KillMcCoy },    /* MSG_USE 41 02 00 */
+    { 0x0D30, trial1_StunBennie },    /* MSG_USE 40 03 00 */
+    { 0x0D38, trial1_KillBennie },    /* MSG_USE 41 03 00 */
+    { 0x0DE6, trial1_E_0DE6 },    /* MSG_USE 40 08 00 */
+    { 0x0DEE, trial1_PhaserEntity },    /* MSG_USE 41 08 00 */
+    { 0x0E1A, trial1_E_0E1A },    /* MSG_USE 40 23 00 */
+    { 0x0E22, trial1_PhaserWall },    /* MSG_USE 41 23 00 */
+    { 0x0E69, trial1_StunFloor },    /* MSG_USE 40 24 00 */
+    { 0x0E94, trial1_KirkStunsFloor },    /* MSG_WALK_DONE 0C 00 00 */
+    { 0x0ECB, trial1_FloorStunned },    /* MSG_ANIM_DONE 0D 00 00 */
+    { 0x0EEF, trial1_KillFloor },    /* MSG_USE 41 24 00 */
+    { 0x0F1A, trial1_KirkMeltsFloor },    /* MSG_WALK_DONE 0E 00 00 */
+    { 0x0F51, trial1_RockMelted },    /* MSG_ANIM_DONE 0F 00 00 */
+    { 0x0FCE, trial1_E_0FCE },    /* MSG_USE 40 22 00 */
+    { 0x0FD6, trial1_PhaserRods },    /* MSG_USE 41 22 00 */
+    { 0x1011, trial1_E_1011 },    /* MSG_USE 40 20 00 */
+    { 0x1019, trial1_PhaserDoor },    /* MSG_USE 41 20 00 */
+    { 0x1092, trial1_E_1092 },    /* MSG_USE 40 21 00 */
+    { 0x109A, trial1_PhaserCoder },    /* MSG_USE 41 21 00 */
+    { 0x10E6, trial1_McCoyScansKirk },    /* MSG_USE 45 00 00 */
+    { 0x115E, trial1_McCoyScansSpock },    /* MSG_USE 45 01 00 */
+    { 0x11B7, trial1_McCoyScansMcCoy },    /* MSG_USE 45 02 00 */
+    { 0x1236, trial1_McCoyScansBennie },    /* MSG_USE 45 03 00 */
+    { 0x12BA, trial1_McCoyScansEntity },    /* MSG_USE 45 08 00 */
+    { 0x1335, trial1_SpockScansWall },    /* MSG_USE 44 23 00 */
+    { 0x13B4, trial1_SpockScansEntity },    /* MSG_USE 44 08 00 */
+    { 0x14A6, trial1_SpockScansRods },    /* MSG_USE 44 22 00 */
+    { 0x1533, trial1_SpockScansFloor },    /* MSG_USE 44 24 00 */
+    { 0x15AD, trial1_SpockScansDoor },    /* MSG_USE 44 20 00 */
+    { 0x162B, trial1_SpockScansCoder },    /* MSG_USE 44 21 00 */
+    { 0x1767, trial1_CallUhura },    /* MSG_USE 47 FF 00 */
+    { 0x1E75, trial1_McCoyOnEntity },    /* MSG_USE 02 08 00 */
+    { 0x1EEA, trial1_McCoyOnCoder },    /* MSG_USE 02 21 00 */
+    { 0x2008, trial1_McCoyOnFloor },    /* MSG_USE 02 24 00 */
+    { 0x2059, trial1_SpockOnEntity },    /* MSG_USE 01 08 00 */
+    { 0x20C6, trial1_SpockOnCoder },    /* MSG_USE 01 21 00 */
+    { 0x2248, trial1_SpockAtCoder },    /* MSG_WALK_DONE 12 00 00 */
+    { 0x227D, trial1_SpockOpensDoor },    /* MSG_ANIM_DONE 13 00 00 */
+    { 0x22CF, trial1_SpockAtCoder2 },    /* MSG_WALK_DONE 14 00 00 */
+    { 0x2304, trial1_SpockOpensOtherWay },    /* MSG_ANIM_DONE 15 00 00 */
+    { 0x232E, trial1_SpockOnFloor },    /* MSG_USE 01 24 00 */
+    { 0x2381, trial1_BennieOnEntity },    /* MSG_USE 03 08 00 */
+    { 0x23E0, trial1_BennieOnCoder },    /* MSG_USE 03 21 00 */
+    { 0x24FF, trial1_BennieAtCoder },    /* MSG_WALK_DONE 18 00 00 */
+    { 0x2534, trial1_BennieOpensDoor },    /* MSG_ANIM_DONE 19 00 00 */
+    { 0x2586, trial1_BennieAtCoder2 },    /* MSG_WALK_DONE 1A 00 00 */
+    { 0x25BB, trial1_BennieOpensOtherWay },    /* MSG_ANIM_DONE 1B 00 00 */
+    { 0x25E5, trial1_BennieOnFloor },    /* MSG_USE 03 24 00 */
+    { 0x264B, trial1_RodOnMcCoy },    /* MSG_USE 68 02 00 */
+    { 0x2672, trial1_RodOnSpock },    /* MSG_USE 68 01 00 */
+    { 0x2699, trial1_RodOnBennie },    /* MSG_USE 68 03 00 */
+    { 0x26C0, trial1_RodOnFloor },    /* MSG_USE 68 24 00 */
+    { 0x26D9, trial1_RodOnWall },    /* MSG_USE 68 23 00 */
+    { 0x26F2, trial1_RodAtEntity },    /* MSG_USE 68 08 00 */
+    { 0x2725, trial1_KirkThrowsRod },    /* MSG_WALK_DONE 0A 00 00 */
+    { 0x274C, trial1_RodThrown },    /* MSG_ANIM_DONE 06 00 00 */
+    { 0x2757, trial1_RodOnCoder },    /* MSG_USE 68 21 00 */
+    { 0x2783, trial1_RodInMoltenRock },    /* MSG_USE 68 09 00 */
+    { 0x27AA, trial1_KirkDipsRod },    /* MSG_WALK_DONE 10 00 00 */
+    { 0x27D0, trial1_IronRod },    /* MSG_ANIM_DONE 11 00 00 */
+    { 0x2852, trial1_IronRodOnMcCoy },    /* MSG_USE 69 02 00 */
+    { 0x286A, trial1_IronRodOnSpock },    /* MSG_USE 69 01 00 */
+    { 0x2882, trial1_IronRodOnBennie },    /* MSG_USE 69 03 00 */
+    { 0x289A, trial1_IronRodOnFloor },    /* MSG_USE 69 24 00 */
+    { 0x28B3, trial1_IronRodOnWall },    /* MSG_USE 69 23 00 */
+    { 0x28CC, trial1_IronRodAtEntity },    /* MSG_USE 69 08 00 */
+    { 0x2908, trial1_KirkThrowsIronRod },    /* MSG_WALK_DONE 0B 00 00 */
+    { 0x293E, trial1_EntityStopped },    /* MSG_ANIM_DONE 07 00 00 */
+    { 0x2A30, trial1_IronRodOnCoder },    /* MSG_USE 69 21 00 */
+    { 0x2A5C, trial1_GetIronRod },    /* MSG_GET 0B 00 00 */
+    { 0x2B07, trial1_WalkToDoor },    /* MSG_WALK 20 00 00 */
+    { 0x2B30, trial1_UseMedkit },    /* MSG_USE 7F FF 00 */
+    { 0, 0 }
+};

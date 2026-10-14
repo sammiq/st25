@@ -1,0 +1,912 @@
+/* TRIAL3.RDF: the room's scripts, translated from the machine code in the room file
+ * (src/rdf/trial3.asm) by tools/rdf2c.py.  They run on the loaded file (CS_B/CS_W) and the
+ * room state (`room`), and call the game through the svc_ macros of rooms.h.
+ *
+ * TRIAL3.RDF - "The Feathered Serpent", the Test of Life, the way out.
+ * Daylight ahead, but too easily: three Klingons beam in and open fire,
+ * and the exit is mined. Once the Klingons are down, Scott has a way
+ * through the force field: the party can beam up, or carry on.
+ *
+ * Actors: 8-10 (0Ah) the Klingons, 11 (0Bh) the explosion.
+ * Objects: 8-0Ah the Klingons, 20h the exit, 21h the wall.
+ * Exit 2: room 2. Region 3: the mined exit.
+ *
+ * Labels: H_ script headers, L branch targets, C_ conversations,
+ * T_/N_/S_ strings; talk_buf: the conversation buffer of Say.
+ *
+ * Quirks of the original:
+ * - The conversation at 00CA is built at run time.
+ */
+
+#include "rooms.h"
+
+/* where the file keeps its strings, conversations and tables */
+enum {
+    talk_buf = 0x00CA,
+    N_Capt_Kirk = 0x0113,
+    N_Dr_McCoy = 0x011E,
+    N_Mr_Spock = 0x0128,
+    N_Ensign_Bennie = 0x0132,
+    N_Lt_Uhura = 0x0140,
+    N_TRI3LOOP = 0x01BB,
+    T_TRI3_030 = 0x0221,
+    T_TRI3_005 = 0x026D,
+    T_TRI3_019 = 0x02AB,
+    T_TRI3_025 = 0x02E6,
+    T_TRI3_020 = 0x037C,
+    T_TRI3_004 = 0x03ED,
+    N_t3kfir = 0x0420,
+    N_t3kfir_2 = 0x0446,
+    N_t3kfir_3 = 0x046C,
+    N_t3phas04 = 0x04A9,
+    N_rkillw = 0x04C8,
+    N_t3phas05 = 0x0501,
+    N_kkillw = 0x0534,
+    N_t3kfir_4 = 0x055A,
+    N_t3kfir_5 = 0x0580,
+    N_t3kfir_6 = 0x05A6,
+    N_t3phas04_2 = 0x05E3,
+    N_rkillw_2 = 0x0602,
+    N_t3phas05_2 = 0x063B,
+    N_kkillw_2 = 0x065A,
+    S_069D = 0x069D,
+    T_TRI3U084 = 0x0709,
+    T_TRI3_007 = 0x0780,
+    T_TRI3U099 = 0x07B2,
+    T_TRI3_006 = 0x0808,
+    T_TRI3_002 = 0x0859,
+    T_TRI3_003 = 0x089C,
+    T_TRI3U080 = 0x0929,
+    N_kteled = 0x0965,
+    N_steled = 0x0983,
+    N_mteled = 0x09A1,
+    N_rteled = 0x09C5,
+    N_t3ktel = 0x0A35,
+    N_BITOKIRK = 0x0A89,
+    N_t3expl = 0x0AA3,
+    S_0ADC = 0x0ADC,
+    T_TRI3N000 = 0x0B03,
+    T_TRI3N004 = 0x0B52,
+    T_TRI3N001 = 0x0BAD,
+    T_TRI3N002 = 0x0C02,
+    T_TRI3N005 = 0x0C6A,
+    T_TRI3N007 = 0x0CBA,
+    T_TRI3_001 = 0x0CF6,
+    T_TRI3_022 = 0x0D3A,
+    T_TRI3_018 = 0x0D79,
+    T_TRI3_029 = 0x0DD1,
+    T_TRI3N006 = 0x0E50,
+    N_kdraww = 0x0E99,
+    N_t3phas00 = 0x0ED9,
+    N_t3kstn = 0x0EF8,
+    N_t3kstn_2 = 0x0F35,
+    N_t3kstn_3 = 0x0F72,
+    N_kdraww_2 = 0x0FA9,
+    N_t3phas02 = 0x0FE4,
+    N_t3kdie = 0x1003,
+    N_t3kdie_2 = 0x1044,
+    N_t3kdie_3 = 0x107C,
+    N_t3kdie_4 = 0x10B4,
+    N_t3kdie_5 = 0x10E7,
+    T_TRI3N003 = 0x112B,
+    N_sscans = 0x116D,
+    T_TRI3_015 = 0x11A4,
+    N_sscans_2 = 0x11E5,
+    T_TRI3_016 = 0x121C,
+    N_sscans_3 = 0x1270,
+    T_TRI3_013 = 0x12A7,
+    T_TRI3_014 = 0x12F7,
+    N_sscans_4 = 0x133D,
+    T_TRI3_009 = 0x1374,
+    N_sscans_5 = 0x13EC,
+    T_TRI3_024 = 0x1423,
+    N_sscans_6 = 0x1477,
+    T_TRI3_023 = 0x14AF,
+    N_sscans_7 = 0x1571,
+    T_TRI3_011 = 0x15A9,
+    T_TRI3_028 = 0x1639,
+    T_TRI3U067 = 0x16A3,
+    T_TRI3U089 = 0x1730,
+    T_TRI3_103 = 0x1771,
+    T_TRI3_104 = 0x17BA,
+    T_TRI3_107 = 0x17F6,
+    T_TRI3_010 = 0x184B,
+    T_TRI3_012 = 0x18A2,
+    T_TRI3_021 = 0x18EB,
+    T_TRI3_008 = 0x193E,
+    T_TRI3_027 = 0x19BE,
+    T_TRI3_026 = 0x1A22,
+    T_TRI3_017 = 0x1A8E,
+};
+
+/* the room's variables: in the room state, and in the file itself */
+#define fv_choice_jumps CS_W(0xDE)
+#define fv_talk_buf CS_W(0xCA)
+#define rv_can_leave ROOM_B(0x5D)
+#define rv_ending ROOM_W(0x5F)
+#define rv_klingon1 ROOM_W(0x3D)
+#define rv_klingon2 ROOM_W(0x3F)
+#define rv_klingon3 ROOM_W(0x41)
+#define rv_klingons_down ROOM_B(0x3C)
+#define rv_max_score ROOM_W(0x2B)
+#define rv_score ROOM_W(0x29)
+#define rv_seen_daylight ROOM_B(0x3A)
+#define rv_shots ROOM_B(0x3B)
+
+/* functions */
+static void trial3_Talk(uint16_t ax);
+static void trial3_Say(uint16_t ax, uint16_t bx);
+static void trial3_StartRoom(void);
+static void trial3_Daylight(void);
+static void trial3_Klingon1Fires(void);
+static void trial3_Klingon2Fires(void);
+static void trial3_Klingon3Fires(void);
+static void trial3_part_0488(void);
+static void trial3_Klingon1FiresAgain(void);
+static void trial3_Klingon2FiresAgain(void);
+static void trial3_Klingon3FiresAgain(void);
+static void trial3_part_05C2(void);
+static void trial3_BennieKilled(void);
+static void trial3_KirkKilled(void);
+static void trial3_Klingon1Down(void);
+static void trial3_Klingon2Down(void);
+static void trial3_Klingon3Down(void);
+static void trial3_part_06DF(void);
+static void trial3_part_08FC(void);
+static void trial3_part_094A(void);
+static void trial3_part_09E2(void);
+static void trial3_CarryOn(void);
+static void trial3_KlingonsBeamIn(void);
+static void trial3_IntoTheMine(void);
+static void trial3_MineExploded(void);
+static void trial3_LookAtKirk(void);
+static void trial3_LookAtSpock(void);
+static void trial3_LookAtMcCoy(void);
+static void trial3_LookAtRedshirt(void);
+static void trial3_LookAtExit(void);
+static void trial3_LookAtWall(void);
+static void trial3_TalkToKirk(void);
+static void trial3_TalkToSpock(void);
+static void trial3_TalkToMcCoy(void);
+static void trial3_TalkToRedshirt(void);
+static void trial3_E_0E3D(void);
+static void trial3_PhaserWall(void);
+static void trial3_StunKlingon1(void);
+static void trial3_KirkFiresStun(void);
+static void trial3_StunKlingon2(void);
+static void trial3_StunKlingon3(void);
+static void trial3_KillKlingon1(void);
+static void trial3_KirkFiresKill(void);
+static void trial3_KillKlingon2(void);
+static void trial3_KillKlingon3(void);
+static void trial3_E_1118(void);
+static void trial3_KillAnything(void);
+static void trial3_McCoyScansKirk(void);
+static void trial3_McCoyScansSpock(void);
+static void trial3_McCoyScansMcCoy(void);
+static void trial3_McCoyScansBennie(void);
+static void trial3_McCoyScansExit(void);
+static void trial3_SpockScansWall(void);
+static void trial3_SpockScansExit(void);
+static void trial3_McCoyScansKlingon(void);
+static void trial3_CallUhura(void);
+static void trial3_McCoyOnWall(void);
+static void trial3_McCoyOnExit(void);
+static void trial3_SpockOnWall(void);
+static void trial3_SpockOnExit(void);
+static void trial3_BennieOnExit(void);
+static void trial3_BennieOnWall(void);
+static void trial3_WalkToExit(void);
+static void trial3_UseMedkit(void);
+
+/* Talk: conversation AX (speaker, choices, 0); returns the choice. */
+static void trial3_Talk(uint16_t ax)
+{
+    svc_Talk(ax);
+    return;
+}
+
+/* Say: one line, BX, said by AX (0: narration). */
+static void trial3_Say(uint16_t ax, uint16_t bx)
+{
+    fv_talk_buf = ax;
+    CS_W(0xCC) = bx;
+    CS_W(0xCE) = 0;
+    trial3_Talk(talk_buf);
+    return;
+}
+
+/* The room starts: the music.
+ * [MSG_TICK 01 00 00] */
+static void trial3_StartRoom(void)
+{
+    svc_Sfx(N_TRI3LOOP);
+    if (rv_seen_daylight == 0) {
+        room.no_walk = 1;
+        room.busy = 2;
+    }
+    svc_Music(0x21, -1);
+    return;
+}
+
+/* Tick 30, the first time: daylight ahead, and doubts.
+ * [MSG_TICK 1E 00 00] */
+static void trial3_Daylight(void)
+{
+    if (rv_seen_daylight == 0) {
+        room.busy = 0;
+    }
+    if (rv_seen_daylight == 1) {
+        return;
+    }
+    rv_seen_daylight = 1;
+    trial3_Say(N_Ensign_Bennie, T_TRI3_030);
+    trial3_Say(N_Capt_Kirk, T_TRI3_005);
+    trial3_Say(N_Dr_McCoy, T_TRI3_019);
+    trial3_Say(N_Mr_Spock, T_TRI3_025);
+    trial3_Say(N_Dr_McCoy, T_TRI3_020);
+    trial3_Say(N_Capt_Kirk, T_TRI3_004);
+    return;
+}
+
+/* The Klingons fire in turn (anim msgs 1-6); each round's hit kills Bennie,
+ * then Kirk (anim msgs 15, 16): game over.
+ * [MSG_ANIM_DONE 01 00 00] */
+static void trial3_Klingon1Fires(void)
+{
+    svc_Anim(8, N_t3kfir, -1, -1, 4);
+    { trial3_part_0488(); return; }
+}
+
+/* [MSG_ANIM_DONE 02 00 00] */
+static void trial3_Klingon2Fires(void)
+{
+    svc_Anim(9, N_t3kfir_2, -1, -1, 5);
+    { trial3_part_0488(); return; }
+}
+
+/* [MSG_ANIM_DONE 03 00 00] */
+static void trial3_Klingon3Fires(void)
+{
+    svc_Anim(0xA, N_t3kfir_3, -1, -1, 6);
+    { trial3_part_0488(); return; }
+}
+
+static void trial3_part_0488(void)
+{
+    rv_shots += 1;
+    if (rv_shots == 1) {
+        svc_BridgeSfx(6);
+        svc_FlashBitmap(N_t3phas04);
+        svc_Anim(3, N_rkillw, -1, -1, 0xF);
+        room.redshirt_dead = 1;
+        return;
+    }
+    if (rv_shots == 2) {
+        svc_BridgeSfx(6);
+        svc_FlashBitmap(N_t3phas05);
+        svc_Music(2, -1);
+        svc_Anim(0, N_kkillw, -1, -1, 0x10);
+        return;
+    }
+    return;
+}
+
+/* [MSG_ANIM_DONE 04 00 00] */
+static void trial3_Klingon1FiresAgain(void)
+{
+    svc_Anim(8, N_t3kfir_4, -1, -1, 4);
+    { trial3_part_05C2(); return; }
+}
+
+/* [MSG_ANIM_DONE 05 00 00] */
+static void trial3_Klingon2FiresAgain(void)
+{
+    svc_Anim(9, N_t3kfir_5, -1, -1, 5);
+    { trial3_part_05C2(); return; }
+}
+
+/* [MSG_ANIM_DONE 06 00 00] */
+static void trial3_Klingon3FiresAgain(void)
+{
+    svc_Anim(0xA, N_t3kfir_6, -1, -1, 6);
+    { trial3_part_05C2(); return; }
+}
+
+static void trial3_part_05C2(void)
+{
+    rv_shots += 1;
+    if (rv_shots == 1) {
+        svc_BridgeSfx(6);
+        svc_FlashBitmap(N_t3phas04_2);
+        svc_Anim(3, N_rkillw_2, -1, -1, 0xF);
+        room.redshirt_dead = 1;
+        return;
+    }
+    if (rv_shots == 2) {
+        svc_BridgeSfx(6);
+        svc_FlashBitmap(N_t3phas05_2);
+        svc_Anim(0, N_kkillw_2, -1, -1, 0x10);
+    }
+    return;
+}
+
+/* [MSG_ANIM_DONE 0F 00 00] */
+static void trial3_BennieKilled(void)
+{
+    room.redshirt_dead = 1;
+    return;
+}
+
+/* [MSG_ANIM_DONE 10 00 00] */
+static void trial3_KirkKilled(void)
+{
+    svc_GameOver();
+    trial3_Say(0, S_069D);
+    return;
+}
+
+/* A Klingon is down (anim msgs 11-13); with all three down, Uhura calls:
+ * Scott can breach the force field. Beam up (ending 1), or carry on.
+ * [MSG_ANIM_DONE 0B 00 00] */
+static void trial3_Klingon1Down(void)
+{
+    rv_klingons_down |= 1;
+    { trial3_part_06DF(); return; }
+}
+
+/* [MSG_ANIM_DONE 0C 00 00] */
+static void trial3_Klingon2Down(void)
+{
+    rv_klingons_down |= 2;
+    { trial3_part_06DF(); return; }
+}
+
+/* [MSG_ANIM_DONE 0D 00 00] */
+static void trial3_Klingon3Down(void)
+{
+    rv_klingons_down |= 4;
+    { trial3_part_06DF(); return; }
+}
+
+static void trial3_part_06DF(void)
+{
+    uint16_t ax = 0, si = 0;
+    if (rv_klingons_down != 1) {
+        return;
+    }
+    rv_klingons_down |= 8;
+    room.no_walk = 0;
+    svc_StopAnim(0);
+    trial3_Say(N_Lt_Uhura, T_TRI3U084);
+    trial3_Say(N_Capt_Kirk, T_TRI3_007);
+    trial3_Say(N_Lt_Uhura, T_TRI3U099);
+    rv_can_leave = 1;
+    fv_talk_buf = N_Capt_Kirk;
+    CS_W(0xCC) = T_TRI3_006;
+    fv_choice_jumps = 0x9E2;
+    CS_W(0xCE) = T_TRI3_002;
+    CS_W(0xE0) = 0x8FC;
+    CS_W(0xD0) = T_TRI3_003;
+    CS_W(0xE2) = 0x919;
+    CS_W(0xD2) = 0;
+    ax = (uint16_t)svc_Talk(talk_buf);
+    ax = ax << 1;
+    si = ax;
+    switch (CS_W(0xDE + si)) {
+    case 0x08FC: { trial3_part_08FC(); return; }
+    case 0x0919: goto L0919;
+    case 0x094A: { trial3_part_094A(); return; }
+    case 0x09E2: { trial3_part_09E2(); return; }
+    default: return;
+    }
+L0919:;
+    trial3_Say(N_Lt_Uhura, T_TRI3U080);
+    { trial3_part_094A(); return; }
+}
+
+static void trial3_part_08FC(void)
+{
+    rv_ending = 1;
+    svc_BeamUp(rv_score, rv_max_score, 1);
+    return;
+}
+
+static void trial3_part_094A(void)
+{
+    room.busy = 1;
+    svc_BridgeSfx(8);
+    svc_Anim(0, N_kteled, -1, -1, 0x13);
+    svc_Anim(1, N_steled, -1, -1, 0x13);
+    svc_Anim(2, N_mteled, -1, -1, 0x13);
+    if (room.redshirt_dead == 0) {
+        svc_Anim(3, N_rteled, -1, -1, 0x13);
+    }
+    return;
+}
+
+static void trial3_part_09E2(void)
+{
+    return;
+}
+
+/* Carrying on (anim msg 19): +2, on to room 4.
+ * [MSG_ANIM_DONE 13 00 00] */
+static void trial3_CarryOn(void)
+{
+    rv_score += 2;
+    room.busy = 1;
+    svc_GotoRoom(4, 4);
+    return;
+}
+
+/* Tick 90: three Klingons beam in and open fire.
+ * [MSG_TICK 5A 00 00] */
+static void trial3_KlingonsBeamIn(void)
+{
+    rv_klingons_down &= 8;
+    if (rv_klingons_down == 0) {
+        if (rv_klingon1 != 0x14) {
+            svc_BridgeSfx(9);
+            svc_Music(0x20, -1);
+            svc_Anim(8, N_t3ktel, 0x57, 0xB1, 1);
+            rv_klingon1 = 0x15;
+        }
+    }
+    return;
+}
+
+/* Region 3, the exit: a Klingon mine explodes (anim msg 14): game over.
+ * [MSG_REGION 03 00 00] */
+static void trial3_IntoTheMine(void)
+{
+    svc_BridgeSfx(0x14);
+    svc_Music(2, -1);
+    svc_Sfx(N_BITOKIRK);
+    svc_Anim(0xB, N_t3expl, 0, 0xC7, 0xE);
+    return;
+}
+
+/* [MSG_ANIM_DONE 0E 00 00] */
+static void trial3_MineExploded(void)
+{
+    svc_GameOver();
+    trial3_Say(0, S_0ADC);
+    return;
+}
+
+/* [MSG_LOOK 00 00 00] */
+static void trial3_LookAtKirk(void)
+{
+    trial3_Say(0, T_TRI3N000);
+    return;
+}
+
+/* [MSG_LOOK 01 00 00] */
+static void trial3_LookAtSpock(void)
+{
+    trial3_Say(0, T_TRI3N004);
+    return;
+}
+
+/* [MSG_LOOK 02 00 00] */
+static void trial3_LookAtMcCoy(void)
+{
+    trial3_Say(0, T_TRI3N001);
+    return;
+}
+
+/* [MSG_LOOK 03 00 00] */
+static void trial3_LookAtRedshirt(void)
+{
+    trial3_Say(0, T_TRI3N002);
+    return;
+}
+
+/* Looking and talking.
+ * [MSG_LOOK 20 00 00] */
+static void trial3_LookAtExit(void)
+{
+    trial3_Say(0, T_TRI3N005);
+    return;
+}
+
+/* [MSG_LOOK 21 00 00] */
+static void trial3_LookAtWall(void)
+{
+    trial3_Say(0, T_TRI3N007);
+    return;
+}
+
+/* [MSG_TALK 00 00 00] */
+static void trial3_TalkToKirk(void)
+{
+    trial3_Say(N_Capt_Kirk, T_TRI3_001);
+    return;
+}
+
+/* [MSG_TALK 01 00 00] */
+static void trial3_TalkToSpock(void)
+{
+    trial3_Say(N_Mr_Spock, T_TRI3_022);
+    return;
+}
+
+/* [MSG_TALK 02 00 00] */
+static void trial3_TalkToMcCoy(void)
+{
+    trial3_Say(N_Dr_McCoy, T_TRI3_018);
+    return;
+}
+
+/* [MSG_TALK 03 00 00] */
+static void trial3_TalkToRedshirt(void)
+{
+    trial3_Say(N_Ensign_Bennie, T_TRI3_029);
+    return;
+}
+
+/* Phasers on the Klingons (msgs 17, 18): stunned, or killed (-3 for the
+ * first).
+ * [MSG_USE 40 21 00] */
+static void trial3_E_0E3D(void)
+{
+    { trial3_PhaserWall(); return; }
+}
+
+/* [MSG_USE 41 21 00] */
+static void trial3_PhaserWall(void)
+{
+    trial3_Say(0, T_TRI3N006);
+    return;
+}
+
+/* [MSG_USE 40 08 00] */
+static void trial3_StunKlingon1(void)
+{
+    if (rv_klingon1 == 0x16) {
+        return;
+    }
+    room.busy = 1;
+    svc_Anim(0, N_kdraww, -1, -1, 0x11);
+    return;
+}
+
+/* [MSG_ANIM_DONE 11 00 00] */
+static void trial3_KirkFiresStun(void)
+{
+    if (rv_klingon1 == 0x15) {
+        svc_BridgeSfx(6);
+        svc_FlashBitmap(N_t3phas00);
+        svc_Anim(8, N_t3kstn, -1, -1, 0xB);
+        room.busy = 0;
+        rv_klingon1 = 0x16;
+    }
+    return;
+}
+
+/* [MSG_USE 40 09 00] */
+static void trial3_StunKlingon2(void)
+{
+    room.busy = 1;
+    if (rv_klingon2 == 0x15) {
+        svc_Anim(9, N_t3kstn_2, -1, -1, 0xC);
+        room.busy = 0;
+        rv_klingon2 = 0x16;
+    }
+    return;
+}
+
+/* [MSG_USE 40 0A 00] */
+static void trial3_StunKlingon3(void)
+{
+    room.busy = 1;
+    if (rv_klingon3 == 0x15) {
+        svc_Anim(0xA, N_t3kstn_3, -1, -1, 0xD);
+        room.busy = 0;
+        rv_klingon3 = 0x16;
+    }
+    return;
+}
+
+/* [MSG_USE 41 08 00] */
+static void trial3_KillKlingon1(void)
+{
+    room.busy = 1;
+    svc_Anim(0, N_kdraww_2, -1, -1, 0x12);
+    return;
+}
+
+/* [MSG_ANIM_DONE 12 00 00] */
+static void trial3_KirkFiresKill(void)
+{
+    if (rv_klingon1 == 0x15) {
+        svc_BridgeSfx(6);
+        svc_FlashBitmap(N_t3phas02);
+        svc_Anim(8, N_t3kdie, -1, -1, 0xB);
+        room.busy = 0;
+        rv_klingon1 = 0x17;
+        rv_score += 0xFFFD;
+    }
+    return;
+}
+
+/* [MSG_USE 41 09 00] */
+static void trial3_KillKlingon2(void)
+{
+    room.busy = 1;
+    if (rv_klingon2 == 0x15) {
+        svc_Anim(9, N_t3kdie_2, -1, -1, 0xC);
+        room.busy = 0;
+        rv_klingon2 = 0x17;
+        return;
+    }
+    if (rv_klingon2 == 0x16) {
+        svc_Anim(9, N_t3kdie_3, -1, -1, 0xC);
+        room.busy = 0;
+        rv_klingon2 = 0x17;
+    }
+    return;
+}
+
+/* [MSG_USE 41 0A 00] */
+static void trial3_KillKlingon3(void)
+{
+    room.busy = 1;
+    if (rv_klingon3 == 0x15) {
+        svc_Anim(0xA, N_t3kdie_4, -1, -1, 0xD);
+        room.busy = 0;
+        rv_klingon3 = 0x17;
+        return;
+    }
+    if (rv_klingon3 == 0x16) {
+        svc_Anim(0xA, N_t3kdie_5, -1, -1, 0xD);
+        room.busy = 0;
+        rv_klingon3 = 0x17;
+    }
+    return;
+}
+
+/* [MSG_USE 40 FF 00] */
+static void trial3_E_1118(void)
+{
+    { trial3_KillAnything(); return; }
+}
+
+/* [MSG_USE 41 FF 00] */
+static void trial3_KillAnything(void)
+{
+    trial3_Say(0, T_TRI3N003);
+    return;
+}
+
+/* Tricorders: McCoy reads Klingons outside, Spock a bomb in the exit.
+ * [MSG_USE 45 00 00] */
+static void trial3_McCoyScansKirk(void)
+{
+    room.fall[1] = 1;
+    svc_Anim(1, N_sscans, -1, -1, 0);
+    svc_BridgeSfx(4);
+    trial3_Say(N_Dr_McCoy, T_TRI3_015);
+    return;
+}
+
+/* [MSG_USE 45 01 00] */
+static void trial3_McCoyScansSpock(void)
+{
+    room.fall[1] = 1;
+    svc_Anim(1, N_sscans_2, -1, -1, 0);
+    svc_BridgeSfx(4);
+    trial3_Say(N_Dr_McCoy, T_TRI3_016);
+    return;
+}
+
+/* [MSG_USE 45 02 00] */
+static void trial3_McCoyScansMcCoy(void)
+{
+    room.fall[1] = 1;
+    svc_Anim(1, N_sscans_3, -1, -1, 0);
+    svc_BridgeSfx(4);
+    trial3_Say(N_Dr_McCoy, T_TRI3_013);
+    return;
+}
+
+/* [MSG_USE 45 03 00] */
+static void trial3_McCoyScansBennie(void)
+{
+    trial3_Say(N_Dr_McCoy, T_TRI3_014);
+    return;
+}
+
+/* [MSG_USE 45 20 00] */
+static void trial3_McCoyScansExit(void)
+{
+    room.fall[1] = 1;
+    svc_Anim(1, N_sscans_4, -1, -1, 0);
+    svc_BridgeSfx(4);
+    trial3_Say(N_Dr_McCoy, T_TRI3_009);
+    return;
+}
+
+/* [MSG_USE 44 21 00] */
+static void trial3_SpockScansWall(void)
+{
+    room.fall[1] = 1;
+    svc_Anim(1, N_sscans_5, -1, -1, 0);
+    svc_BridgeSfx(4);
+    trial3_Say(N_Mr_Spock, T_TRI3_024);
+    return;
+}
+
+/* [MSG_USE 44 20 00] */
+static void trial3_SpockScansExit(void)
+{
+    room.fall[1] = 1;
+    svc_Anim(1, N_sscans_6, -1, -1, 0);
+    svc_BridgeSfx(4);
+    trial3_Say(N_Mr_Spock, T_TRI3_023);
+    return;
+}
+
+/* [MSG_USE 45 08 00] */
+static void trial3_McCoyScansKlingon(void)
+{
+    if (rv_klingon1 != 0x16) {
+    } else {
+        room.fall[1] = 1;
+        svc_Anim(1, N_sscans_7, -1, -1, 0);
+        svc_BridgeSfx(4);
+        trial3_Say(N_Dr_McCoy, T_TRI3_011);
+        trial3_Say(N_Ensign_Bennie, T_TRI3_028);
+        return;
+    }
+    return;
+}
+
+/* The communicator: still working on it, or (can_leave) beam up now?
+ * [MSG_USE 47 FF 00] */
+static void trial3_CallUhura(void)
+{
+    uint16_t ax = 0, si = 0;
+    if (rv_can_leave != 0) {
+    } else {
+        trial3_Say(N_Lt_Uhura, T_TRI3U067);
+        return;
+    }
+    trial3_Say(N_Lt_Uhura, T_TRI3U089);
+    fv_talk_buf = N_Capt_Kirk;
+    CS_W(0xCC) = T_TRI3_103;
+    fv_choice_jumps = 0x8FC;
+    CS_W(0xCE) = T_TRI3_104;
+    CS_W(0xE0) = 0x94A;
+    CS_W(0xD0) = T_TRI3_107;
+    CS_W(0xE2) = 0x9E2;
+    CS_W(0xD2) = 0;
+    ax = (uint16_t)svc_Talk(talk_buf);
+    ax = ax << 1;
+    si = ax;
+    switch (CS_W(0xDE + si)) {
+    case 0x08FC: { trial3_part_08FC(); return; }
+    case 0x094A: { trial3_part_094A(); return; }
+    case 0x09E2: { trial3_part_09E2(); return; }
+    default: return;
+    }
+}
+
+/* The crew on the wall and the exit.
+ * [MSG_USE 02 21 00] */
+static void trial3_McCoyOnWall(void)
+{
+    trial3_Say(N_Dr_McCoy, T_TRI3_010);
+    return;
+}
+
+/* [MSG_USE 02 20 00] */
+static void trial3_McCoyOnExit(void)
+{
+    trial3_Say(N_Dr_McCoy, T_TRI3_012);
+    return;
+}
+
+/* [MSG_USE 01 21 00] */
+static void trial3_SpockOnWall(void)
+{
+    trial3_Say(N_Mr_Spock, T_TRI3_021);
+    return;
+}
+
+/* [MSG_USE 01 20 00] */
+static void trial3_SpockOnExit(void)
+{
+    trial3_Say(N_Mr_Spock, T_TRI3_008);
+    return;
+}
+
+/* [MSG_USE 03 20 00] */
+static void trial3_BennieOnExit(void)
+{
+    trial3_Say(N_Ensign_Bennie, T_TRI3_027);
+    return;
+}
+
+/* [MSG_USE 03 21 00] */
+static void trial3_BennieOnWall(void)
+{
+    trial3_Say(N_Ensign_Bennie, T_TRI3_026);
+    return;
+}
+
+/* [MSG_WALK 20 00 00] */
+static void trial3_WalkToExit(void)
+{
+    svc_Walk(0, 0x26, 0x9D, 0);
+    return;
+}
+
+/* [MSG_USE 7F FF 00] */
+static void trial3_UseMedkit(void)
+{
+    trial3_Say(N_Dr_McCoy, T_TRI3_017);
+    return;
+}
+
+/* the scripts, by the offset of their code in the room file */
+const RoomScript trial3_scripts[] = {
+    { 0x01B9, trial3_StartRoom },    /* MSG_TICK 01 00 00 */
+    { 0x01FC, trial3_Daylight },    /* MSG_TICK 1E 00 00 */
+    { 0x041E, trial3_Klingon1Fires },    /* MSG_ANIM_DONE 01 00 00 */
+    { 0x0444, trial3_Klingon2Fires },    /* MSG_ANIM_DONE 02 00 00 */
+    { 0x046A, trial3_Klingon3Fires },    /* MSG_ANIM_DONE 03 00 00 */
+    { 0x0558, trial3_Klingon1FiresAgain },    /* MSG_ANIM_DONE 04 00 00 */
+    { 0x057E, trial3_Klingon2FiresAgain },    /* MSG_ANIM_DONE 05 00 00 */
+    { 0x05A4, trial3_Klingon3FiresAgain },    /* MSG_ANIM_DONE 06 00 00 */
+    { 0x067D, trial3_BennieKilled },    /* MSG_ANIM_DONE 0F 00 00 */
+    { 0x0688, trial3_KirkKilled },    /* MSG_ANIM_DONE 10 00 00 */
+    { 0x06B9, trial3_Klingon1Down },    /* MSG_ANIM_DONE 0B 00 00 */
+    { 0x06CA, trial3_Klingon2Down },    /* MSG_ANIM_DONE 0C 00 00 */
+    { 0x06DB, trial3_Klingon3Down },    /* MSG_ANIM_DONE 0D 00 00 */
+    { 0x09E9, trial3_CarryOn },    /* MSG_ANIM_DONE 13 00 00 */
+    { 0x0A03, trial3_KlingonsBeamIn },    /* MSG_TICK 5A 00 00 */
+    { 0x0A63, trial3_IntoTheMine },    /* MSG_REGION 03 00 00 */
+    { 0x0AC7, trial3_MineExploded },    /* MSG_ANIM_DONE 0E 00 00 */
+    { 0x0AF8, trial3_LookAtKirk },    /* MSG_LOOK 00 00 00 */
+    { 0x0B47, trial3_LookAtSpock },    /* MSG_LOOK 01 00 00 */
+    { 0x0BA2, trial3_LookAtMcCoy },    /* MSG_LOOK 02 00 00 */
+    { 0x0BF7, trial3_LookAtRedshirt },    /* MSG_LOOK 03 00 00 */
+    { 0x0C5F, trial3_LookAtExit },    /* MSG_LOOK 20 00 00 */
+    { 0x0CAF, trial3_LookAtWall },    /* MSG_LOOK 21 00 00 */
+    { 0x0CEB, trial3_TalkToKirk },    /* MSG_TALK 00 00 00 */
+    { 0x0D2F, trial3_TalkToSpock },    /* MSG_TALK 01 00 00 */
+    { 0x0D6E, trial3_TalkToMcCoy },    /* MSG_TALK 02 00 00 */
+    { 0x0DC6, trial3_TalkToRedshirt },    /* MSG_TALK 03 00 00 */
+    { 0x0E3D, trial3_E_0E3D },    /* MSG_USE 40 21 00 */
+    { 0x0E45, trial3_PhaserWall },    /* MSG_USE 41 21 00 */
+    { 0x0E8C, trial3_StunKlingon1 },    /* MSG_USE 40 08 00 */
+    { 0x0EBC, trial3_KirkFiresStun },    /* MSG_ANIM_DONE 11 00 00 */
+    { 0x0F29, trial3_StunKlingon2 },    /* MSG_USE 40 09 00 */
+    { 0x0F66, trial3_StunKlingon3 },    /* MSG_USE 40 0A 00 */
+    { 0x0FA3, trial3_KillKlingon1 },    /* MSG_USE 41 08 00 */
+    { 0x0FCC, trial3_KirkFiresKill },    /* MSG_ANIM_DONE 12 00 00 */
+    { 0x1038, trial3_KillKlingon2 },    /* MSG_USE 41 09 00 */
+    { 0x10A8, trial3_KillKlingon3 },    /* MSG_USE 41 0A 00 */
+    { 0x1118, trial3_E_1118 },    /* MSG_USE 40 FF 00 */
+    { 0x1120, trial3_KillAnything },    /* MSG_USE 41 FF 00 */
+    { 0x1167, trial3_McCoyScansKirk },    /* MSG_USE 45 00 00 */
+    { 0x11DF, trial3_McCoyScansSpock },    /* MSG_USE 45 01 00 */
+    { 0x126A, trial3_McCoyScansMcCoy },    /* MSG_USE 45 02 00 */
+    { 0x12EC, trial3_McCoyScansBennie },    /* MSG_USE 45 03 00 */
+    { 0x1337, trial3_McCoyScansExit },    /* MSG_USE 45 20 00 */
+    { 0x13E6, trial3_SpockScansWall },    /* MSG_USE 44 21 00 */
+    { 0x1471, trial3_SpockScansExit },    /* MSG_USE 44 20 00 */
+    { 0x1562, trial3_McCoyScansKlingon },    /* MSG_USE 45 08 00 */
+    { 0x168E, trial3_CallUhura },    /* MSG_USE 47 FF 00 */
+    { 0x1840, trial3_McCoyOnWall },    /* MSG_USE 02 21 00 */
+    { 0x1897, trial3_McCoyOnExit },    /* MSG_USE 02 20 00 */
+    { 0x18E0, trial3_SpockOnWall },    /* MSG_USE 01 21 00 */
+    { 0x1933, trial3_SpockOnExit },    /* MSG_USE 01 20 00 */
+    { 0x19B3, trial3_BennieOnExit },    /* MSG_USE 03 20 00 */
+    { 0x1A17, trial3_BennieOnWall },    /* MSG_USE 03 21 00 */
+    { 0x1A60, trial3_WalkToExit },    /* MSG_WALK 20 00 00 */
+    { 0x1A83, trial3_UseMedkit },    /* MSG_USE 7F FF 00 */
+    { 0, 0 }
+};

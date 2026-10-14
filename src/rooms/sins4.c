@@ -1,0 +1,674 @@
+/* SINS4.RDF: the room's scripts, translated from the machine code in the room file
+ * (src/rdf/sins4.asm) by tools/rdf2c.py.  They run on the loaded file (CS_B/CS_W) and the
+ * room state (`room`), and call the game through the svc_ macros of rooms.h.
+ *
+ * SINS4.RDF - "Sins of Omission", a corridor joining three chambers of the
+ * Scythe base. One door has a card lock: its slot shows traces of the
+ * moon's silver, and its pattern lets the drill (room 3) make a keycard.
+ * Uhura cures the virus, but the Enterprise's phasers stay down.
+ *
+ * Actors: 8 the door.
+ * Objects: 8/20h the door, 21h the lock, 22h a beam, 23h lights, 24h the
+ * way back, 25h the way on. Exits: 0 room 5, 1 room 2, 2 room 3.
+ *
+ * Labels: H_ script headers, L branch targets, C_ conversations,
+ * T_/N_/S_ strings; talk_buf: the conversation buffer of Say.
+ *
+ * Quirks of the original:
+ * - Two scripts answer Spock on the lock; the second never runs.
+ * - The conversation at 00D8 is built at run time.
+ */
+
+#include "rooms.h"
+
+/* where the file keeps its strings, conversations and tables */
+enum {
+    N_mscans = 0x00D1,
+    talk_buf = 0x00D8,
+    N_Capt_Kirk = 0x0121,
+    N_Dr_McCoy = 0x012C,
+    N_Mr_Spock = 0x0136,
+    N_Ensign_Mosher = 0x0140,
+    N_Lt_Uhura = 0x014E,
+    N_SIN4LOOP = 0x0258,
+    N_s4dro = 0x0287,
+    N_sscann = 0x02B9,
+    T_SIN4_020 = 0x02F1,
+    T_SIN4_018 = 0x03E6,
+    T_SIN4_009 = 0x043E,
+    T_SIN4_008 = 0x04B9,
+    T_SIN4N006 = 0x054A,
+    N_kusemn = 0x059C,
+    N_s4door = 0x05C1,
+    N_MUR4E1 = 0x05DF,
+    N_kusemn_2 = 0x0625,
+    T_SIN4N012 = 0x0653,
+    T_SIN4_022 = 0x0686,
+    T_SIN4N009 = 0x072C,
+    T_SIN4N010 = 0x0787,
+    T_SIN4N013 = 0x07DB,
+    T_SIN4N011 = 0x0839,
+    T_SIN4_021 = 0x089E,
+    T_SIN4_010 = 0x0906,
+    T_SIN4U088 = 0x09FA,
+    T_SIN4_007 = 0x0A44,
+    T_SIN4U103 = 0x0A70,
+    T_SIN4_025 = 0x0AEB,
+    T_SIN4_003 = 0x0B1E,
+    T_SIN4U107 = 0x0BA6,
+    T_SIN4U105 = 0x0C3E,
+    T_SIN4_005 = 0x0CCB,
+    T_SIN4N002 = 0x0D3D,
+    T_SIN4N004 = 0x0D98,
+    T_SIN4N003 = 0x0DEE,
+    T_SIN4N001 = 0x0E51,
+    T_SIN4N000 = 0x0F11,
+    T_SIN4N005 = 0x0F84,
+    T_SIN4N008 = 0x0FFB,
+    T_SIN4N007 = 0x1040,
+    T_SIN4_001 = 0x1085,
+    T_SIN4_028 = 0x10C0,
+    T_SIN4_004 = 0x1127,
+    T_SIN4_019 = 0x1177,
+    T_SIN4_015 = 0x11C1,
+    T_SIN4_024 = 0x122A,
+    T_SIN4_017 = 0x1277,
+    T_SIN4_031 = 0x12CC,
+    N_sscann_2 = 0x134F,
+    T_SIN4_027 = 0x1387,
+    T_SIN4_032 = 0x1422,
+    T_SIN4_026 = 0x1472,
+    N_sscans = 0x14EB,
+    T_SIN4_011 = 0x1522,
+    T_SIN4U100 = 0x1591,
+    T_SIN4_006 = 0x15DB,
+    T_SIN4U83B = 0x163A,
+    T_SIN4_002 = 0x1678,
+    T_SIN4U073 = 0x16CC,
+    T_SIN4_016 = 0x170C,
+    T_SIN4_029 = 0x1756,
+    T_SIN4_023 = 0x17B6,
+    T_SIN4_013 = 0x1806,
+    T_SIN4_030 = 0x1841,
+    T_SIN4_014 = 0x1945,
+    T_SIN4_012 = 0x19CA,
+};
+
+/* the room's variables: in the room state, and in the file itself */
+#define fv_talk_buf CS_W(0xD8)
+#define rv_door_open3 ROOM_B(0x3F)
+#define rv_rocks_known ROOM_B(0x39)
+#define rv_scanned_lock ROOM_B(0x36)
+#define rv_scanned_walls ROOM_B(0x49)
+#define rv_score ROOM_W(0x52)
+#define rv_seen_mine ROOM_B(0x45)
+#define rv_virus_cured ROOM_B(0x46)
+
+/* functions */
+static void sins4_Talk(uint16_t ax);
+static void sins4_Say(uint16_t ax, uint16_t bx);
+static void sins4_StartRoom(void);
+static void sins4_SpockScansLock(void);
+static void sins4_SpockOnLock(void);
+static void sins4_E_042B(void);
+static void sins4_PhaserDoor(void);
+static void sins4_E_04A6(void);
+static void sins4_PhaserLock(void);
+static void sins4_CardInLock(void);
+static void sins4_KirkAtLock(void);
+static void sins4_DoorOpens(void);
+static void sins4_RockOnLock(void);
+static void sins4_KirkAtLock2(void);
+static void sins4_RockHitsLock(void);
+static void sins4_LookAtWayBack(void);
+static void sins4_LookAtWayOn(void);
+static void sins4_LookAtScene(void);
+static void sins4_LookAtLock(void);
+static void sins4_SpockOnLockNever(void);
+static void sins4_part_08EC(void);
+static void sins4_UhuraCuresVirus(void);
+static void sins4_LookAtKirk(void);
+static void sins4_LookAtSpock(void);
+static void sins4_LookAtMcCoy(void);
+static void sins4_LookAtRedshirt(void);
+static void sins4_LookAtLights(void);
+static void sins4_LookAtBeam(void);
+static void sins4_LookAtOpenDoor(void);
+static void sins4_LookAtDoor(void);
+static void sins4_TalkToKirk(void);
+static void sins4_TalkToSpock(void);
+static void sins4_TalkToMcCoy(void);
+static void sins4_TalkToRedshirt(void);
+static void sins4_SpockScansDoor(void);
+static void sins4_SpockScansWalls(void);
+static void sins4_UseCommunicator(void);
+static void sins4_McCoyOnDoor(void);
+static void sins4_MosherOnDoor(void);
+static void sins4_SpockOnDoor(void);
+static void sins4_McCoyOnLock(void);
+static void sins4_MosherOnLock(void);
+static void sins4_WalkThroughDoor(void);
+static void sins4_WalkThroughDoor2(void);
+static void sins4_WalkBack(void);
+static void sins4_WalkOn(void);
+static void sins4_E_1922(void);
+static void sins4_MedkitOnSpock(void);
+static void sins4_MedkitOnMcCoy(void);
+static void sins4_MedkitOnRedshirt(void);
+static void sins4_E_1986(void);
+static void sins4_E_198E(void);
+static void sins4_E_1996(void);
+static void sins4_McCoyScansRedshirt(void);
+
+/* Talk: conversation AX (speaker, choices, 0); returns the choice. */
+static void sins4_Talk(uint16_t ax)
+{
+    svc_Talk(ax);
+    return;
+}
+
+/* Say: one line, BX, said by AX (0: narration). */
+static void sins4_Say(uint16_t ax, uint16_t bx)
+{
+    fv_talk_buf = ax;
+    CS_W(0xDA) = bx;
+    CS_W(0xDC) = 0;
+    sins4_Talk(talk_buf);
+    return;
+}
+
+/* The room starts: the door, if opened. Until Uhura's call (tick 40)
+ * the party can't move.
+ * [MSG_TICK 01 00 00] */
+static void sins4_StartRoom(void)
+{
+    svc_Sfx(N_SIN4LOOP);
+    if (rv_virus_cured == 0) {
+        room.busy = 2;
+    }
+    if (rv_door_open3 == 1) {
+        svc_Anim(8, N_s4dro, 0, 0, 0);
+    }
+    svc_Music(0x1B, -3);
+    return;
+}
+
+/* The lock: Spock's scan finds traces of tri-phosphorate silver in its
+ * slot (scanned_lock).
+ * [MSG_USE 44 21 00] */
+static void sins4_SpockScansLock(void)
+{
+    svc_Anim(1, N_sscann, -1, -1, 0);
+    svc_BridgeSfx(4);
+    sins4_Say(N_Mr_Spock, T_SIN4_020);
+    rv_scanned_lock = 1;
+    rv_rocks_known |= 4;
+    { sins4_part_08EC(); return; }
+}
+
+/* Spock on the lock. SpockOnLockNever has the same key, so it never runs
+ * (and with it Spock's suggestion of a keycard here).
+ * [MSG_USE 01 21 00] */
+static void sins4_SpockOnLock(void)
+{
+    sins4_Say(N_Mr_Spock, T_SIN4_018);
+    return;
+}
+
+/* Phasers.
+ * [MSG_USE 41 20 00] */
+static void sins4_E_042B(void)
+{
+    { sins4_PhaserDoor(); return; }
+}
+
+/* [MSG_USE 40 20 00] */
+static void sins4_PhaserDoor(void)
+{
+    sins4_Say(N_Mr_Spock, T_SIN4_009);
+    return;
+}
+
+/* [MSG_USE 41 21 00] */
+static void sins4_E_04A6(void)
+{
+    { sins4_PhaserLock(); return; }
+}
+
+/* [MSG_USE 40 21 00] */
+static void sins4_PhaserLock(void)
+{
+    sins4_Say(N_Mr_Spock, T_SIN4_008);
+    return;
+}
+
+/* The keycard in the lock (msgs 2, 5): the door opens (anim msg 1).
+ * [MSG_USE 75 21 00] */
+static void sins4_CardInLock(void)
+{
+    if (rv_door_open3 == 0) {
+        room.fall[0] = 0;
+        svc_Walk(0, 0xB8, 0x86, 2);
+        return;
+    }
+    sins4_Say(0, T_SIN4N006);
+    return;
+}
+
+/* [MSG_WALK_DONE 02 00 00] */
+static void sins4_KirkAtLock(void)
+{
+    rv_door_open3 = 1;
+    svc_TakeItem(IT_IDCARD);
+    svc_Anim(0, N_kusemn, -1, -1, 5);
+    return;
+}
+
+/* [MSG_ANIM_DONE 05 00 00] */
+static void sins4_DoorOpens(void)
+{
+    svc_Anim(8, N_s4door, 0, 0, 1);
+    svc_Sfx(N_MUR4E1);
+    return;
+}
+
+/* A rock in the slot (msgs 3, 4): a power surge, nothing more.
+ * [MSG_USE 74 21 00] */
+static void sins4_RockOnLock(void)
+{
+    room.fall[0] = 0;
+    svc_Walk(0, 0xB8, 0x86, 3);
+    return;
+}
+
+/* [MSG_WALK_DONE 03 00 00] */
+static void sins4_KirkAtLock2(void)
+{
+    svc_Anim(0, N_kusemn_2, -1, -1, 4);
+    return;
+}
+
+/* [MSG_ANIM_DONE 04 00 00] */
+static void sins4_RockHitsLock(void)
+{
+    sins4_Say(0, T_SIN4N012);
+    sins4_Say(N_Mr_Spock, T_SIN4_022);
+    { sins4_part_08EC(); return; }
+}
+
+/* Looking and talking.
+ * [MSG_LOOK 24 00 00] */
+static void sins4_LookAtWayBack(void)
+{
+    sins4_Say(0, T_SIN4N009);
+    return;
+}
+
+/* [MSG_LOOK 25 00 00] */
+static void sins4_LookAtWayOn(void)
+{
+    sins4_Say(0, T_SIN4N010);
+    return;
+}
+
+/* [MSG_LOOK FF 00 00] */
+static void sins4_LookAtScene(void)
+{
+    sins4_Say(0, T_SIN4N013);
+    return;
+}
+
+/* [MSG_LOOK 21 00 00] */
+static void sins4_LookAtLock(void)
+{
+    sins4_Say(0, T_SIN4N011);
+    return;
+}
+
+/* [MSG_USE 01 21 00] */
+static void sins4_SpockOnLockNever(void)
+{
+    sins4_Say(N_Mr_Spock, T_SIN4_021);
+    { sins4_part_08EC(); return; }
+}
+
+static void sins4_part_08EC(void)
+{
+    if (rv_rocks_known != 7) {
+    } else {
+        sins4_Say(N_Mr_Spock, T_SIN4_010);
+        rv_rocks_known |= 8;
+    }
+    return;
+}
+
+/* Tick 40, once: Uhura has destroyed the virus, but the phasers are still
+ * out: the party must stop the missiles from here.
+ * [MSG_TICK 28 00 00] */
+static void sins4_UhuraCuresVirus(void)
+{
+    if (rv_virus_cured != 0) {
+    } else {
+        room.busy = 0;
+        sins4_Say(N_Lt_Uhura, T_SIN4U088);
+        sins4_Say(N_Capt_Kirk, T_SIN4_007);
+        sins4_Say(N_Lt_Uhura, T_SIN4U103);
+        sins4_Say(N_Mr_Spock, T_SIN4_025);
+        sins4_Say(N_Capt_Kirk, T_SIN4_003);
+        sins4_Say(N_Lt_Uhura, T_SIN4U107);
+        sins4_Say(N_Lt_Uhura, T_SIN4U105);
+        sins4_Say(N_Capt_Kirk, T_SIN4_005);
+        rv_virus_cured = 1;
+    }
+    return;
+}
+
+/* [MSG_LOOK 00 00 00] */
+static void sins4_LookAtKirk(void)
+{
+    sins4_Say(0, T_SIN4N002);
+    return;
+}
+
+/* [MSG_LOOK 01 00 00] */
+static void sins4_LookAtSpock(void)
+{
+    sins4_Say(0, T_SIN4N004);
+    return;
+}
+
+/* [MSG_LOOK 02 00 00] */
+static void sins4_LookAtMcCoy(void)
+{
+    sins4_Say(0, T_SIN4N003);
+    return;
+}
+
+/* [MSG_LOOK 03 00 00] */
+static void sins4_LookAtRedshirt(void)
+{
+    sins4_Say(0, T_SIN4N001);
+    return;
+}
+
+/* [MSG_LOOK 23 00 00] */
+static void sins4_LookAtLights(void)
+{
+    sins4_Say(0, T_SIN4N000);
+    return;
+}
+
+/* [MSG_LOOK 22 00 00] */
+static void sins4_LookAtBeam(void)
+{
+    sins4_Say(0, T_SIN4N005);
+    return;
+}
+
+/* [MSG_LOOK 08 00 00] */
+static void sins4_LookAtOpenDoor(void)
+{
+    sins4_Say(0, T_SIN4N008);
+    return;
+}
+
+/* [MSG_LOOK 20 00 00] */
+static void sins4_LookAtDoor(void)
+{
+    sins4_Say(0, T_SIN4N007);
+    return;
+}
+
+/* [MSG_TALK 00 00 00] */
+static void sins4_TalkToKirk(void)
+{
+    sins4_Say(N_Capt_Kirk, T_SIN4_001);
+    sins4_Say(N_Mr_Spock, T_SIN4_028);
+    sins4_Say(N_Capt_Kirk, T_SIN4_004);
+    return;
+}
+
+/* [MSG_TALK 01 00 00] */
+static void sins4_TalkToSpock(void)
+{
+    sins4_Say(N_Mr_Spock, T_SIN4_019);
+    return;
+}
+
+/* [MSG_TALK 02 00 00] */
+static void sins4_TalkToMcCoy(void)
+{
+    sins4_Say(N_Dr_McCoy, T_SIN4_015);
+    sins4_Say(N_Mr_Spock, T_SIN4_024);
+    sins4_Say(N_Dr_McCoy, T_SIN4_017);
+    return;
+}
+
+/* [MSG_TALK 03 00 00] */
+static void sins4_TalkToRedshirt(void)
+{
+    sins4_Say(N_Ensign_Mosher, T_SIN4_031);
+    return;
+}
+
+/* Tricorders and the communicator.
+ * [MSG_USE 44 20 00] */
+static void sins4_SpockScansDoor(void)
+{
+    svc_Anim(1, N_sscann_2, -1, -1, 0);
+    svc_BridgeSfx(4);
+    sins4_Say(N_Mr_Spock, T_SIN4_027);
+    sins4_Say(N_Ensign_Mosher, T_SIN4_032);
+    sins4_Say(N_Mr_Spock, T_SIN4_026);
+    return;
+}
+
+/* [MSG_USE 44 FF 00] */
+static void sins4_SpockScansWalls(void)
+{
+    svc_Anim(1, N_sscans, -1, -1, 0);
+    svc_BridgeSfx(4);
+    sins4_Say(N_Mr_Spock, T_SIN4_011);
+    if (rv_scanned_walls != 1) {
+        rv_score += 1;
+        rv_scanned_walls = 1;
+    }
+    return;
+}
+
+/* [MSG_USE 47 FF 00] */
+static void sins4_UseCommunicator(void)
+{
+    if (rv_seen_mine != 0) {
+    } else {
+        sins4_Say(N_Lt_Uhura, T_SIN4U100);
+        sins4_Say(N_Capt_Kirk, T_SIN4_006);
+        sins4_Say(N_Lt_Uhura, T_SIN4U83B);
+        sins4_Say(N_Capt_Kirk, T_SIN4_002);
+        goto L16BB;
+    }
+L16BB:;
+    if (rv_seen_mine == 1) {
+        sins4_Say(N_Lt_Uhura, T_SIN4U073);
+        goto L16FA;
+    }
+L16FA:;
+    return;
+}
+
+/* The crew on the door and the lock.
+ * [MSG_USE 02 20 00] */
+static void sins4_McCoyOnDoor(void)
+{
+    sins4_Say(N_Dr_McCoy, T_SIN4_016);
+    return;
+}
+
+/* [MSG_USE 03 20 00] */
+static void sins4_MosherOnDoor(void)
+{
+    sins4_Say(N_Ensign_Mosher, T_SIN4_029);
+    return;
+}
+
+/* [MSG_USE 01 20 00] */
+static void sins4_SpockOnDoor(void)
+{
+    sins4_Say(N_Mr_Spock, T_SIN4_023);
+    return;
+}
+
+/* [MSG_USE 02 21 00] */
+static void sins4_McCoyOnLock(void)
+{
+    sins4_Say(N_Dr_McCoy, T_SIN4_013);
+    return;
+}
+
+/* [MSG_USE 03 21 00] */
+static void sins4_MosherOnLock(void)
+{
+    sins4_Say(N_Ensign_Mosher, T_SIN4_030);
+    return;
+}
+
+/* Walking: through the door (room 5), back (room 2), on (room 3).
+ * [MSG_WALK 20 00 00] */
+static void sins4_WalkThroughDoor(void)
+{
+    if (rv_door_open3 == 1) {
+        svc_Walk(0, 0x96, 0x7D, 0);
+    }
+    return;
+}
+
+/* [MSG_WALK 08 00 00] */
+static void sins4_WalkThroughDoor2(void)
+{
+    if (rv_door_open3 == 1) {
+        svc_Walk(0, 0x96, 0x7D, 0);
+    }
+    return;
+}
+
+/* [MSG_WALK 24 00 00] */
+static void sins4_WalkBack(void)
+{
+    svc_Walk(0, 0x1B, 0x95, 0);
+    return;
+}
+
+/* [MSG_WALK 25 00 00] */
+static void sins4_WalkOn(void)
+{
+    svc_Walk(0, 0x13C, 0x9B, 0);
+    return;
+}
+
+/* [MSG_USE 7F 00 00] */
+static void sins4_E_1922(void)
+{
+    { sins4_MedkitOnSpock(); return; }
+}
+
+/* [MSG_USE 7F 01 00] */
+static void sins4_MedkitOnSpock(void)
+{
+    { sins4_MedkitOnMcCoy(); return; }
+}
+
+/* [MSG_USE 7F 02 00] */
+static void sins4_MedkitOnMcCoy(void)
+{
+    { sins4_MedkitOnRedshirt(); return; }
+}
+
+/* [MSG_USE 7F 03 00] */
+static void sins4_MedkitOnRedshirt(void)
+{
+    sins4_Say(N_Dr_McCoy, T_SIN4_014);
+    return;
+}
+
+/* [MSG_USE 45 00 00] */
+static void sins4_E_1986(void)
+{
+    { sins4_McCoyScansRedshirt(); return; }
+}
+
+/* [MSG_USE 45 01 00] */
+static void sins4_E_198E(void)
+{
+    { sins4_McCoyScansRedshirt(); return; }
+}
+
+/* [MSG_USE 45 02 00] */
+static void sins4_E_1996(void)
+{
+    { sins4_McCoyScansRedshirt(); return; }
+}
+
+/* [MSG_USE 45 03 00] */
+static void sins4_McCoyScansRedshirt(void)
+{
+    svc_Anim(2, N_mscans, -1, -1, 0);
+    svc_BridgeSfx(4);
+    sins4_Say(N_Dr_McCoy, T_SIN4_012);
+    return;
+}
+
+/* the scripts, by the offset of their code in the room file */
+const RoomScript sins4_scripts[] = {
+    { 0x0256, sins4_StartRoom },    /* MSG_TICK 01 00 00 */
+    { 0x02B7, sins4_SpockScansLock },    /* MSG_USE 44 21 00 */
+    { 0x03DB, sins4_SpockOnLock },    /* MSG_USE 01 21 00 */
+    { 0x042B, sins4_E_042B },    /* MSG_USE 41 20 00 */
+    { 0x0433, sins4_PhaserDoor },    /* MSG_USE 40 20 00 */
+    { 0x04A6, sins4_E_04A6 },    /* MSG_USE 41 21 00 */
+    { 0x04AE, sins4_PhaserLock },    /* MSG_USE 40 21 00 */
+    { 0x0518, sins4_CardInLock },    /* MSG_USE 75 21 00 */
+    { 0x0585, sins4_KirkAtLock },    /* MSG_WALK_DONE 02 00 00 */
+    { 0x05BF, sins4_DoorOpens },    /* MSG_ANIM_DONE 05 00 00 */
+    { 0x05FC, sins4_RockOnLock },    /* MSG_USE 74 21 00 */
+    { 0x0623, sins4_KirkAtLock2 },    /* MSG_WALK_DONE 03 00 00 */
+    { 0x0648, sins4_RockHitsLock },    /* MSG_ANIM_DONE 04 00 00 */
+    { 0x0721, sins4_LookAtWayBack },    /* MSG_LOOK 24 00 00 */
+    { 0x077C, sins4_LookAtWayOn },    /* MSG_LOOK 25 00 00 */
+    { 0x07D0, sins4_LookAtScene },    /* MSG_LOOK FF 00 00 */
+    { 0x082E, sins4_LookAtLock },    /* MSG_LOOK 21 00 00 */
+    { 0x0893, sins4_SpockOnLockNever },    /* MSG_USE 01 21 00 */
+    { 0x09E2, sins4_UhuraCuresVirus },    /* MSG_TICK 28 00 00 */
+    { 0x0D32, sins4_LookAtKirk },    /* MSG_LOOK 00 00 00 */
+    { 0x0D8D, sins4_LookAtSpock },    /* MSG_LOOK 01 00 00 */
+    { 0x0DE3, sins4_LookAtMcCoy },    /* MSG_LOOK 02 00 00 */
+    { 0x0E45, sins4_LookAtRedshirt },    /* MSG_LOOK 03 00 00 */
+    { 0x0F06, sins4_LookAtLights },    /* MSG_LOOK 23 00 00 */
+    { 0x0F79, sins4_LookAtBeam },    /* MSG_LOOK 22 00 00 */
+    { 0x0FF0, sins4_LookAtOpenDoor },    /* MSG_LOOK 08 00 00 */
+    { 0x1035, sins4_LookAtDoor },    /* MSG_LOOK 20 00 00 */
+    { 0x107A, sins4_TalkToKirk },    /* MSG_TALK 00 00 00 */
+    { 0x116C, sins4_TalkToSpock },    /* MSG_TALK 01 00 00 */
+    { 0x11B6, sins4_TalkToMcCoy },    /* MSG_TALK 02 00 00 */
+    { 0x12C1, sins4_TalkToRedshirt },    /* MSG_TALK 03 00 00 */
+    { 0x134D, sins4_SpockScansDoor },    /* MSG_USE 44 20 00 */
+    { 0x14E9, sins4_SpockScansWalls },    /* MSG_USE 44 FF 00 */
+    { 0x157D, sins4_UseCommunicator },    /* MSG_USE 47 FF 00 */
+    { 0x1701, sins4_McCoyOnDoor },    /* MSG_USE 02 20 00 */
+    { 0x174B, sins4_MosherOnDoor },    /* MSG_USE 03 20 00 */
+    { 0x17AB, sins4_SpockOnDoor },    /* MSG_USE 01 20 00 */
+    { 0x17FB, sins4_McCoyOnLock },    /* MSG_USE 02 21 00 */
+    { 0x1836, sins4_MosherOnLock },    /* MSG_USE 03 21 00 */
+    { 0x188A, sins4_WalkThroughDoor },    /* MSG_WALK 20 00 00 */
+    { 0x18B3, sins4_WalkThroughDoor2 },    /* MSG_WALK 08 00 00 */
+    { 0x18DC, sins4_WalkBack },    /* MSG_WALK 24 00 00 */
+    { 0x18FF, sins4_WalkOn },    /* MSG_WALK 25 00 00 */
+    { 0x1922, sins4_E_1922 },    /* MSG_USE 7F 00 00 */
+    { 0x192A, sins4_MedkitOnSpock },    /* MSG_USE 7F 01 00 */
+    { 0x1932, sins4_MedkitOnMcCoy },    /* MSG_USE 7F 02 00 */
+    { 0x193A, sins4_MedkitOnRedshirt },    /* MSG_USE 7F 03 00 */
+    { 0x1986, sins4_E_1986 },    /* MSG_USE 45 00 00 */
+    { 0x198E, sins4_E_198E },    /* MSG_USE 45 01 00 */
+    { 0x1996, sins4_E_1996 },    /* MSG_USE 45 02 00 */
+    { 0x199E, sins4_McCoyScansRedshirt },    /* MSG_USE 45 03 00 */
+    { 0, 0 }
+};

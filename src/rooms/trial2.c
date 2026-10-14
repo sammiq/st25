@@ -1,0 +1,1059 @@
+/* TRIAL2.RDF: the room's scripts, translated from the machine code in the room file
+ * (src/rdf/trial2.asm) by tools/rdf2c.py.  They run on the loaded file (CS_B/CS_W) and the
+ * room state (`room`), and call the game through the svc_ macros of rooms.h.
+ *
+ * TRIAL2.RDF - "The Feathered Serpent", the Test of Life, second chamber.
+ * A sphere of energy, an automaton with a force field, blocks the way. It
+ * absorbs phaser fire: at a charge of exactly 3 it splits in two, at 4 it
+ * overloads and explodes, so the spheres must be charged past 3 with
+ * the right mix of stun and kill shots.
+ *
+ * Actors: 8-11 (0Bh) the spheres.
+ * Objects: 8-0Ah the spheres, 20h the insignia, 21h the wall, 22h the
+ * way back. Exits: 2 room 1, 3 room 3. Region 0: the sphere's field.
+ *
+ * Labels: H_ script headers, L branch targets, C_ conversations,
+ * T_/N_/S_ strings; talk_buf: the conversation buffer of Say.
+ *
+ * Quirks of the original:
+ * - The conversation at 00CA is built at run time.
+ */
+
+#include "rooms.h"
+
+/* where the file keeps its strings, conversations and tables */
+enum {
+    talk_buf = 0x00CA,
+    N_Capt_Kirk = 0x0113,
+    N_Dr_McCoy = 0x011E,
+    N_Mr_Spock = 0x0128,
+    N_Ensign_Bennie = 0x0132,
+    N_Lt_Uhura = 0x0140,
+    N_NOOOLOOP = 0x01D2,
+    N_trial22 = 0x0216,
+    N_TRI2LOOP = 0x0233,
+    N_sglob = 0x024D,
+    N_TRI2LOOP_2 = 0x027C,
+    N_sglob_2 = 0x0296,
+    N_sglob_3 = 0x02B4,
+    T_TRI2_034 = 0x0309,
+    T_TRI2_005 = 0x0340,
+    T_TRI2_030 = 0x0370,
+    T_TRI2_008 = 0x03F2,
+    T_TRI2_024 = 0x0463,
+    T_TRI2N003 = 0x04FD,
+    T_TRI2N001 = 0x055D,
+    T_TRI2N006 = 0x05C2,
+    T_TRI2N002 = 0x062B,
+    T_TRI2N004 = 0x067F,
+    T_TRI2N000 = 0x06C2,
+    T_TRI2N007 = 0x06FE,
+    T_TRI2N005 = 0x0771,
+    T_TRI2_001 = 0x07CC,
+    T_TRI2_019 = 0x0846,
+    T_TRI2_013 = 0x08CC,
+    T_TRI2_033 = 0x0953,
+    T_QUIET = 0x09AE,
+    T_QUIET_2 = 0x09DC,
+    T_QUIET_3 = 0x0A0A,
+    T_TRI2N008 = 0x0A40,
+    N_kdraww = 0x0AA7,
+    N_t2kp00 = 0x0AE0,
+    T_TRI2_025 = 0x0B24,
+    N_kdraww_2 = 0x0BD8,
+    N_t2kp03 = 0x0C11,
+    N_GLOBEDIV = 0x0C58,
+    N_globsp = 0x0C72,
+    N_REDBALL = 0x0CAD,
+    N_globex = 0x0CC6,
+    N_kdraww_3 = 0x0D14,
+    N_t2kp01 = 0x0D4D,
+    T_TRI2_025_2 = 0x0D91,
+    N_kdraww_4 = 0x0E45,
+    N_t2kp04 = 0x0E7E,
+    T_TRI2_023 = 0x0EC1,
+    N_globsp_2 = 0x0F47,
+    N_globex_2 = 0x0F82,
+    N_kdraww_5 = 0x0FD0,
+    N_t2kp02 = 0x1009,
+    T_TRI2_025_3 = 0x104D,
+    N_kdraww_6 = 0x1101,
+    N_t2kp05 = 0x113A,
+    T_TRI2_023_2 = 0x1181,
+    N_globsp_3 = 0x1207,
+    N_globex_3 = 0x1242,
+    N_Noooloop_2 = 0x1287,
+    T_TRI2_020 = 0x12AA,
+    N_trial2 = 0x130A,
+    T_TRI2_009 = 0x1331,
+    N_sglob_6 = 0x1490,
+    N_sglob_7 = 0x14AE,
+    N_sglob_8 = 0x14D4,
+    N_sglob_9 = 0x14F3,
+    N_V7ALLGET = 0x1513,
+    N_kkills = 0x154A,
+    N_skills = 0x1568,
+    N_mkills = 0x1586,
+    N_rkills = 0x15A4,
+    S_15E0 = 0x15E0,
+    N_mscans = 0x1603,
+    T_TRI2_016 = 0x163A,
+    N_mscans_2 = 0x167B,
+    T_TRI2_017 = 0x16B2,
+    N_mscans_3 = 0x1706,
+    T_TRI2_014 = 0x173D,
+    N_mscans_4 = 0x1785,
+    T_TRI2_015 = 0x17BC,
+    N_mscans_5 = 0x1812,
+    T_TRI2_011 = 0x1849,
+    N_sscans = 0x1898,
+    T_TRI2_029 = 0x18CF,
+    N_sscans_2 = 0x1923,
+    T_TRI2_027 = 0x195A,
+    N_sscans_3 = 0x19C3,
+    T_TRI2_026 = 0x19FB,
+    T_TRI2U091 = 0x1B30,
+    T_TRI2_003 = 0x1B71,
+    T_TRI2_004 = 0x1BBA,
+    T_TRI2_007 = 0x1BF6,
+    T_TRI2U087 = 0x1C46,
+    T_TRI2_006 = 0x1D14,
+    T_TRI2U104 = 0x1D78,
+    T_TRI2U081 = 0x1DB0,
+    T_TRI2_002 = 0x1DEA,
+    T_TRI2U074 = 0x1E4B,
+    T_TRI2_012 = 0x1ECE,
+    T_TRI2_012_2 = 0x1F1C,
+    T_TRI2_010 = 0x1F6A,
+    T_TRI2_028 = 0x1FB5,
+    T_TRI2_F11 = 0x2035,
+    T_TRI2_022 = 0x20B5,
+    T_TRI2_031 = 0x2108,
+    T_TRI2_031_2 = 0x2168,
+    T_TRI2_032 = 0x21C8,
+    T_TRI2_018 = 0x221C,
+};
+
+/* the room's variables: in the room state, and in the file itself */
+#define fv_choice_jumps CS_W(0xDE)
+#define fv_talk_buf CS_W(0xCA)
+#define rv_can_leave ROOM_B(0x5D)
+#define rv_ending ROOM_W(0x5F)
+#define rv_scanned_sphere ROOM_B(0x64)
+#define rv_score ROOM_W(0x29)
+#define rv_seen_sphere ROOM_B(0x5C)
+#define rv_sphere1 ROOM_B(0x37)
+#define rv_sphere2 ROOM_B(0x38)
+#define rv_sphere3 ROOM_B(0x39)
+#define rv_spheres_gone ROOM_B(0x36)
+#define rv_split ROOM_B(0x35)
+
+/* functions */
+static void trial2_Talk(uint16_t ax);
+static void trial2_Say(uint16_t ax, uint16_t bx);
+static void trial2_StartRoom(void);
+static void trial2_FirstSight(void);
+static void trial2_Blocked(void);
+static void trial2_LookAtKirk(void);
+static void trial2_LookAtSpock(void);
+static void trial2_LookAtMcCoy(void);
+static void trial2_LookAtRedshirt(void);
+static void trial2_LookAtInsignia(void);
+static void trial2_E_06A7(void);
+static void trial2_E_06AF(void);
+static void trial2_LookAtSphere(void);
+static void trial2_LookAtWall(void);
+static void trial2_LookAtWayBack(void);
+static void trial2_TalkToKirk(void);
+static void trial2_TalkToSpock(void);
+static void trial2_TalkToMcCoy(void);
+static void trial2_TalkToRedshirt(void);
+static void trial2_TalkToSphere1(void);
+static void trial2_TalkToSphere2(void);
+static void trial2_TalkToSphere3(void);
+static void trial2_E_0A2D(void);
+static void trial2_PhaserWall(void);
+static void trial2_StunSphere1(void);
+static void trial2_KirkFires1(void);
+static void trial2_Sphere1Charged(void);
+static void trial2_KillSphere1(void);
+static void trial2_KirkFires1Kill(void);
+static void trial2_Sphere1Overcharged(void);
+static void trial2_part_0C4B(void);
+static void trial2_StunSphere2(void);
+static void trial2_KirkFires2(void);
+static void trial2_Sphere2Charged(void);
+static void trial2_KillSphere2(void);
+static void trial2_KirkFires2Kill(void);
+static void trial2_Sphere2Overcharged(void);
+static void trial2_StunSphere3(void);
+static void trial2_KirkFires3(void);
+static void trial2_Sphere3Charged(void);
+static void trial2_KillSphere3(void);
+static void trial2_KirkFires3Kill(void);
+static void trial2_Sphere3Overcharged(void);
+static void trial2_part_11FA(void);
+static void trial2_Sphere1Explodes(void);
+static void trial2_Sphere2Explodes(void);
+static void trial2_SpheresGone(void);
+static void trial2_part_1279(void);
+static void trial2_Sphere1Splits(void);
+static void trial2_Sphere2Splits(void);
+static void trial2_Sphere3Splits(void);
+static void trial2_part_1511(void);
+static void trial2_PartyKilled(void);
+static void trial2_McCoyScansKirk(void);
+static void trial2_McCoyScansSpock(void);
+static void trial2_McCoyScansMcCoy(void);
+static void trial2_McCoyScansBennie(void);
+static void trial2_E_17FC(void);
+static void trial2_E_1804(void);
+static void trial2_McCoyScansSphere(void);
+static void trial2_SpockScansWall(void);
+static void trial2_SpockScans(void);
+static void trial2_E_19AD(void);
+static void trial2_E_19B5(void);
+static void trial2_SpockScansSphere(void);
+static void trial2_CallUhura(void);
+static void trial2_McCoyOnSphere2(void);
+static void trial2_McCoyOnSphere3(void);
+static void trial2_McCoyOnWall(void);
+static void trial2_SpockOnSphere2(void);
+static void trial2_SpockOnSphere3(void);
+static void trial2_SpockOnWall(void);
+static void trial2_BennieOnSphere2(void);
+static void trial2_BennieOnSphere3(void);
+static void trial2_BennieOnWall(void);
+static void trial2_WalkBack(void);
+static void trial2_UseMedkit(void);
+
+/* Talk: conversation AX (speaker, choices, 0); returns the choice. */
+static void trial2_Talk(uint16_t ax)
+{
+    svc_Talk(ax);
+    return;
+}
+
+/* Say: one line, BX, said by AX (0: narration). */
+static void trial2_Say(uint16_t ax, uint16_t bx)
+{
+    fv_talk_buf = ax;
+    CS_W(0xCC) = bx;
+    CS_W(0xCE) = 0;
+    trial2_Talk(talk_buf);
+    return;
+}
+
+/* The room starts: the sphere, or the two after the split, or none.
+ * [MSG_TICK 01 00 00] */
+static void trial2_StartRoom(void)
+{
+    svc_Sfx(N_NOOOLOOP);
+    if (rv_seen_sphere == 0) {
+        room.busy = 2;
+    }
+    if (rv_spheres_gone == 1) {
+        return;
+    }
+    svc_Music(0x18, -1);
+    svc_LoadMap(N_trial22);
+    if (rv_split == 0) {
+        svc_Sfx(N_TRI2LOOP);
+        svc_Anim(8, N_sglob, 0x46, 0xAF, 0);
+        rv_sphere1 = 1;
+        goto L0274;
+    }
+L0274:;
+    if (rv_split == 1) {
+        svc_Sfx(N_TRI2LOOP_2);
+        svc_Anim(9, N_sglob_2, 0x20, 0xAF, 0);
+        svc_Anim(0xA, N_sglob_3, 0x69, 0xAF, 0);
+        rv_sphere2 = 1;
+        rv_sphere3 = 1;
+        goto L02DF;
+    }
+L02DF:;
+    return;
+}
+
+/* Tick 60, the first time: the crew on the sphere.
+ * [MSG_TICK 3C 00 00] */
+static void trial2_FirstSight(void)
+{
+    if (rv_seen_sphere == 0) {
+        room.busy = 0;
+    }
+    if (rv_seen_sphere != 0) {
+    } else {
+        trial2_Say(N_Ensign_Bennie, T_TRI2_034);
+        trial2_Say(N_Capt_Kirk, T_TRI2_005);
+        trial2_Say(N_Mr_Spock, T_TRI2_030);
+        trial2_Say(N_Capt_Kirk, T_TRI2_008);
+        rv_seen_sphere = 1;
+    }
+    return;
+}
+
+/* Region 0: the sphere's force field stops the party.
+ * [MSG_REGION 00 00 00] */
+static void trial2_Blocked(void)
+{
+    if (rv_sphere2 == 0) {
+        if (rv_sphere3 == 0) {
+            return;
+        }
+    }
+    trial2_Say(N_Mr_Spock, T_TRI2_024);
+    return;
+}
+
+/* [MSG_LOOK 00 00 00] */
+static void trial2_LookAtKirk(void)
+{
+    trial2_Say(0, T_TRI2N003);
+    return;
+}
+
+/* [MSG_LOOK 01 00 00] */
+static void trial2_LookAtSpock(void)
+{
+    trial2_Say(0, T_TRI2N001);
+    return;
+}
+
+/* [MSG_LOOK 02 00 00] */
+static void trial2_LookAtMcCoy(void)
+{
+    trial2_Say(0, T_TRI2N006);
+    return;
+}
+
+/* [MSG_LOOK 03 00 00] */
+static void trial2_LookAtRedshirt(void)
+{
+    trial2_Say(0, T_TRI2N002);
+    return;
+}
+
+/* Looking and talking.
+ * [MSG_LOOK 20 00 00] */
+static void trial2_LookAtInsignia(void)
+{
+    trial2_Say(0, T_TRI2N004);
+    return;
+}
+
+/* [MSG_LOOK 08 00 00] */
+static void trial2_E_06A7(void)
+{
+    { trial2_LookAtSphere(); return; }
+}
+
+/* [MSG_LOOK 09 00 00] */
+static void trial2_E_06AF(void)
+{
+    { trial2_LookAtSphere(); return; }
+}
+
+/* [MSG_LOOK 0A 00 00] */
+static void trial2_LookAtSphere(void)
+{
+    trial2_Say(0, T_TRI2N000);
+    return;
+}
+
+/* [MSG_LOOK 21 00 00] */
+static void trial2_LookAtWall(void)
+{
+    trial2_Say(0, T_TRI2N007);
+    return;
+}
+
+/* [MSG_LOOK 22 00 00] */
+static void trial2_LookAtWayBack(void)
+{
+    trial2_Say(0, T_TRI2N005);
+    return;
+}
+
+/* [MSG_TALK 00 00 00] */
+static void trial2_TalkToKirk(void)
+{
+    trial2_Say(N_Capt_Kirk, T_TRI2_001);
+    return;
+}
+
+/* [MSG_TALK 01 00 00] */
+static void trial2_TalkToSpock(void)
+{
+    trial2_Say(N_Mr_Spock, T_TRI2_019);
+    return;
+}
+
+/* [MSG_TALK 02 00 00] */
+static void trial2_TalkToMcCoy(void)
+{
+    trial2_Say(N_Dr_McCoy, T_TRI2_013);
+    return;
+}
+
+/* [MSG_TALK 03 00 00] */
+static void trial2_TalkToRedshirt(void)
+{
+    trial2_Say(N_Ensign_Bennie, T_TRI2_033);
+    return;
+}
+
+/* [MSG_TALK 08 00 00] */
+static void trial2_TalkToSphere1(void)
+{
+    trial2_Say(0, T_QUIET);
+    return;
+}
+
+/* [MSG_TALK 09 00 00] */
+static void trial2_TalkToSphere2(void)
+{
+    trial2_Say(0, T_QUIET_2);
+    return;
+}
+
+/* [MSG_TALK 0A 00 00] */
+static void trial2_TalkToSphere3(void)
+{
+    trial2_Say(0, T_QUIET_3);
+    return;
+}
+
+/* Phasers on the spheres (msgs 7-18): stun charges one by 1, kill by 2.
+ * At exactly 3 it splits, at 4 it overloads and explodes.
+ * [MSG_USE 40 21 00] */
+static void trial2_E_0A2D(void)
+{
+    { trial2_PhaserWall(); return; }
+}
+
+/* [MSG_USE 41 21 00] */
+static void trial2_PhaserWall(void)
+{
+    trial2_Say(0, T_TRI2N008);
+    return;
+}
+
+/* [MSG_USE 40 08 00] */
+static void trial2_StunSphere1(void)
+{
+    room.busy = 1;
+    svc_Walk(0, 0xCD, 0xC5, 7);
+    return;
+}
+
+/* [MSG_WALK_DONE 07 00 00] */
+static void trial2_KirkFires1(void)
+{
+    svc_Anim(0, N_kdraww, -1, -1, 0xA);
+    return;
+}
+
+/* [MSG_ANIM_DONE 0A 00 00] */
+static void trial2_Sphere1Charged(void)
+{
+    room.fall[0] = 3;
+    svc_BridgeSfx(6);
+    svc_FlashBitmap(N_t2kp00);
+    svc_StopAnim(0);
+    room.busy = 0;
+    rv_sphere1 += 1;
+    trial2_Say(N_Mr_Spock, T_TRI2_025);
+    { trial2_part_0C4B(); return; }
+}
+
+/* [MSG_USE 41 08 00] */
+static void trial2_KillSphere1(void)
+{
+    room.busy = 1;
+    svc_Walk(0, 0xCD, 0xC5, 0xD);
+    return;
+}
+
+/* [MSG_WALK_DONE 0D 00 00] */
+static void trial2_KirkFires1Kill(void)
+{
+    svc_Anim(0, N_kdraww_2, -1, -1, 0x10);
+    return;
+}
+
+/* [MSG_ANIM_DONE 10 00 00] */
+static void trial2_Sphere1Overcharged(void)
+{
+    room.fall[0] = 3;
+    svc_BridgeSfx(6);
+    svc_FlashBitmap(N_t2kp03);
+    svc_StopAnim(0);
+    room.busy = 0;
+    rv_sphere1 += 2;
+    { trial2_part_0C4B(); return; }
+}
+
+static void trial2_part_0C4B(void)
+{
+    if (rv_sphere1 == 3) {
+        svc_Sfx(N_GLOBEDIV);
+        svc_Anim(8, N_globsp, 0x46, 0xAF, 1);
+        return;
+    }
+    if ((int8_t)rv_sphere1 >= (int8_t)4) {
+        svc_BridgeSfx(0x14);
+        svc_Sfx(N_REDBALL);
+        svc_Anim(8, N_globex, 0x46, 0xAF, 4);
+        return;
+    }
+    return;
+}
+
+/* [MSG_USE 40 09 00] */
+static void trial2_StunSphere2(void)
+{
+    room.busy = 1;
+    svc_Walk(0, 0xCD, 0xC5, 8);
+    return;
+}
+
+/* [MSG_WALK_DONE 08 00 00] */
+static void trial2_KirkFires2(void)
+{
+    svc_Anim(0, N_kdraww_3, -1, -1, 0xB);
+    return;
+}
+
+/* [MSG_ANIM_DONE 0B 00 00] */
+static void trial2_Sphere2Charged(void)
+{
+    room.fall[0] = 3;
+    svc_BridgeSfx(6);
+    svc_FlashBitmap(N_t2kp01);
+    svc_StopAnim(0);
+    room.busy = 0;
+    rv_sphere2 += 1;
+    trial2_Say(N_Mr_Spock, T_TRI2_025_2);
+    { trial2_part_0C4B(); return; }
+}
+
+/* [MSG_USE 41 09 00] */
+static void trial2_KillSphere2(void)
+{
+    room.busy = 1;
+    svc_Walk(0, 0xCD, 0xC5, 0xE);
+    return;
+}
+
+/* [MSG_WALK_DONE 0E 00 00] */
+static void trial2_KirkFires2Kill(void)
+{
+    svc_Anim(0, N_kdraww_4, -1, -1, 0x11);
+    return;
+}
+
+/* [MSG_ANIM_DONE 11 00 00] */
+static void trial2_Sphere2Overcharged(void)
+{
+    room.fall[0] = 3;
+    svc_BridgeSfx(6);
+    svc_FlashBitmap(N_t2kp04);
+    svc_StopAnim(0);
+    room.busy = 0;
+    rv_sphere2 += 2;
+    trial2_Say(N_Mr_Spock, T_TRI2_023);
+    if (rv_sphere2 == 3) {
+        svc_Anim(9, N_globsp_2, 0x20, 0xAF, 2);
+        return;
+    }
+    if ((int8_t)rv_sphere2 >= (int8_t)4) {
+        svc_BridgeSfx(0x14);
+        svc_Anim(9, N_globex_2, 0x20, 0xAF, 5);
+        return;
+    }
+    return;
+}
+
+/* [MSG_USE 40 0A 00] */
+static void trial2_StunSphere3(void)
+{
+    room.busy = 1;
+    svc_Walk(0, 0xCD, 0xC5, 9);
+    return;
+}
+
+/* [MSG_WALK_DONE 09 00 00] */
+static void trial2_KirkFires3(void)
+{
+    svc_Anim(0, N_kdraww_5, -1, -1, 0xC);
+    return;
+}
+
+/* [MSG_ANIM_DONE 0C 00 00] */
+static void trial2_Sphere3Charged(void)
+{
+    room.fall[0] = 3;
+    svc_BridgeSfx(6);
+    svc_FlashBitmap(N_t2kp02);
+    svc_StopAnim(0);
+    room.busy = 0;
+    rv_sphere3 += 1;
+    trial2_Say(N_Mr_Spock, T_TRI2_025_3);
+    { trial2_part_11FA(); return; }
+}
+
+/* [MSG_USE 41 0A 00] */
+static void trial2_KillSphere3(void)
+{
+    room.busy = 1;
+    svc_Walk(0, 0xCD, 0xC5, 0xF);
+    return;
+}
+
+/* [MSG_WALK_DONE 0F 00 00] */
+static void trial2_KirkFires3Kill(void)
+{
+    svc_Anim(0, N_kdraww_6, -1, -1, 0x12);
+    return;
+}
+
+/* [MSG_ANIM_DONE 12 00 00] */
+static void trial2_Sphere3Overcharged(void)
+{
+    room.fall[0] = 3;
+    svc_BridgeSfx(6);
+    svc_FlashBitmap(N_t2kp05);
+    svc_StopAnim(0);
+    room.busy = 0;
+    room.busy = 0;
+    rv_sphere3 += 2;
+    trial2_Say(N_Mr_Spock, T_TRI2_023_2);
+    { trial2_part_11FA(); return; }
+}
+
+static void trial2_part_11FA(void)
+{
+    if (rv_sphere3 == 3) {
+        svc_Anim(0xA, N_globsp_3, 0x69, 0xAF, 3);
+        return;
+    }
+    if ((int8_t)rv_sphere3 >= (int8_t)4) {
+        svc_BridgeSfx(0x14);
+        svc_Anim(0xA, N_globex_3, 0x69, 0xAF, 6);
+        return;
+    }
+    return;
+}
+
+/* A sphere has overloaded (anim msgs 4-6): its explosion clears the way,
+ * +1.
+ * [MSG_ANIM_DONE 04 00 00] */
+static void trial2_Sphere1Explodes(void)
+{
+    { trial2_part_1279(); return; }
+}
+
+/* [MSG_ANIM_DONE 05 00 00] */
+static void trial2_Sphere2Explodes(void)
+{
+    { trial2_part_1279(); return; }
+}
+
+/* [MSG_ANIM_DONE 06 00 00] */
+static void trial2_SpheresGone(void)
+{
+    { trial2_part_1279(); return; }
+}
+
+static void trial2_part_1279(void)
+{
+    svc_DigiOff();
+    svc_Sfx(N_Noooloop_2);
+    trial2_Say(N_Mr_Spock, T_TRI2_020);
+    rv_spheres_gone = 1;
+    svc_Music(0x1C, -1);
+    rv_score += 1;
+    svc_LoadMap(N_trial2);
+    return;
+}
+
+/* The first sphere splits in two (anim msg 1); a second split (anim msgs 2,
+ * 3) multiplies them until they kill the party (anim msg 19).
+ * [MSG_ANIM_DONE 01 00 00] */
+static void trial2_Sphere1Splits(void)
+{
+    trial2_Say(N_Mr_Spock, T_TRI2_009);
+    { trial2_part_1511(); return; }
+}
+
+/* [MSG_ANIM_DONE 02 00 00] */
+static void trial2_Sphere2Splits(void)
+{
+    svc_Anim(0xB, N_sglob_6, 0x43, 0xAF, 0);
+    svc_Anim(9, N_sglob_7, 0, 0xAF, 0);
+    { trial2_part_1511(); return; }
+}
+
+/* [MSG_ANIM_DONE 03 00 00] */
+static void trial2_Sphere3Splits(void)
+{
+    svc_Anim(0xB, N_sglob_8, 0x8C, 0xAF, 0);
+    svc_Anim(0xA, N_sglob_9, 0x46, 0xAF, 0);
+    { trial2_part_1511(); return; }
+}
+
+static void trial2_part_1511(void)
+{
+    svc_Sfx(N_V7ALLGET);
+    room.busy = 1;
+    svc_Music(0x1A, -1);
+    svc_Anim(0, N_kkills, -1, -1, 0x13);
+    svc_Anim(1, N_skills, -1, -1, 0);
+    svc_Anim(2, N_mkills, -1, -1, 0);
+    svc_Anim(3, N_rkills, -1, -1, 0);
+    return;
+}
+
+/* [MSG_ANIM_DONE 13 00 00] */
+static void trial2_PartyKilled(void)
+{
+    room.busy = 0;
+    svc_GameOver();
+    trial2_Say(0, S_15E0);
+    return;
+}
+
+/* Tricorders (+1 for the sphere, once).
+ * [MSG_USE 45 00 00] */
+static void trial2_McCoyScansKirk(void)
+{
+    room.fall[2] = 1;
+    svc_Anim(2, N_mscans, -1, -1, 0);
+    svc_BridgeSfx(4);
+    trial2_Say(N_Dr_McCoy, T_TRI2_016);
+    return;
+}
+
+/* [MSG_USE 45 01 00] */
+static void trial2_McCoyScansSpock(void)
+{
+    room.fall[2] = 1;
+    svc_Anim(2, N_mscans_2, -1, -1, 0);
+    svc_BridgeSfx(4);
+    trial2_Say(N_Dr_McCoy, T_TRI2_017);
+    return;
+}
+
+/* [MSG_USE 45 02 00] */
+static void trial2_McCoyScansMcCoy(void)
+{
+    room.fall[2] = 1;
+    svc_Anim(2, N_mscans_3, -1, -1, 0);
+    svc_BridgeSfx(4);
+    trial2_Say(N_Dr_McCoy, T_TRI2_014);
+    return;
+}
+
+/* [MSG_USE 45 03 00] */
+static void trial2_McCoyScansBennie(void)
+{
+    room.fall[2] = 1;
+    svc_Anim(2, N_mscans_4, -1, -1, 0);
+    svc_BridgeSfx(4);
+    trial2_Say(N_Dr_McCoy, T_TRI2_015);
+    return;
+}
+
+/* [MSG_USE 45 08 00] */
+static void trial2_E_17FC(void)
+{
+    { trial2_McCoyScansSphere(); return; }
+}
+
+/* [MSG_USE 45 09 00] */
+static void trial2_E_1804(void)
+{
+    { trial2_McCoyScansSphere(); return; }
+}
+
+/* [MSG_USE 45 0A 00] */
+static void trial2_McCoyScansSphere(void)
+{
+    room.fall[2] = 1;
+    svc_Anim(2, N_mscans_5, -1, -1, 0);
+    svc_BridgeSfx(4);
+    trial2_Say(N_Dr_McCoy, T_TRI2_011);
+    if (rv_scanned_sphere == 0) {
+        rv_scanned_sphere = 1;
+        rv_score += 1;
+    }
+    return;
+}
+
+/* [MSG_USE 44 21 00] */
+static void trial2_SpockScansWall(void)
+{
+    room.fall[1] = 1;
+    svc_Anim(1, N_sscans, -1, -1, 0);
+    svc_BridgeSfx(4);
+    trial2_Say(N_Mr_Spock, T_TRI2_029);
+    return;
+}
+
+/* [MSG_USE 44 FF 00] */
+static void trial2_SpockScans(void)
+{
+    room.fall[1] = 1;
+    svc_Anim(1, N_sscans_2, -1, -1, 0);
+    svc_BridgeSfx(4);
+    trial2_Say(N_Mr_Spock, T_TRI2_027);
+    return;
+}
+
+/* [MSG_USE 44 08 00] */
+static void trial2_E_19AD(void)
+{
+    { trial2_SpockScansSphere(); return; }
+}
+
+/* [MSG_USE 44 09 00] */
+static void trial2_E_19B5(void)
+{
+    { trial2_SpockScansSphere(); return; }
+}
+
+/* [MSG_USE 44 0A 00] */
+static void trial2_SpockScansSphere(void)
+{
+    room.fall[1] = 1;
+    svc_Anim(1, N_sscans_3, -1, -1, 0);
+    svc_BridgeSfx(4);
+    trial2_Say(N_Mr_Spock, T_TRI2_026);
+    if (rv_scanned_sphere == 0) {
+        rv_scanned_sphere = 1;
+        rv_score += 1;
+    }
+    return;
+}
+
+/* The communicator: Uhura can't get through yet (or, room 3 done, beams up).
+ * [MSG_USE 47 FF 00] */
+static void trial2_CallUhura(void)
+{
+    uint16_t ax = 0, si = 0;
+    uint16_t stk[32 + 8] = { 0 };       /* the top 8 are what a service call reads past the stack */
+    int sp_ = 32;
+    if (rv_can_leave != 1) {
+    } else {
+        trial2_Say(N_Lt_Uhura, T_TRI2U091);
+        goto L1B68;
+L1AB8:;
+        rv_ending = 1;
+        stk[--sp_] = 1;
+        stk[--sp_] = 1;
+        ax = rv_score;
+        stk[--sp_] = ax;
+        stk[--sp_] = 0x11;
+        ScriptService(stk[sp_], stk[sp_ + 1], stk[sp_ + 2], stk[sp_ + 3], stk[sp_ + 4], stk[sp_ + 5]);
+        sp_ += 4;
+        return;
+L1AFC:;
+        room.busy = 1;
+        stk[--sp_] = 4;
+        stk[--sp_] = 4;
+        stk[--sp_] = 6;
+        ScriptService(stk[sp_], stk[sp_ + 1], stk[sp_ + 2], stk[sp_ + 3], stk[sp_ + 4], stk[sp_ + 5]);
+L1B10:;
+        return;
+L1B68:;
+        fv_talk_buf = N_Capt_Kirk;
+        CS_W(0xCC) = T_TRI2_003;
+        fv_choice_jumps = 0x1AB8;
+        CS_W(0xCE) = T_TRI2_004;
+        CS_W(0xE0) = 0x1AFC;
+        CS_W(0xD0) = T_TRI2_007;
+        CS_W(0xE2) = 0x1B10;
+        CS_W(0xD2) = 0;
+        stk[--sp_] = talk_buf;
+        stk[--sp_] = 3;
+        ax = (uint16_t)ScriptService(stk[sp_], stk[sp_ + 1], stk[sp_ + 2], stk[sp_ + 3], stk[sp_ + 4], stk[sp_ + 5]);
+        sp_ += 2;
+        ax = ax << 1;
+        si = ax;
+        switch (CS_W(0xDE + si)) {
+        case 0x1AB8: goto L1AB8;
+        case 0x1AFC: goto L1AFC;
+        case 0x1B10: goto L1B10;
+        default: return;
+        }
+    }
+    trial2_Say(N_Lt_Uhura, T_TRI2U087);
+    trial2_Say(N_Capt_Kirk, T_TRI2_006);
+    trial2_Say(N_Lt_Uhura, T_TRI2U104);
+    if (rv_spheres_gone != 0) {
+    } else {
+        trial2_Say(N_Lt_Uhura, T_TRI2U081);
+        trial2_Say(N_Capt_Kirk, T_TRI2_002);
+        goto L1E40;
+    }
+L1E40:;
+    trial2_Say(N_Lt_Uhura, T_TRI2U074);
+    return;
+}
+
+/* The crew on the spheres and the wall.
+ * [MSG_USE 02 09 00] */
+static void trial2_McCoyOnSphere2(void)
+{
+    trial2_Say(N_Dr_McCoy, T_TRI2_012);
+    return;
+}
+
+/* [MSG_USE 02 0A 00] */
+static void trial2_McCoyOnSphere3(void)
+{
+    trial2_Say(N_Dr_McCoy, T_TRI2_012_2);
+    return;
+}
+
+/* [MSG_USE 02 21 00] */
+static void trial2_McCoyOnWall(void)
+{
+    trial2_Say(N_Dr_McCoy, T_TRI2_010);
+    return;
+}
+
+/* [MSG_USE 01 09 00] */
+static void trial2_SpockOnSphere2(void)
+{
+    trial2_Say(N_Mr_Spock, T_TRI2_028);
+    return;
+}
+
+/* [MSG_USE 01 0A 00] */
+static void trial2_SpockOnSphere3(void)
+{
+    trial2_Say(N_Mr_Spock, T_TRI2_F11);
+    return;
+}
+
+/* [MSG_USE 01 21 00] */
+static void trial2_SpockOnWall(void)
+{
+    trial2_Say(N_Mr_Spock, T_TRI2_022);
+    return;
+}
+
+/* [MSG_USE 03 09 00] */
+static void trial2_BennieOnSphere2(void)
+{
+    trial2_Say(N_Ensign_Bennie, T_TRI2_031);
+    return;
+}
+
+/* [MSG_USE 03 0A 00] */
+static void trial2_BennieOnSphere3(void)
+{
+    trial2_Say(N_Ensign_Bennie, T_TRI2_031_2);
+    return;
+}
+
+/* [MSG_USE 03 21 00] */
+static void trial2_BennieOnWall(void)
+{
+    trial2_Say(N_Ensign_Bennie, T_TRI2_032);
+    return;
+}
+
+/* Walking back to the entity's chamber.
+ * [MSG_WALK 22 00 00] */
+static void trial2_WalkBack(void)
+{
+    svc_Walk(0, 0x117, 0xB5, 0);
+    return;
+}
+
+/* [MSG_USE 7F FF 00] */
+static void trial2_UseMedkit(void)
+{
+    trial2_Say(N_Dr_McCoy, T_TRI2_018);
+    return;
+}
+
+/* the scripts, by the offset of their code in the room file */
+const RoomScript trial2_scripts[] = {
+    { 0x01D0, trial2_StartRoom },    /* MSG_TICK 01 00 00 */
+    { 0x02E6, trial2_FirstSight },    /* MSG_TICK 3C 00 00 */
+    { 0x0445, trial2_Blocked },    /* MSG_REGION 00 00 00 */
+    { 0x04F2, trial2_LookAtKirk },    /* MSG_LOOK 00 00 00 */
+    { 0x0552, trial2_LookAtSpock },    /* MSG_LOOK 01 00 00 */
+    { 0x05B7, trial2_LookAtMcCoy },    /* MSG_LOOK 02 00 00 */
+    { 0x0620, trial2_LookAtRedshirt },    /* MSG_LOOK 03 00 00 */
+    { 0x0674, trial2_LookAtInsignia },    /* MSG_LOOK 20 00 00 */
+    { 0x06A7, trial2_E_06A7 },    /* MSG_LOOK 08 00 00 */
+    { 0x06AF, trial2_E_06AF },    /* MSG_LOOK 09 00 00 */
+    { 0x06B7, trial2_LookAtSphere },    /* MSG_LOOK 0A 00 00 */
+    { 0x06F3, trial2_LookAtWall },    /* MSG_LOOK 21 00 00 */
+    { 0x0766, trial2_LookAtWayBack },    /* MSG_LOOK 22 00 00 */
+    { 0x07C1, trial2_TalkToKirk },    /* MSG_TALK 00 00 00 */
+    { 0x083B, trial2_TalkToSpock },    /* MSG_TALK 01 00 00 */
+    { 0x08C1, trial2_TalkToMcCoy },    /* MSG_TALK 02 00 00 */
+    { 0x0948, trial2_TalkToRedshirt },    /* MSG_TALK 03 00 00 */
+    { 0x09A3, trial2_TalkToSphere1 },    /* MSG_TALK 08 00 00 */
+    { 0x09D1, trial2_TalkToSphere2 },    /* MSG_TALK 09 00 00 */
+    { 0x09FF, trial2_TalkToSphere3 },    /* MSG_TALK 0A 00 00 */
+    { 0x0A2D, trial2_E_0A2D },    /* MSG_USE 40 21 00 */
+    { 0x0A35, trial2_PhaserWall },    /* MSG_USE 41 21 00 */
+    { 0x0A7E, trial2_StunSphere1 },    /* MSG_USE 40 08 00 */
+    { 0x0AA5, trial2_KirkFires1 },    /* MSG_WALK_DONE 07 00 00 */
+    { 0x0ACA, trial2_Sphere1Charged },    /* MSG_ANIM_DONE 0A 00 00 */
+    { 0x0BAF, trial2_KillSphere1 },    /* MSG_USE 41 08 00 */
+    { 0x0BD6, trial2_KirkFires1Kill },    /* MSG_WALK_DONE 0D 00 00 */
+    { 0x0BFB, trial2_Sphere1Overcharged },    /* MSG_ANIM_DONE 10 00 00 */
+    { 0x0CEB, trial2_StunSphere2 },    /* MSG_USE 40 09 00 */
+    { 0x0D12, trial2_KirkFires2 },    /* MSG_WALK_DONE 08 00 00 */
+    { 0x0D37, trial2_Sphere2Charged },    /* MSG_ANIM_DONE 0B 00 00 */
+    { 0x0E1C, trial2_KillSphere2 },    /* MSG_USE 41 09 00 */
+    { 0x0E43, trial2_KirkFires2Kill },    /* MSG_WALK_DONE 0E 00 00 */
+    { 0x0E68, trial2_Sphere2Overcharged },    /* MSG_ANIM_DONE 11 00 00 */
+    { 0x0FA7, trial2_StunSphere3 },    /* MSG_USE 40 0A 00 */
+    { 0x0FCE, trial2_KirkFires3 },    /* MSG_WALK_DONE 09 00 00 */
+    { 0x0FF3, trial2_Sphere3Charged },    /* MSG_ANIM_DONE 0C 00 00 */
+    { 0x10D8, trial2_KillSphere3 },    /* MSG_USE 41 0A 00 */
+    { 0x10FF, trial2_KirkFires3Kill },    /* MSG_WALK_DONE 0F 00 00 */
+    { 0x1124, trial2_Sphere3Overcharged },    /* MSG_ANIM_DONE 12 00 00 */
+    { 0x1267, trial2_Sphere1Explodes },    /* MSG_ANIM_DONE 04 00 00 */
+    { 0x126F, trial2_Sphere2Explodes },    /* MSG_ANIM_DONE 05 00 00 */
+    { 0x1277, trial2_SpheresGone },    /* MSG_ANIM_DONE 06 00 00 */
+    { 0x1325, trial2_Sphere1Splits },    /* MSG_ANIM_DONE 01 00 00 */
+    { 0x148E, trial2_Sphere2Splits },    /* MSG_ANIM_DONE 02 00 00 */
+    { 0x14D2, trial2_Sphere3Splits },    /* MSG_ANIM_DONE 03 00 00 */
+    { 0x15C7, trial2_PartyKilled },    /* MSG_ANIM_DONE 13 00 00 */
+    { 0x15FD, trial2_McCoyScansKirk },    /* MSG_USE 45 00 00 */
+    { 0x1675, trial2_McCoyScansSpock },    /* MSG_USE 45 01 00 */
+    { 0x1700, trial2_McCoyScansMcCoy },    /* MSG_USE 45 02 00 */
+    { 0x177F, trial2_McCoyScansBennie },    /* MSG_USE 45 03 00 */
+    { 0x17FC, trial2_E_17FC },    /* MSG_USE 45 08 00 */
+    { 0x1804, trial2_E_1804 },    /* MSG_USE 45 09 00 */
+    { 0x180C, trial2_McCoyScansSphere },    /* MSG_USE 45 0A 00 */
+    { 0x1892, trial2_SpockScansWall },    /* MSG_USE 44 21 00 */
+    { 0x191D, trial2_SpockScans },    /* MSG_USE 44 FF 00 */
+    { 0x19AD, trial2_E_19AD },    /* MSG_USE 44 08 00 */
+    { 0x19B5, trial2_E_19B5 },    /* MSG_USE 44 09 00 */
+    { 0x19BD, trial2_SpockScansSphere },    /* MSG_USE 44 0A 00 */
+    { 0x1B1C, trial2_CallUhura },    /* MSG_USE 47 FF 00 */
+    { 0x1EC3, trial2_McCoyOnSphere2 },    /* MSG_USE 02 09 00 */
+    { 0x1F11, trial2_McCoyOnSphere3 },    /* MSG_USE 02 0A 00 */
+    { 0x1F5F, trial2_McCoyOnWall },    /* MSG_USE 02 21 00 */
+    { 0x1FAA, trial2_SpockOnSphere2 },    /* MSG_USE 01 09 00 */
+    { 0x202A, trial2_SpockOnSphere3 },    /* MSG_USE 01 0A 00 */
+    { 0x20AA, trial2_SpockOnWall },    /* MSG_USE 01 21 00 */
+    { 0x20FD, trial2_BennieOnSphere2 },    /* MSG_USE 03 09 00 */
+    { 0x215D, trial2_BennieOnSphere3 },    /* MSG_USE 03 0A 00 */
+    { 0x21BD, trial2_BennieOnWall },    /* MSG_USE 03 21 00 */
+    { 0x21EE, trial2_WalkBack },    /* MSG_WALK 22 00 00 */
+    { 0x2211, trial2_UseMedkit },    /* MSG_USE 7F FF 00 */
+    { 0, 0 }
+};

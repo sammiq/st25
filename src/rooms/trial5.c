@@ -1,0 +1,1898 @@
+/* TRIAL5.RDF: the room's scripts, translated from the machine code in the room file
+ * (src/rdf/trial5.asm) by tools/rdf2c.py.  They run on the loaded file (CS_B/CS_W) and the
+ * room state (`room`), and call the game through the svc_ macros of rooms.h.
+ *
+ * TRIAL5.RDF - "The Feathered Serpent", the heart of Hrakkour, reached by
+ * the Test of Life's other door (room 1). A machine of the planet's dead
+ * builders takes three gems, from nine (rubies, emeralds, sapphires) in
+ * three holes: their colours light the Light of War, Knowledge or
+ * Travel. The right combination primes the neural interlink, through which
+ * Bialbi, the last of Hrakkour, judges Vlict for destroying it.
+ *
+ * Actors: 9 the interface, 14-22 (0Eh-16h) the gems, 23 (17h) Vlict.
+ * Objects: 9 the platform, 0Eh-16h the gems, 21h-23h the holes, 24h the
+ * interface.
+ *
+ * Labels: H_ script headers, L branch targets, C_ conversations,
+ * T_/N_/S_ strings; talk_buf: the conversation buffer of Say.
+ *
+ * Quirks of the original:
+ * - The conversation at 00CA is built at run time.
+ */
+
+#include "rooms.h"
+
+/* where the file keeps its strings, conversations and tables */
+enum {
+    talk_buf = 0x00CA,
+    N_Capt_Kirk = 0x0113,
+    N_Dr_McCoy = 0x011E,
+    N_Mr_Spock = 0x0128,
+    N_Ensign_Bennie = 0x0132,
+    N_Light_of_War = 0x014A,
+    N_Light_of_Knowledge = 0x0157,
+    N_Light_of_Travel = 0x016A,
+    N_A_Voice_Speaks = 0x017A,
+    N_Bialbi = 0x0189,
+    N_Vlict = 0x0190,
+    N_TRI5LOOP = 0x0223,
+    N_redgem = 0x0251,
+    N_redgem_2 = 0x0271,
+    N_redgem_3 = 0x0291,
+    N_grngem = 0x02B1,
+    N_grngem_2 = 0x02D1,
+    N_grngem_3 = 0x02F1,
+    N_blugem = 0x0311,
+    N_blugem_2 = 0x0331,
+    N_blugem_3 = 0x0351,
+    T_TRI5_052 = 0x0381,
+    T_TRI5_017 = 0x03AF,
+    T_TRI5_014 = 0x03F2,
+    T_TRI5_002 = 0x043A,
+    T_TRI5_027 = 0x04E3,
+    T_TRI5_020 = 0x05A7,
+    T_TRI5_031 = 0x05DC,
+    T_TRI5_022 = 0x06A3,
+    T_TRI5_029 = 0x06DB,
+    T_TRI5_018 = 0x077D,
+    T_TRI5_003 = 0x079B,
+    T_TRI5_008 = 0x07FB,
+    T_TRI5_006 = 0x0869,
+    T_TRI5_023 = 0x0909,
+    T_TRI5_015 = 0x0969,
+    T_TRI5_009 = 0x09B8,
+    T_TRI5_007 = 0x0A1F,
+    T_TRI5_034 = 0x0AC0,
+    T_TRI5_019 = 0x0B86,
+    T_TRI5_025 = 0x0BBC,
+    T_TRI5_004 = 0x0C20,
+    T_TRI5_030 = 0x0C6B,
+    T_TRI5_026 = 0x0CD5,
+    T_TRI5_021 = 0x0D9F,
+    T_TRI5_028 = 0x0DE2,
+    T_TRI5_005 = 0x0E50,
+    T_TRI5_033 = 0x0EF6,
+    T_TRI5_032 = 0x0FA1,
+    T_TRI5_035 = 0x1077,
+    T_TRI5_024 = 0x10B4,
+    N_vlict1 = 0x1142,
+    N_kusemn = 0x1392,
+    T_TRI5N005 = 0x14C1,
+    T_TRI5N009 = 0x1505,
+    T_TRI5N008 = 0x1547,
+    T_TRI5N010 = 0x158F,
+    T_TRI5N002 = 0x15DA,
+    T_TRI5N004 = 0x161D,
+    N_sscane = 0x1651,
+    T_TRI5_010 = 0x1688,
+    N_mscane = 0x1701,
+    T_TRI5_011 = 0x1738,
+    T_TRI5N013 = 0x1799,
+    T_TRI5N014 = 0x180D,
+    T_TRI5N015 = 0x1881,
+    T_TRI5N019 = 0x18F5,
+    T_TRI5N020 = 0x196C,
+    T_TRI5N021 = 0x19E3,
+    T_TRI5N016 = 0x1A5A,
+    T_TRI5N017 = 0x1AD1,
+    T_TRI5N018 = 0x1B48,
+    T_TRI5N006 = 0x1BCF,
+    T_TRI5_001 = 0x1C2A,
+    T_TRI5_016 = 0x1C95,
+    T_TRI5_013 = 0x1D39,
+    T_TRI5_051 = 0x1D7D,
+    T_TRI5N011 = 0x1DEB,
+    N_sscans = 0x1E2B,
+    T_TRI5N012 = 0x1E62,
+    T_TRI5N007 = 0x1EE1,
+    N_kusehn = 0x1F42,
+    N_RedGem1 = 0x1F6B,
+    N_kusehn_2 = 0x1FC8,
+    N_RedGem2 = 0x1FF1,
+    N_kusehn_3 = 0x204E,
+    N_RedGem3 = 0x2077,
+    N_kusehn_4 = 0x20D4,
+    N_GrnGem1 = 0x20FD,
+    N_kusehn_5 = 0x215A,
+    N_GrnGem2 = 0x2183,
+    N_kusehn_6 = 0x21E0,
+    N_GrnGem3 = 0x2209,
+    N_kusehn_7 = 0x2266,
+    N_BluGem1 = 0x228F,
+    N_kusehn_8 = 0x22EC,
+    N_BluGem2 = 0x2315,
+    N_kusehn_9 = 0x2372,
+    N_BluGem3 = 0x239B,
+    N_kusehn_10 = 0x23F8,
+    N_RedGem1_2 = 0x2421,
+    N_kusehn_11 = 0x247E,
+    N_RedGem2_2 = 0x24A7,
+    N_kusehn_12 = 0x2504,
+    N_RedGem3_2 = 0x252D,
+    N_kusehn_13 = 0x258A,
+    N_GrnGem1_2 = 0x25B3,
+    N_kusehn_14 = 0x2610,
+    N_GrnGem2_2 = 0x2639,
+    N_kusehn_15 = 0x2696,
+    N_GrnGem3_2 = 0x26BF,
+    N_kusehn_16 = 0x271C,
+    N_BluGem1_2 = 0x2745,
+    N_kusehn_17 = 0x27A2,
+    N_BluGem2_2 = 0x27CB,
+    N_kusehn_18 = 0x2828,
+    N_BluGem3_2 = 0x2851,
+    N_kusehn_19 = 0x28AE,
+    N_RedGem1_3 = 0x28D7,
+    N_kusehn_20 = 0x2934,
+    N_RedGem2_3 = 0x295D,
+    N_kusehn_21 = 0x29BA,
+    N_RedGem3_3 = 0x29E3,
+    N_kusehn_22 = 0x2A40,
+    N_GrnGem1_3 = 0x2A69,
+    N_kusehn_23 = 0x2AC6,
+    N_GrnGem2_3 = 0x2AEF,
+    N_kusehn_24 = 0x2B4C,
+    N_GrnGem3_3 = 0x2B75,
+    N_kusehn_25 = 0x2BD2,
+    N_BluGem1_3 = 0x2BFB,
+    N_kusehn_26 = 0x2C58,
+    N_BluGem2_3 = 0x2C81,
+    N_kusehn_27 = 0x2CDE,
+    N_BluGem3_3 = 0x2D07,
+    T_TRI5_039 = 0x319A,
+    N_redlit = 0x3211,
+    T_TRI5_050 = 0x3250,
+    S_32B6 = 0x32B6,
+    T_TRI5_036 = 0x32DA,
+    T_TRI5_049 = 0x330F,
+    T_TRI5_048 = 0x335E,
+    N_grnlit = 0x33CA,
+    T_TRI5_047 = 0x33F5,
+    N_EFX12B = 0x3421,
+    T_TRI5_040 = 0x3443,
+    T_TRI5_037 = 0x3528,
+    T_TRI5_038 = 0x3574,
+    T_TRI5_041 = 0x3624,
+    T_TRI5_039_2 = 0x3691,
+    N_blulit = 0x3708,
+    T_TRI5_045 = 0x3733,
+    T_TRI5_044 = 0x378F,
+    T_TRI5_046 = 0x3807,
+    N_kteled = 0x3881,
+    N_steled = 0x389F,
+    N_mteled = 0x38BD,
+    N_rteled = 0x38E1,
+    T_TRI5_042 = 0x3926,
+    T_TRI5_043 = 0x39B2,
+    T_TRI5_012 = 0x3A0B,
+};
+
+/* the room's variables: in the room state, and in the file itself */
+#define fv_choice_jumps CS_W(0xDE)
+#define fv_colour1 CS_B(0x2D34)
+#define fv_colour2 CS_B(0x2D35)
+#define fv_colour3 CS_B(0x2D36)
+#define fv_take_item CS_W(0x1386)
+#define fv_take_object CS_W(0x1388)
+#define fv_talk_buf CS_W(0xCA)
+#define rv_ending ROOM_W(0x5F)
+#define rv_hole1 ROOM_W(0x44)
+#define rv_hole2 ROOM_W(0x46)
+#define rv_hole3 ROOM_W(0x48)
+#define rv_interlink_primed ROOM_B(0x43)
+#define rv_primed_scored ROOM_B(0x63)
+#define rv_score ROOM_W(0x29)
+
+/* functions */
+static void trial5_Talk(uint16_t ax);
+static void trial5_Say(uint16_t ax, uint16_t bx);
+static void trial5_StartRoom(void);
+static void trial5_FirstSight(void);
+static void trial5_BialbiJudgesVlict(void);
+static void trial5_KirkToInterface(void);
+static void trial5_WalkToInterface(void);
+static void trial5_AtInterface(void);
+static void trial5_part_1179(void);
+static void trial5_KirkAtHoles(void);
+static void trial5_GemTakenBack(void);
+static void trial5_GetRuby1(void);
+static void trial5_GetRuby2(void);
+static void trial5_GetRuby3(void);
+static void trial5_GetEmerald1(void);
+static void trial5_GetEmerald2(void);
+static void trial5_GetEmerald3(void);
+static void trial5_GetSapphire1(void);
+static void trial5_GetSapphire2(void);
+static void trial5_GetSapphire3(void);
+static void trial5_LookAtKirk(void);
+static void trial5_LookAtSpock(void);
+static void trial5_LookAtMcCoy(void);
+static void trial5_LookAtRedshirt(void);
+static void trial5_LookAtPlatform(void);
+static void trial5_LookAtInterface(void);
+static void trial5_SpockScansInterface(void);
+static void trial5_McCoyScansInterface(void);
+static void trial5_LookAtRuby1(void);
+static void trial5_LookAtRuby2(void);
+static void trial5_LookAtRuby3(void);
+static void trial5_LookAtEmerald1(void);
+static void trial5_LookAtEmerald2(void);
+static void trial5_LookAtEmerald3(void);
+static void trial5_LookAtSapphire1(void);
+static void trial5_LookAtSapphire2(void);
+static void trial5_LookAtSapphire3(void);
+static void trial5_E_1BB4(void);
+static void trial5_E_1BBC(void);
+static void trial5_LookAtHoles(void);
+static void trial5_TalkToKirk(void);
+static void trial5_TalkToSpock(void);
+static void trial5_TalkToMcCoy(void);
+static void trial5_TalkToRedshirt(void);
+static void trial5_E_1DD8(void);
+static void trial5_KillAnything(void);
+static void trial5_E_1E1D(void);
+static void trial5_TricorderAnything(void);
+static void trial5_UseCommunicator(void);
+static void trial5_Ruby1InHole1(void);
+static void trial5_Ruby1Placed1(void);
+static void trial5_Ruby2InHole1(void);
+static void trial5_Ruby2Placed1(void);
+static void trial5_Ruby3InHole1(void);
+static void trial5_Ruby3Placed1(void);
+static void trial5_Emerald1InHole1(void);
+static void trial5_Emerald1Placed1(void);
+static void trial5_Emerald2InHole1(void);
+static void trial5_Emerald2Placed1(void);
+static void trial5_Emerald3InHole1(void);
+static void trial5_Emerald3Placed1(void);
+static void trial5_Sapphire1InHole1(void);
+static void trial5_Sapphire1Placed1(void);
+static void trial5_Sapphire2InHole1(void);
+static void trial5_Sapphire2Placed1(void);
+static void trial5_Sapphire3InHole1(void);
+static void trial5_Sapphire3Placed1(void);
+static void trial5_Ruby1InHole2(void);
+static void trial5_Ruby1Placed2(void);
+static void trial5_Ruby2InHole2(void);
+static void trial5_Ruby2Placed2(void);
+static void trial5_Ruby3InHole2(void);
+static void trial5_Ruby3Placed2(void);
+static void trial5_Emerald1InHole2(void);
+static void trial5_Emerald1Placed2(void);
+static void trial5_Emerald2InHole2(void);
+static void trial5_Emerald2Placed2(void);
+static void trial5_Emerald3InHole2(void);
+static void trial5_Emerald3Placed2(void);
+static void trial5_Sapphire1InHole2(void);
+static void trial5_Sapphire1Placed2(void);
+static void trial5_Sapphire2InHole2(void);
+static void trial5_Sapphire2Placed2(void);
+static void trial5_Sapphire3InHole2(void);
+static void trial5_Sapphire3Placed2(void);
+static void trial5_Ruby1InHole3(void);
+static void trial5_Ruby1Placed3(void);
+static void trial5_Ruby2InHole3(void);
+static void trial5_Ruby2Placed3(void);
+static void trial5_Ruby3InHole3(void);
+static void trial5_Ruby3Placed3(void);
+static void trial5_Emerald1InHole3(void);
+static void trial5_Emerald1Placed3(void);
+static void trial5_Emerald2InHole3(void);
+static void trial5_Emerald2Placed3(void);
+static void trial5_Emerald3InHole3(void);
+static void trial5_Emerald3Placed3(void);
+static void trial5_Sapphire1InHole3(void);
+static void trial5_Sapphire1Placed3(void);
+static void trial5_Sapphire2InHole3(void);
+static void trial5_Sapphire2Placed3(void);
+static void trial5_Sapphire3InHole3(void);
+static void trial5_Sapphire3Placed3(void);
+static void trial5_ReadGems(void);
+static void trial5_LightOfWar(void);
+static void trial5_LightOfKnowledge(void);
+static void trial5_LightOfTravel(void);
+static void trial5_Travelled(void);
+static void trial5_UseMedkit(void);
+
+/* Talk: conversation AX (speaker, choices, 0); returns the choice. */
+static void trial5_Talk(uint16_t ax)
+{
+    svc_Talk(ax);
+    return;
+}
+
+/* Say: one line, BX, said by AX (0: narration). */
+static void trial5_Say(uint16_t ax, uint16_t bx)
+{
+    fv_talk_buf = ax;
+    CS_W(0xCC) = bx;
+    CS_W(0xCE) = 0;
+    trial5_Talk(talk_buf);
+    return;
+}
+
+/* The room starts: the nine gems.
+ * [MSG_TICK 01 00 00] */
+static void trial5_StartRoom(void)
+{
+    svc_Sfx(N_TRI5LOOP);
+    svc_Music(0x1F, -1);
+    svc_Anim(0xE, N_redgem, 0x82, 0x98, 0);
+    svc_Anim(0xF, N_redgem_2, 0x81, 0x9E, 0);
+    svc_Anim(0x10, N_redgem_3, 0x80, 0xA5, 0);
+    svc_Anim(0x11, N_grngem, 0x97, 0x98, 0);
+    svc_Anim(0x12, N_grngem_2, 0x97, 0x9E, 0);
+    svc_Anim(0x13, N_grngem_3, 0x97, 0xA5, 0);
+    svc_Anim(0x14, N_blugem, 0xAB, 0x98, 0);
+    svc_Anim(0x15, N_blugem_2, 0xAC, 0x9E, 0);
+    svc_Anim(0x16, N_blugem_3, 0xAD, 0xA5, 0);
+    return;
+}
+
+/* Tick 60: the crew on the alien chamber.
+ * [MSG_TICK 3C 00 00] */
+static void trial5_FirstSight(void)
+{
+    trial5_Say(N_Ensign_Bennie, T_TRI5_052);
+    trial5_Say(N_Mr_Spock, T_TRI5_017);
+    trial5_Say(N_Dr_McCoy, T_TRI5_014);
+    trial5_Say(N_Capt_Kirk, T_TRI5_002);
+    return;
+}
+
+/* Bialbi brings Vlict before the interlink (anim msg 1) and tries him:
+ * Kirk's answers decide between mercy (the Klingons leave, ending 3) and
+ * Vlict's execution (ending 4).
+ * [MSG_ANIM_DONE 01 00 00] */
+static void trial5_BialbiJudgesVlict(void)
+{
+    uint16_t ax = 0, si = 0;
+    trial5_Say(N_Bialbi, T_TRI5_027);
+    trial5_Say(N_Vlict, T_TRI5_020);
+    trial5_Say(N_Bialbi, T_TRI5_031);
+    trial5_Say(N_Vlict, T_TRI5_022);
+    trial5_Say(N_Bialbi, T_TRI5_029);
+    trial5_Say(N_Vlict, T_TRI5_018);
+    fv_talk_buf = N_Capt_Kirk;
+    CS_W(0xCC) = T_TRI5_003;
+    fv_choice_jumps = 0x8F9;
+    CS_W(0xCE) = T_TRI5_008;
+    CS_W(0xE0) = 0xAAF;
+    CS_W(0xD0) = T_TRI5_006;
+    CS_W(0xE2) = 0xB76;
+    CS_W(0xD2) = 0;
+    ax = (uint16_t)svc_Talk(talk_buf);
+    ax = ax << 1;
+    si = ax;
+    switch (CS_W(0xDE + si)) {
+    case 0x08F9: goto L08F9;
+    case 0x0AAF: goto L0AAF;
+    case 0x0B76: goto L0B76;
+    default: return;
+    }
+L08F9:;
+    trial5_Say(N_Vlict, T_TRI5_023);
+    trial5_Say(N_Dr_McCoy, T_TRI5_015);
+    fv_talk_buf = N_Capt_Kirk;
+    CS_W(0xCC) = T_TRI5_009;
+    fv_choice_jumps = 0xAAF;
+    CS_W(0xCE) = T_TRI5_007;
+    CS_W(0xE0) = 0xB76;
+    CS_W(0xD0) = 0;
+    ax = (uint16_t)svc_Talk(talk_buf);
+    ax = ax << 1;
+    si = ax;
+    switch (CS_W(0xDE + si)) {
+    case 0x08F9: goto L08F9;
+    case 0x0AAF: goto L0AAF;
+    case 0x0B76: goto L0B76;
+    default: return;
+    }
+L0AAF:;
+    trial5_Say(N_Bialbi, T_TRI5_034);
+    rv_ending = 4;
+    svc_BeamUp(rv_score, 1, 4);
+    return;
+L0B76:;
+    trial5_Say(N_Vlict, T_TRI5_019);
+    svc_Music(0x1C, -1);
+    trial5_Say(N_Bialbi, T_TRI5_025);
+    rv_score += 4;
+    trial5_Say(N_Capt_Kirk, T_TRI5_004);
+    trial5_Say(N_Bialbi, T_TRI5_030);
+    trial5_Say(N_Bialbi, T_TRI5_026);
+    trial5_Say(N_Vlict, T_TRI5_021);
+    trial5_Say(N_Bialbi, T_TRI5_028);
+    trial5_Say(N_Capt_Kirk, T_TRI5_005);
+    trial5_Say(N_Bialbi, T_TRI5_033);
+    trial5_Say(N_Bialbi, T_TRI5_032);
+    rv_ending = 3;
+    svc_BeamUp(1, 1, 3);
+    return;
+}
+
+/* The interface (msg 2): unprimed, it refuses; primed, Bialbi speaks
+ * (+5) and calls Vlict in.
+ * [MSG_USE 00 24 00] */
+static void trial5_KirkToInterface(void)
+{
+    svc_Walk(0, 0x106, 0x96, 2);
+    return;
+}
+
+/* [MSG_WALK 24 00 00] */
+static void trial5_WalkToInterface(void)
+{
+    svc_Walk(0, 0x106, 0x96, 2);
+    return;
+}
+
+/* [MSG_WALK_DONE 02 00 00] */
+static void trial5_AtInterface(void)
+{
+    if (rv_interlink_primed != 1) {
+        trial5_Say(N_A_Voice_Speaks, T_TRI5_035);
+        return;
+    }
+    trial5_Say(N_Bialbi, T_TRI5_024);
+    svc_Anim(0x17, N_vlict1, 0xBE, 0x91, 1);
+    rv_score += 5;
+    svc_Music(1, -1);
+    return;
+}
+
+static void trial5_part_1179(void)
+{
+    uint16_t ax = 0;
+    room.busy = 1;
+    ax = fv_take_object;
+    if (ax == rv_hole1) {
+        rv_hole1 = 0;
+        rv_interlink_primed = 0;
+        svc_StopAnim(9);
+        svc_Walk(0, 0x2C, 0x9F, 0x1E);
+        return;
+    }
+    if (ax == rv_hole2) {
+        rv_hole2 = 0;
+        rv_interlink_primed = 0;
+        svc_StopAnim(9);
+        svc_Walk(0, 0x22, 0x9F, 0x1E);
+        return;
+    }
+    if (ax == rv_hole3) {
+        rv_hole3 = 0;
+        rv_interlink_primed = 0;
+        svc_StopAnim(9);
+        svc_Walk(0, 0x3C, 0x9F, 0x1E);
+        return;
+    }
+    if (fv_take_object == 0xE) {
+        svc_Walk(0, 0x80, 0xAA, 0x1E);
+    }
+    if (fv_take_object == 0xF) {
+        svc_Walk(0, 0x80, 0xAA, 0x1E);
+    }
+    if (fv_take_object == 0x10) {
+        svc_Walk(0, 0x80, 0xAA, 0x1E);
+    }
+    if (fv_take_object == 0x11) {
+        svc_Walk(0, 0x95, 0xAA, 0x1E);
+    }
+    if (fv_take_object == 0x12) {
+        svc_Walk(0, 0x95, 0xAA, 0x1E);
+    }
+    if (fv_take_object == 0x13) {
+        svc_Walk(0, 0x95, 0xAA, 0x1E);
+    }
+    if (fv_take_object == 0x14) {
+        svc_Walk(0, 0xAD, 0xAA, 0x1E);
+    }
+    if (fv_take_object == 0x15) {
+        svc_Walk(0, 0xAD, 0xAA, 0x1E);
+    }
+    if (fv_take_object == 0x16) {
+        svc_Walk(0, 0xAD, 0xAA, 0x1E);
+    }
+    return;
+}
+
+/* [MSG_WALK_DONE 1E 00 00] */
+static void trial5_KirkAtHoles(void)
+{
+    svc_Anim(0, N_kusemn, -1, -1, 0x1F);
+    return;
+}
+
+/* [MSG_ANIM_DONE 1F 00 00] */
+static void trial5_GemTakenBack(void)
+{
+    uint16_t ax = 0;
+    ax = fv_take_item;
+    svc_GiveItem(ax);
+    ax = fv_take_object;
+    svc_StopAnim(ax);
+    room.busy = 0;
+    return;
+}
+
+/* Taking a gem back out of a hole (msgs 30, 31).
+ * [MSG_GET 0E 00 00] */
+static void trial5_GetRuby1(void)
+{
+    fv_take_item = 0x6A;
+    fv_take_object = 0xE;
+    { trial5_part_1179(); return; }
+}
+
+/* [MSG_GET 0F 00 00] */
+static void trial5_GetRuby2(void)
+{
+    fv_take_item = 0x6B;
+    fv_take_object = 0xF;
+    { trial5_part_1179(); return; }
+}
+
+/* [MSG_GET 10 00 00] */
+static void trial5_GetRuby3(void)
+{
+    fv_take_item = 0x6C;
+    fv_take_object = 0x10;
+    { trial5_part_1179(); return; }
+}
+
+/* [MSG_GET 11 00 00] */
+static void trial5_GetEmerald1(void)
+{
+    fv_take_item = 0x6D;
+    fv_take_object = 0x11;
+    { trial5_part_1179(); return; }
+}
+
+/* [MSG_GET 12 00 00] */
+static void trial5_GetEmerald2(void)
+{
+    fv_take_item = 0x6E;
+    fv_take_object = 0x12;
+    { trial5_part_1179(); return; }
+}
+
+/* [MSG_GET 13 00 00] */
+static void trial5_GetEmerald3(void)
+{
+    fv_take_item = 0x6F;
+    fv_take_object = 0x13;
+    { trial5_part_1179(); return; }
+}
+
+/* [MSG_GET 14 00 00] */
+static void trial5_GetSapphire1(void)
+{
+    fv_take_item = 0x70;
+    fv_take_object = 0x14;
+    { trial5_part_1179(); return; }
+}
+
+/* [MSG_GET 15 00 00] */
+static void trial5_GetSapphire2(void)
+{
+    fv_take_item = 0x71;
+    fv_take_object = 0x15;
+    { trial5_part_1179(); return; }
+}
+
+/* [MSG_GET 16 00 00] */
+static void trial5_GetSapphire3(void)
+{
+    fv_take_item = 0x72;
+    fv_take_object = 0x16;
+    { trial5_part_1179(); return; }
+}
+
+/* [MSG_LOOK 00 00 00] */
+static void trial5_LookAtKirk(void)
+{
+    trial5_Say(0, T_TRI5N005);
+    return;
+}
+
+/* [MSG_LOOK 01 00 00] */
+static void trial5_LookAtSpock(void)
+{
+    trial5_Say(0, T_TRI5N009);
+    return;
+}
+
+/* [MSG_LOOK 02 00 00] */
+static void trial5_LookAtMcCoy(void)
+{
+    trial5_Say(0, T_TRI5N008);
+    return;
+}
+
+/* [MSG_LOOK 03 00 00] */
+static void trial5_LookAtRedshirt(void)
+{
+    trial5_Say(0, T_TRI5N010);
+    return;
+}
+
+/* Looking, scanning and talking.
+ * [MSG_LOOK 09 00 00] */
+static void trial5_LookAtPlatform(void)
+{
+    trial5_Say(0, T_TRI5N002);
+    return;
+}
+
+/* [MSG_LOOK 24 00 00] */
+static void trial5_LookAtInterface(void)
+{
+    trial5_Say(0, T_TRI5N004);
+    return;
+}
+
+/* [MSG_USE 44 24 00] */
+static void trial5_SpockScansInterface(void)
+{
+    room.fall[1] = 2;
+    svc_Anim(1, N_sscane, -1, -1, 0);
+    svc_BridgeSfx(4);
+    trial5_Say(N_Mr_Spock, T_TRI5_010);
+    return;
+}
+
+/* [MSG_USE 45 24 00] */
+static void trial5_McCoyScansInterface(void)
+{
+    room.fall[2] = 2;
+    svc_Anim(2, N_mscane, -1, -1, 0);
+    svc_BridgeSfx(4);
+    trial5_Say(N_Dr_McCoy, T_TRI5_011);
+    return;
+}
+
+/* [MSG_LOOK 0E 00 00] */
+static void trial5_LookAtRuby1(void)
+{
+    trial5_Say(0, T_TRI5N013);
+    return;
+}
+
+/* [MSG_LOOK 0F 00 00] */
+static void trial5_LookAtRuby2(void)
+{
+    trial5_Say(0, T_TRI5N014);
+    return;
+}
+
+/* [MSG_LOOK 10 00 00] */
+static void trial5_LookAtRuby3(void)
+{
+    trial5_Say(0, T_TRI5N015);
+    return;
+}
+
+/* [MSG_LOOK 11 00 00] */
+static void trial5_LookAtEmerald1(void)
+{
+    trial5_Say(0, T_TRI5N019);
+    return;
+}
+
+/* [MSG_LOOK 12 00 00] */
+static void trial5_LookAtEmerald2(void)
+{
+    trial5_Say(0, T_TRI5N020);
+    return;
+}
+
+/* [MSG_LOOK 13 00 00] */
+static void trial5_LookAtEmerald3(void)
+{
+    trial5_Say(0, T_TRI5N021);
+    return;
+}
+
+/* [MSG_LOOK 14 00 00] */
+static void trial5_LookAtSapphire1(void)
+{
+    trial5_Say(0, T_TRI5N016);
+    return;
+}
+
+/* [MSG_LOOK 15 00 00] */
+static void trial5_LookAtSapphire2(void)
+{
+    trial5_Say(0, T_TRI5N017);
+    return;
+}
+
+/* [MSG_LOOK 16 00 00] */
+static void trial5_LookAtSapphire3(void)
+{
+    trial5_Say(0, T_TRI5N018);
+    return;
+}
+
+/* [MSG_LOOK 21 00 00] */
+static void trial5_E_1BB4(void)
+{
+    { trial5_LookAtHoles(); return; }
+}
+
+/* [MSG_LOOK 22 00 00] */
+static void trial5_E_1BBC(void)
+{
+    { trial5_LookAtHoles(); return; }
+}
+
+/* [MSG_LOOK 23 00 00] */
+static void trial5_LookAtHoles(void)
+{
+    trial5_Say(0, T_TRI5N006);
+    return;
+}
+
+/* [MSG_TALK 00 00 00] */
+static void trial5_TalkToKirk(void)
+{
+    trial5_Say(N_Capt_Kirk, T_TRI5_001);
+    return;
+}
+
+/* [MSG_TALK 01 00 00] */
+static void trial5_TalkToSpock(void)
+{
+    trial5_Say(N_Mr_Spock, T_TRI5_016);
+    return;
+}
+
+/* [MSG_TALK 02 00 00] */
+static void trial5_TalkToMcCoy(void)
+{
+    trial5_Say(N_Dr_McCoy, T_TRI5_013);
+    return;
+}
+
+/* [MSG_TALK 03 00 00] */
+static void trial5_TalkToRedshirt(void)
+{
+    trial5_Say(N_Ensign_Bennie, T_TRI5_051);
+    return;
+}
+
+/* The phasers, tricorders and communicator don't work here.
+ * [MSG_USE 40 FF 00] */
+static void trial5_E_1DD8(void)
+{
+    { trial5_KillAnything(); return; }
+}
+
+/* [MSG_USE 41 FF 00] */
+static void trial5_KillAnything(void)
+{
+    trial5_Say(0, T_TRI5N011);
+    return;
+}
+
+/* [MSG_USE 45 FF 00] */
+static void trial5_E_1E1D(void)
+{
+    { trial5_TricorderAnything(); return; }
+}
+
+/* [MSG_USE 44 FF 00] */
+static void trial5_TricorderAnything(void)
+{
+    room.fall[1] = 1;
+    svc_Anim(1, N_sscans, -1, -1, 0);
+    svc_BridgeSfx(4);
+    trial5_Say(0, T_TRI5N012);
+    return;
+}
+
+/* [MSG_USE 47 FF 00] */
+static void trial5_UseCommunicator(void)
+{
+    trial5_Say(0, T_TRI5N007);
+    return;
+}
+
+/* Gems in the holes (msgs 3-29): each hole takes one gem; with all three
+ * in, ReadGems works out their colours and lights a Light.
+ * [MSG_USE 6A 21 00] */
+static void trial5_Ruby1InHole1(void)
+{
+    room.fall[0] = 0;
+    svc_Walk(0, 0x2C, 0x9F, 3);
+    return;
+}
+
+/* [MSG_WALK_DONE 03 00 00] */
+static void trial5_Ruby1Placed1(void)
+{
+    svc_Anim(0, N_kusehn, -1, -1, 0);
+    if (rv_hole1 == 0) {
+        rv_hole1 = 0xE;
+        svc_Anim(0xE, N_RedGem1, 0x2E, 0x8E, 0);
+        svc_TakeItem(IT_REDGEM1);
+        { trial5_ReadGems(); return; }
+    }
+    return;
+}
+
+/* [MSG_USE 6B 21 00] */
+static void trial5_Ruby2InHole1(void)
+{
+    room.fall[0] = 0;
+    svc_Walk(0, 0x2C, 0x9F, 6);
+    return;
+}
+
+/* [MSG_WALK_DONE 06 00 00] */
+static void trial5_Ruby2Placed1(void)
+{
+    svc_Anim(0, N_kusehn_2, -1, -1, 0);
+    if (rv_hole1 == 0) {
+        rv_hole1 = 0xF;
+        svc_Anim(0xF, N_RedGem2, 0x2E, 0x8E, 0);
+        svc_TakeItem(IT_REDGEM2);
+        { trial5_ReadGems(); return; }
+    }
+    return;
+}
+
+/* [MSG_USE 6C 21 00] */
+static void trial5_Ruby3InHole1(void)
+{
+    room.fall[0] = 0;
+    svc_Walk(0, 0x2C, 0x9F, 9);
+    return;
+}
+
+/* [MSG_WALK_DONE 09 00 00] */
+static void trial5_Ruby3Placed1(void)
+{
+    svc_Anim(0, N_kusehn_3, -1, -1, 0);
+    if (rv_hole1 == 0) {
+        rv_hole1 = 0x10;
+        svc_Anim(0x10, N_RedGem3, 0x2E, 0x8E, 0);
+        svc_TakeItem(IT_REDGEM3);
+        { trial5_ReadGems(); return; }
+    }
+    return;
+}
+
+/* [MSG_USE 6D 21 00] */
+static void trial5_Emerald1InHole1(void)
+{
+    room.fall[0] = 0;
+    svc_Walk(0, 0x2C, 0x9F, 0xC);
+    return;
+}
+
+/* [MSG_WALK_DONE 0C 00 00] */
+static void trial5_Emerald1Placed1(void)
+{
+    svc_Anim(0, N_kusehn_4, -1, -1, 0);
+    if (rv_hole1 == 0) {
+        rv_hole1 = 0x11;
+        svc_Anim(0x11, N_GrnGem1, 0x2E, 0x8E, 0);
+        svc_TakeItem(IT_GRNGEM1);
+        { trial5_ReadGems(); return; }
+    }
+    return;
+}
+
+/* [MSG_USE 6E 21 00] */
+static void trial5_Emerald2InHole1(void)
+{
+    room.fall[0] = 0;
+    svc_Walk(0, 0x2C, 0x9F, 0xF);
+    return;
+}
+
+/* [MSG_WALK_DONE 0F 00 00] */
+static void trial5_Emerald2Placed1(void)
+{
+    svc_Anim(0, N_kusehn_5, -1, -1, 0);
+    if (rv_hole1 == 0) {
+        rv_hole1 = 0x12;
+        svc_Anim(0x12, N_GrnGem2, 0x2E, 0x8E, 0);
+        svc_TakeItem(IT_GRNGEM2);
+        { trial5_ReadGems(); return; }
+    }
+    return;
+}
+
+/* [MSG_USE 6F 21 00] */
+static void trial5_Emerald3InHole1(void)
+{
+    room.fall[0] = 0;
+    svc_Walk(0, 0x2C, 0x9F, 0x12);
+    return;
+}
+
+/* [MSG_WALK_DONE 12 00 00] */
+static void trial5_Emerald3Placed1(void)
+{
+    svc_Anim(0, N_kusehn_6, -1, -1, 0);
+    if (rv_hole1 == 0) {
+        rv_hole1 = 0x13;
+        svc_Anim(0x13, N_GrnGem3, 0x2E, 0x8E, 0);
+        svc_TakeItem(IT_GRNGEM3);
+        { trial5_ReadGems(); return; }
+    }
+    return;
+}
+
+/* [MSG_USE 70 21 00] */
+static void trial5_Sapphire1InHole1(void)
+{
+    room.fall[0] = 0;
+    svc_Walk(0, 0x2C, 0x9F, 0x15);
+    return;
+}
+
+/* [MSG_WALK_DONE 15 00 00] */
+static void trial5_Sapphire1Placed1(void)
+{
+    svc_Anim(0, N_kusehn_7, -1, -1, 0);
+    if (rv_hole1 == 0) {
+        rv_hole1 = 0x14;
+        svc_Anim(0x14, N_BluGem1, 0x2E, 0x8E, 0);
+        svc_TakeItem(IT_BLUGEM1);
+        { trial5_ReadGems(); return; }
+    }
+    return;
+}
+
+/* [MSG_USE 71 21 00] */
+static void trial5_Sapphire2InHole1(void)
+{
+    room.fall[0] = 0;
+    svc_Walk(0, 0x2C, 0x9F, 0x18);
+    return;
+}
+
+/* [MSG_WALK_DONE 18 00 00] */
+static void trial5_Sapphire2Placed1(void)
+{
+    svc_Anim(0, N_kusehn_8, -1, -1, 0);
+    if (rv_hole1 == 0) {
+        rv_hole1 = 0x15;
+        svc_Anim(0x15, N_BluGem2, 0x2E, 0x8E, 0);
+        svc_TakeItem(IT_BLUGEM2);
+        { trial5_ReadGems(); return; }
+    }
+    return;
+}
+
+/* [MSG_USE 72 21 00] */
+static void trial5_Sapphire3InHole1(void)
+{
+    room.fall[0] = 0;
+    svc_Walk(0, 0x2C, 0x9F, 0x1B);
+    return;
+}
+
+/* [MSG_WALK_DONE 1B 00 00] */
+static void trial5_Sapphire3Placed1(void)
+{
+    svc_Anim(0, N_kusehn_9, -1, -1, 0);
+    if (rv_hole1 == 0) {
+        rv_hole1 = 0x16;
+        svc_Anim(0x16, N_BluGem3, 0x2E, 0x8E, 0);
+        svc_TakeItem(IT_BLUGEM3);
+        { trial5_ReadGems(); return; }
+    }
+    return;
+}
+
+/* [MSG_USE 6A 22 00] */
+static void trial5_Ruby1InHole2(void)
+{
+    room.fall[0] = 0;
+    svc_Walk(0, 0x22, 0x9F, 4);
+    return;
+}
+
+/* [MSG_WALK_DONE 04 00 00] */
+static void trial5_Ruby1Placed2(void)
+{
+    svc_Anim(0, N_kusehn_10, -1, -1, 0);
+    if (rv_hole2 == 0) {
+        rv_hole2 = 0xE;
+        svc_Anim(0xE, N_RedGem1_2, 0x22, 0x95, 0);
+        svc_TakeItem(IT_REDGEM1);
+        { trial5_ReadGems(); return; }
+    }
+    return;
+}
+
+/* [MSG_USE 6B 22 00] */
+static void trial5_Ruby2InHole2(void)
+{
+    room.fall[0] = 0;
+    svc_Walk(0, 0x22, 0x9F, 7);
+    return;
+}
+
+/* [MSG_WALK_DONE 07 00 00] */
+static void trial5_Ruby2Placed2(void)
+{
+    svc_Anim(0, N_kusehn_11, -1, -1, 0);
+    if (rv_hole2 == 0) {
+        rv_hole2 = 0xF;
+        svc_Anim(0xF, N_RedGem2_2, 0x22, 0x95, 0);
+        svc_TakeItem(IT_REDGEM2);
+        { trial5_ReadGems(); return; }
+    }
+    return;
+}
+
+/* [MSG_USE 6C 22 00] */
+static void trial5_Ruby3InHole2(void)
+{
+    room.fall[0] = 0;
+    svc_Walk(0, 0x22, 0x9F, 0xA);
+    return;
+}
+
+/* [MSG_WALK_DONE 0A 00 00] */
+static void trial5_Ruby3Placed2(void)
+{
+    svc_Anim(0, N_kusehn_12, -1, -1, 0);
+    if (rv_hole2 == 0) {
+        rv_hole2 = 0x10;
+        svc_Anim(0x10, N_RedGem3_2, 0x22, 0x95, 0);
+        svc_TakeItem(IT_REDGEM3);
+        { trial5_ReadGems(); return; }
+    }
+    return;
+}
+
+/* [MSG_USE 6D 22 00] */
+static void trial5_Emerald1InHole2(void)
+{
+    room.fall[0] = 0;
+    svc_Walk(0, 0x22, 0x9F, 0xD);
+    return;
+}
+
+/* [MSG_WALK_DONE 0D 00 00] */
+static void trial5_Emerald1Placed2(void)
+{
+    svc_Anim(0, N_kusehn_13, -1, -1, 0);
+    if (rv_hole2 == 0) {
+        rv_hole2 = 0x11;
+        svc_Anim(0x11, N_GrnGem1_2, 0x22, 0x95, 0);
+        svc_TakeItem(IT_GRNGEM1);
+        { trial5_ReadGems(); return; }
+    }
+    return;
+}
+
+/* [MSG_USE 6E 22 00] */
+static void trial5_Emerald2InHole2(void)
+{
+    room.fall[0] = 0;
+    svc_Walk(0, 0x22, 0x9F, 0x10);
+    return;
+}
+
+/* [MSG_WALK_DONE 10 00 00] */
+static void trial5_Emerald2Placed2(void)
+{
+    svc_Anim(0, N_kusehn_14, -1, -1, 0);
+    if (rv_hole2 == 0) {
+        rv_hole2 = 0x12;
+        svc_Anim(0x12, N_GrnGem2_2, 0x22, 0x95, 0);
+        svc_TakeItem(IT_GRNGEM2);
+        { trial5_ReadGems(); return; }
+    }
+    return;
+}
+
+/* [MSG_USE 6F 22 00] */
+static void trial5_Emerald3InHole2(void)
+{
+    room.fall[0] = 0;
+    svc_Walk(0, 0x22, 0x9F, 0x13);
+    return;
+}
+
+/* [MSG_WALK_DONE 13 00 00] */
+static void trial5_Emerald3Placed2(void)
+{
+    svc_Anim(0, N_kusehn_15, -1, -1, 0);
+    if (rv_hole2 == 0) {
+        rv_hole2 = 0x13;
+        svc_Anim(0x13, N_GrnGem3_2, 0x22, 0x95, 0);
+        svc_TakeItem(IT_GRNGEM3);
+        { trial5_ReadGems(); return; }
+    }
+    return;
+}
+
+/* [MSG_USE 70 22 00] */
+static void trial5_Sapphire1InHole2(void)
+{
+    room.fall[0] = 0;
+    svc_Walk(0, 0x22, 0x9F, 0x16);
+    return;
+}
+
+/* [MSG_WALK_DONE 16 00 00] */
+static void trial5_Sapphire1Placed2(void)
+{
+    svc_Anim(0, N_kusehn_16, -1, -1, 0);
+    if (rv_hole2 == 0) {
+        rv_hole2 = 0x14;
+        svc_Anim(0x14, N_BluGem1_2, 0x22, 0x95, 0);
+        svc_TakeItem(IT_BLUGEM1);
+        { trial5_ReadGems(); return; }
+    }
+    return;
+}
+
+/* [MSG_USE 71 22 00] */
+static void trial5_Sapphire2InHole2(void)
+{
+    room.fall[0] = 0;
+    svc_Walk(0, 0x22, 0x9F, 0x19);
+    return;
+}
+
+/* [MSG_WALK_DONE 19 00 00] */
+static void trial5_Sapphire2Placed2(void)
+{
+    svc_Anim(0, N_kusehn_17, -1, -1, 0);
+    if (rv_hole2 == 0) {
+        rv_hole2 = 0x15;
+        svc_Anim(0x15, N_BluGem2_2, 0x22, 0x95, 0);
+        svc_TakeItem(IT_BLUGEM2);
+        { trial5_ReadGems(); return; }
+    }
+    return;
+}
+
+/* [MSG_USE 72 22 00] */
+static void trial5_Sapphire3InHole2(void)
+{
+    room.fall[0] = 0;
+    svc_Walk(0, 0x22, 0x9F, 0x1C);
+    return;
+}
+
+/* [MSG_WALK_DONE 1C 00 00] */
+static void trial5_Sapphire3Placed2(void)
+{
+    svc_Anim(0, N_kusehn_18, -1, -1, 0);
+    if (rv_hole2 == 0) {
+        rv_hole2 = 0x16;
+        svc_Anim(0x16, N_BluGem3_2, 0x22, 0x95, 0);
+        svc_TakeItem(IT_BLUGEM3);
+        { trial5_ReadGems(); return; }
+    }
+    return;
+}
+
+/* [MSG_USE 6A 23 00] */
+static void trial5_Ruby1InHole3(void)
+{
+    room.fall[0] = 0;
+    svc_Walk(0, 0x3C, 0x9F, 5);
+    return;
+}
+
+/* [MSG_WALK_DONE 05 00 00] */
+static void trial5_Ruby1Placed3(void)
+{
+    svc_Anim(0, N_kusehn_19, -1, -1, 0);
+    if (rv_hole3 == 0) {
+        rv_hole3 = 0xE;
+        svc_Anim(0xE, N_RedGem1_3, 0x3C, 0x95, 0);
+        svc_TakeItem(IT_REDGEM1);
+        { trial5_ReadGems(); return; }
+    }
+    return;
+}
+
+/* [MSG_USE 6B 23 00] */
+static void trial5_Ruby2InHole3(void)
+{
+    room.fall[0] = 0;
+    svc_Walk(0, 0x3C, 0x9F, 8);
+    return;
+}
+
+/* [MSG_WALK_DONE 08 00 00] */
+static void trial5_Ruby2Placed3(void)
+{
+    svc_Anim(0, N_kusehn_20, -1, -1, 0);
+    if (rv_hole3 == 0) {
+        rv_hole3 = 0xF;
+        svc_Anim(0xF, N_RedGem2_3, 0x3C, 0x95, 0);
+        svc_TakeItem(IT_REDGEM2);
+        { trial5_ReadGems(); return; }
+    }
+    return;
+}
+
+/* [MSG_USE 6C 23 00] */
+static void trial5_Ruby3InHole3(void)
+{
+    room.fall[0] = 0;
+    svc_Walk(0, 0x3C, 0x9F, 0xB);
+    return;
+}
+
+/* [MSG_WALK_DONE 0B 00 00] */
+static void trial5_Ruby3Placed3(void)
+{
+    svc_Anim(0, N_kusehn_21, -1, -1, 0);
+    if (rv_hole3 == 0) {
+        rv_hole3 = 0x10;
+        svc_Anim(0x10, N_RedGem3_3, 0x3C, 0x95, 0);
+        svc_TakeItem(IT_REDGEM3);
+        { trial5_ReadGems(); return; }
+    }
+    return;
+}
+
+/* [MSG_USE 6D 23 00] */
+static void trial5_Emerald1InHole3(void)
+{
+    room.fall[0] = 0;
+    svc_Walk(0, 0x3C, 0x9F, 0xE);
+    return;
+}
+
+/* [MSG_WALK_DONE 0E 00 00] */
+static void trial5_Emerald1Placed3(void)
+{
+    svc_Anim(0, N_kusehn_22, -1, -1, 0);
+    if (rv_hole3 == 0) {
+        rv_hole3 = 0x11;
+        svc_Anim(0x11, N_GrnGem1_3, 0x3C, 0x95, 0);
+        svc_TakeItem(IT_GRNGEM1);
+        { trial5_ReadGems(); return; }
+    }
+    return;
+}
+
+/* [MSG_USE 6E 23 00] */
+static void trial5_Emerald2InHole3(void)
+{
+    room.fall[0] = 0;
+    svc_Walk(0, 0x3C, 0x9F, 0x11);
+    return;
+}
+
+/* [MSG_WALK_DONE 11 00 00] */
+static void trial5_Emerald2Placed3(void)
+{
+    svc_Anim(0, N_kusehn_23, -1, -1, 0);
+    if (rv_hole3 == 0) {
+        rv_hole3 = 0x12;
+        svc_Anim(0x12, N_GrnGem2_3, 0x3C, 0x95, 0);
+        svc_TakeItem(IT_GRNGEM2);
+        { trial5_ReadGems(); return; }
+    }
+    return;
+}
+
+/* [MSG_USE 6F 23 00] */
+static void trial5_Emerald3InHole3(void)
+{
+    room.fall[0] = 0;
+    svc_Walk(0, 0x3C, 0x9F, 0x14);
+    return;
+}
+
+/* [MSG_WALK_DONE 14 00 00] */
+static void trial5_Emerald3Placed3(void)
+{
+    svc_Anim(0, N_kusehn_24, -1, -1, 0);
+    if (rv_hole3 == 0) {
+        rv_hole3 = 0x13;
+        svc_Anim(0x13, N_GrnGem3_3, 0x3C, 0x95, 0);
+        svc_TakeItem(IT_GRNGEM3);
+        { trial5_ReadGems(); return; }
+    }
+    return;
+}
+
+/* [MSG_USE 70 23 00] */
+static void trial5_Sapphire1InHole3(void)
+{
+    room.fall[0] = 0;
+    svc_Walk(0, 0x3C, 0x9F, 0x17);
+    return;
+}
+
+/* [MSG_WALK_DONE 17 00 00] */
+static void trial5_Sapphire1Placed3(void)
+{
+    svc_Anim(0, N_kusehn_25, -1, -1, 0);
+    if (rv_hole3 == 0) {
+        rv_hole3 = 0x14;
+        svc_Anim(0x14, N_BluGem1_3, 0x3C, 0x95, 0);
+        svc_TakeItem(IT_BLUGEM1);
+        { trial5_ReadGems(); return; }
+    }
+    return;
+}
+
+/* [MSG_USE 71 23 00] */
+static void trial5_Sapphire2InHole3(void)
+{
+    room.fall[0] = 0;
+    svc_Walk(0, 0x3C, 0x9F, 0x1A);
+    return;
+}
+
+/* [MSG_WALK_DONE 1A 00 00] */
+static void trial5_Sapphire2Placed3(void)
+{
+    svc_Anim(0, N_kusehn_26, -1, -1, 0);
+    if (rv_hole3 == 0) {
+        rv_hole3 = 0x15;
+        svc_Anim(0x15, N_BluGem2_3, 0x3C, 0x95, 0);
+        svc_TakeItem(IT_BLUGEM2);
+        { trial5_ReadGems(); return; }
+    }
+    return;
+}
+
+/* [MSG_USE 72 23 00] */
+static void trial5_Sapphire3InHole3(void)
+{
+    room.fall[0] = 0;
+    svc_Walk(0, 0x3C, 0x9F, 0x1D);
+    return;
+}
+
+/* [MSG_WALK_DONE 1D 00 00] */
+static void trial5_Sapphire3Placed3(void)
+{
+    svc_Anim(0, N_kusehn_27, -1, -1, 0);
+    if (rv_hole3 == 0) {
+        rv_hole3 = 0x16;
+        svc_Anim(0x16, N_BluGem3_3, 0x3C, 0x95, 0);
+        svc_TakeItem(IT_BLUGEM3);
+        { trial5_ReadGems(); return; }
+    }
+    return;
+}
+
+/* The gems' colours (1 red, 2 green, 3 blue) in the three holes pick one of
+ * the 27 combinations: the first chooses the Light (War, Knowledge, Travel),
+ * the others what it does. */
+static void trial5_ReadGems(void)
+{
+    fv_colour1 = 0;
+    fv_colour2 = 0;
+    fv_colour3 = 0;
+    if (rv_hole1 == 0xE) {
+        fv_colour1 = 1;
+    }
+    if (rv_hole1 == 0xF) {
+        fv_colour1 = 1;
+    }
+    if (rv_hole1 == 0x10) {
+        fv_colour1 = 1;
+    }
+    if (rv_hole2 == 0xE) {
+        fv_colour2 = 1;
+    }
+    if (rv_hole2 == 0xF) {
+        fv_colour2 = 1;
+    }
+    if (rv_hole2 == 0x10) {
+        fv_colour2 = 1;
+    }
+    if (rv_hole3 == 0xE) {
+        fv_colour3 = 1;
+    }
+    if (rv_hole3 == 0xF) {
+        fv_colour3 = 1;
+    }
+    if (rv_hole3 == 0x10) {
+        fv_colour3 = 1;
+    }
+    if (rv_hole1 == 0x11) {
+        fv_colour1 = 2;
+    }
+    if (rv_hole1 == 0x12) {
+        fv_colour1 = 2;
+    }
+    if (rv_hole1 == 0x13) {
+        fv_colour1 = 2;
+    }
+    if (rv_hole2 == 0x11) {
+        fv_colour2 = 2;
+    }
+    if (rv_hole2 == 0x12) {
+        fv_colour2 = 2;
+    }
+    if (rv_hole2 == 0x13) {
+        fv_colour2 = 2;
+    }
+    if (rv_hole3 == 0x11) {
+        fv_colour3 = 2;
+    }
+    if (rv_hole3 == 0x12) {
+        fv_colour3 = 2;
+    }
+    if (rv_hole3 == 0x13) {
+        fv_colour3 = 2;
+    }
+    if (rv_hole1 == 0x14) {
+        fv_colour1 = 3;
+    }
+    if (rv_hole1 == 0x15) {
+        fv_colour1 = 3;
+    }
+    if (rv_hole1 == 0x16) {
+        fv_colour1 = 3;
+    }
+    if (rv_hole2 == 0x14) {
+        fv_colour2 = 3;
+    }
+    if (rv_hole2 == 0x15) {
+        fv_colour2 = 3;
+    }
+    if (rv_hole2 == 0x16) {
+        fv_colour2 = 3;
+    }
+    if (rv_hole3 == 0x14) {
+        fv_colour3 = 3;
+    }
+    if (rv_hole3 == 0x15) {
+        fv_colour3 = 3;
+    }
+    if (rv_hole3 == 0x16) {
+        fv_colour3 = 3;
+    }
+    if (fv_colour1 == 1) {
+        if (fv_colour2 == 1) {
+            if (fv_colour3 == 1) {
+                goto L322E;
+            }
+        }
+    }
+    if (fv_colour1 == 1) {
+        if (fv_colour2 == 1) {
+            if (fv_colour3 == 2) {
+                goto L317F;
+            }
+        }
+    }
+    if (fv_colour1 == 1) {
+        if (fv_colour2 == 1) {
+            if (fv_colour3 == 3) {
+                goto L317F;
+            }
+        }
+    }
+    if (fv_colour1 == 1) {
+        if (fv_colour2 == 2) {
+            if (fv_colour3 == 1) {
+                goto L317F;
+            }
+        }
+    }
+    if (fv_colour1 == 1) {
+        if (fv_colour2 == 2) {
+            if (fv_colour3 == 2) {
+                goto L32CC;
+            }
+        }
+    }
+    if (fv_colour1 == 1) {
+        if (fv_colour2 == 2) {
+            if (fv_colour3 == 3) {
+                goto L3350;
+            }
+        }
+    }
+    if (fv_colour1 == 1) {
+        if (fv_colour2 == 3) {
+            if (fv_colour3 == 1) {
+                goto L317F;
+            }
+        }
+    }
+    if (fv_colour1 == 1) {
+        if (fv_colour2 == 3) {
+            if (fv_colour3 == 2) {
+                goto L317F;
+            }
+        }
+    }
+    if (fv_colour1 == 1) {
+        if (fv_colour2 == 3) {
+            if (fv_colour3 == 3) {
+                goto L3301;
+            }
+        }
+    }
+    if (fv_colour1 == 2) {
+        if (fv_colour2 == 1) {
+            if (fv_colour3 == 1) {
+                goto L33E7;
+            }
+        }
+    }
+    if (fv_colour1 == 2) {
+        if (fv_colour2 == 1) {
+            if (fv_colour3 == 2) {
+                goto L3683;
+            }
+        }
+    }
+    if (fv_colour1 == 2) {
+        if (fv_colour2 == 1) {
+            if (fv_colour3 == 3) {
+                goto L3683;
+            }
+        }
+    }
+    if (fv_colour1 == 2) {
+        if (fv_colour2 == 2) {
+            if (fv_colour3 == 1) {
+                goto L317F;
+            }
+        }
+    }
+    if (fv_colour1 == 2) {
+        if (fv_colour2 == 2) {
+            if (fv_colour3 == 2) {
+                goto L341C;
+            }
+        }
+    }
+    if (fv_colour1 == 2) {
+        if (fv_colour2 == 2) {
+            if (fv_colour3 == 3) {
+                goto L317F;
+            }
+        }
+    }
+    if (fv_colour1 == 2) {
+        if (fv_colour2 == 3) {
+            if (fv_colour3 == 1) {
+                goto L3616;
+            }
+        }
+    }
+    if (fv_colour1 == 2) {
+        if (fv_colour2 == 3) {
+            if (fv_colour3 == 2) {
+                goto L3683;
+            }
+        }
+    }
+    if (fv_colour1 == 2) {
+        if (fv_colour2 == 3) {
+            if (fv_colour3 == 3) {
+                goto L3565;
+            }
+        }
+    }
+    if (fv_colour1 == 3) {
+        if (fv_colour2 == 1) {
+            if (fv_colour3 == 1) {
+                goto L3725;
+            }
+        }
+    }
+    if (fv_colour1 == 3) {
+        if (fv_colour2 == 1) {
+            if (fv_colour3 == 2) {
+                goto L39A4;
+            }
+        }
+    }
+    if (fv_colour1 == 3) {
+        if (fv_colour2 == 1) {
+            if (fv_colour3 == 3) {
+                goto L39A4;
+            }
+        }
+    }
+    if (fv_colour1 == 3) {
+        if (fv_colour2 == 2) {
+            if (fv_colour3 == 1) {
+                goto L3918;
+            }
+        }
+    }
+    if (fv_colour1 == 3) {
+        if (fv_colour2 == 2) {
+            if (fv_colour3 == 2) {
+                goto L3781;
+            }
+        }
+    }
+    if (fv_colour1 == 3) {
+        if (fv_colour2 == 2) {
+            if (fv_colour3 == 3) {
+                goto L39A4;
+            }
+        }
+    }
+    if (fv_colour1 == 3) {
+        if (fv_colour2 == 3) {
+            if (fv_colour3 == 1) {
+                goto L317F;
+            }
+        }
+    }
+    if (fv_colour1 == 3) {
+        if (fv_colour2 == 3) {
+            if (fv_colour3 == 2) {
+                goto L317F;
+            }
+        }
+    }
+    if (fv_colour1 == 3) {
+        if (fv_colour2 == 3) {
+            if (fv_colour3 == 3) {
+                goto L37F9;
+            }
+        }
+    }
+    svc_StopAnim(9);
+    return;
+L317F:;
+    svc_BridgeSfx(0xA);
+    trial5_Say(N_Light_of_Knowledge, T_TRI5_039);
+    return;
+L322E:;
+    trial5_LightOfWar();
+    svc_Music(1, -1);
+    trial5_Say(N_Light_of_War, T_TRI5_050);
+    svc_GameOver();
+    trial5_Say(0, S_32B6);
+    return;
+L32CC:;
+    trial5_LightOfWar();
+    trial5_Say(N_Light_of_War, T_TRI5_036);
+    return;
+L3301:;
+    trial5_LightOfWar();
+    trial5_Say(N_Light_of_War, T_TRI5_049);
+    return;
+L3350:;
+    trial5_LightOfWar();
+    trial5_Say(N_Light_of_War, T_TRI5_048);
+    return;
+L33E7:;
+    trial5_LightOfKnowledge();
+    trial5_Say(N_Light_of_Knowledge, T_TRI5_047);
+    return;
+L341C:;
+    trial5_LightOfKnowledge();
+    svc_Sfx(N_EFX12B);
+    trial5_Say(N_Light_of_Knowledge, T_TRI5_040);
+    trial5_Say(N_Light_of_Knowledge, T_TRI5_037);
+    rv_interlink_primed = 1;
+    if (rv_primed_scored == 0) {
+        rv_primed_scored = 1;
+        rv_score += 3;
+    }
+    return;
+L3565:;
+    trial5_LightOfKnowledge();
+    trial5_Say(N_Light_of_Knowledge, T_TRI5_038);
+    return;
+L3616:;
+    trial5_LightOfKnowledge();
+    trial5_Say(N_Light_of_Knowledge, T_TRI5_041);
+    return;
+L3683:;
+    trial5_LightOfKnowledge();
+    trial5_Say(N_Light_of_Knowledge, T_TRI5_039_2);
+    return;
+L3725:;
+    trial5_LightOfTravel();
+    trial5_Say(N_Light_of_Travel, T_TRI5_045);
+    return;
+L3781:;
+    trial5_LightOfTravel();
+    trial5_Say(N_Light_of_Travel, T_TRI5_044);
+    return;
+L37F9:;
+    trial5_LightOfTravel();
+    trial5_Say(N_Light_of_Travel, T_TRI5_046);
+    room.busy = 1;
+    svc_BridgeSfx(8);
+    svc_Anim(0, N_kteled, -1, -1, 0x20);
+    svc_Anim(1, N_steled, -1, -1, 0x20);
+    svc_Anim(2, N_mteled, -1, -1, 0x20);
+    if (room.redshirt_dead == 0) {
+        svc_Anim(3, N_rteled, -1, -1, 0x20);
+    }
+    return;
+L3918:;
+    trial5_LightOfTravel();
+    trial5_Say(N_Light_of_Travel, T_TRI5_042);
+    return;
+L39A4:;
+    trial5_LightOfTravel();
+    trial5_Say(N_Light_of_Travel, T_TRI5_043);
+    return;
+}
+
+/* The Light of War: the planet's defences. */
+static void trial5_LightOfWar(void)
+{
+    svc_BridgeSfx(0xA);
+    svc_Anim(9, N_redlit, 0, 0, 0);
+    return;
+}
+
+/* The Light of Knowledge: Bialbi's archives; one combination primes the
+ * interlink (interlink_primed, +1 once). */
+static void trial5_LightOfKnowledge(void)
+{
+    svc_BridgeSfx(0xA);
+    svc_Anim(9, N_grnlit, 0, 0, 0);
+    return;
+}
+
+/* The Light of Travel: transport, mostly refused. */
+static void trial5_LightOfTravel(void)
+{
+    svc_BridgeSfx(0xA);
+    svc_Anim(9, N_blulit, 0, 0, 0);
+    return;
+}
+
+/* Transport done (anim msg 32): +1, back to the court (room 4).
+ * [MSG_ANIM_DONE 20 00 00] */
+static void trial5_Travelled(void)
+{
+    rv_score += 1;
+    room.busy = 1;
+    svc_GotoRoom(4, 4);
+    return;
+}
+
+/* [MSG_USE 7F FF 00] */
+static void trial5_UseMedkit(void)
+{
+    trial5_Say(N_Dr_McCoy, T_TRI5_012);
+    return;
+}
+
+/* the scripts, by the offset of their code in the room file */
+const RoomScript trial5_scripts[] = {
+    { 0x0221, trial5_StartRoom },    /* MSG_TICK 01 00 00 */
+    { 0x0376, trial5_FirstSight },    /* MSG_TICK 3C 00 00 */
+    { 0x04D7, trial5_BialbiJudgesVlict },    /* MSG_ANIM_DONE 01 00 00 */
+    { 0x1020, trial5_KirkToInterface },    /* MSG_USE 00 24 00 */
+    { 0x1043, trial5_WalkToInterface },    /* MSG_WALK 24 00 00 */
+    { 0x1066, trial5_AtInterface },    /* MSG_WALK_DONE 02 00 00 */
+    { 0x1390, trial5_KirkAtHoles },    /* MSG_WALK_DONE 1E 00 00 */
+    { 0x13B5, trial5_GemTakenBack },    /* MSG_ANIM_DONE 1F 00 00 */
+    { 0x13DE, trial5_GetRuby1 },    /* MSG_GET 0E 00 00 */
+    { 0x13F6, trial5_GetRuby2 },    /* MSG_GET 0F 00 00 */
+    { 0x140E, trial5_GetRuby3 },    /* MSG_GET 10 00 00 */
+    { 0x1426, trial5_GetEmerald1 },    /* MSG_GET 11 00 00 */
+    { 0x143E, trial5_GetEmerald2 },    /* MSG_GET 12 00 00 */
+    { 0x1456, trial5_GetEmerald3 },    /* MSG_GET 13 00 00 */
+    { 0x146E, trial5_GetSapphire1 },    /* MSG_GET 14 00 00 */
+    { 0x1486, trial5_GetSapphire2 },    /* MSG_GET 15 00 00 */
+    { 0x149E, trial5_GetSapphire3 },    /* MSG_GET 16 00 00 */
+    { 0x14B6, trial5_LookAtKirk },    /* MSG_LOOK 00 00 00 */
+    { 0x14FA, trial5_LookAtSpock },    /* MSG_LOOK 01 00 00 */
+    { 0x153C, trial5_LookAtMcCoy },    /* MSG_LOOK 02 00 00 */
+    { 0x1584, trial5_LookAtRedshirt },    /* MSG_LOOK 03 00 00 */
+    { 0x15CF, trial5_LookAtPlatform },    /* MSG_LOOK 09 00 00 */
+    { 0x1612, trial5_LookAtInterface },    /* MSG_LOOK 24 00 00 */
+    { 0x164B, trial5_SpockScansInterface },    /* MSG_USE 44 24 00 */
+    { 0x16FB, trial5_McCoyScansInterface },    /* MSG_USE 45 24 00 */
+    { 0x178E, trial5_LookAtRuby1 },    /* MSG_LOOK 0E 00 00 */
+    { 0x1802, trial5_LookAtRuby2 },    /* MSG_LOOK 0F 00 00 */
+    { 0x1876, trial5_LookAtRuby3 },    /* MSG_LOOK 10 00 00 */
+    { 0x18EA, trial5_LookAtEmerald1 },    /* MSG_LOOK 11 00 00 */
+    { 0x1961, trial5_LookAtEmerald2 },    /* MSG_LOOK 12 00 00 */
+    { 0x19D8, trial5_LookAtEmerald3 },    /* MSG_LOOK 13 00 00 */
+    { 0x1A4F, trial5_LookAtSapphire1 },    /* MSG_LOOK 14 00 00 */
+    { 0x1AC6, trial5_LookAtSapphire2 },    /* MSG_LOOK 15 00 00 */
+    { 0x1B3D, trial5_LookAtSapphire3 },    /* MSG_LOOK 16 00 00 */
+    { 0x1BB4, trial5_E_1BB4 },    /* MSG_LOOK 21 00 00 */
+    { 0x1BBC, trial5_E_1BBC },    /* MSG_LOOK 22 00 00 */
+    { 0x1BC4, trial5_LookAtHoles },    /* MSG_LOOK 23 00 00 */
+    { 0x1C1F, trial5_TalkToKirk },    /* MSG_TALK 00 00 00 */
+    { 0x1C89, trial5_TalkToSpock },    /* MSG_TALK 01 00 00 */
+    { 0x1D2E, trial5_TalkToMcCoy },    /* MSG_TALK 02 00 00 */
+    { 0x1D72, trial5_TalkToRedshirt },    /* MSG_TALK 03 00 00 */
+    { 0x1DD8, trial5_E_1DD8 },    /* MSG_USE 40 FF 00 */
+    { 0x1DE0, trial5_KillAnything },    /* MSG_USE 41 FF 00 */
+    { 0x1E1D, trial5_E_1E1D },    /* MSG_USE 45 FF 00 */
+    { 0x1E25, trial5_TricorderAnything },    /* MSG_USE 44 FF 00 */
+    { 0x1ED6, trial5_UseCommunicator },    /* MSG_USE 47 FF 00 */
+    { 0x1F19, trial5_Ruby1InHole1 },    /* MSG_USE 6A 21 00 */
+    { 0x1F40, trial5_Ruby1Placed1 },    /* MSG_WALK_DONE 03 00 00 */
+    { 0x1F9F, trial5_Ruby2InHole1 },    /* MSG_USE 6B 21 00 */
+    { 0x1FC6, trial5_Ruby2Placed1 },    /* MSG_WALK_DONE 06 00 00 */
+    { 0x2025, trial5_Ruby3InHole1 },    /* MSG_USE 6C 21 00 */
+    { 0x204C, trial5_Ruby3Placed1 },    /* MSG_WALK_DONE 09 00 00 */
+    { 0x20AB, trial5_Emerald1InHole1 },    /* MSG_USE 6D 21 00 */
+    { 0x20D2, trial5_Emerald1Placed1 },    /* MSG_WALK_DONE 0C 00 00 */
+    { 0x2131, trial5_Emerald2InHole1 },    /* MSG_USE 6E 21 00 */
+    { 0x2158, trial5_Emerald2Placed1 },    /* MSG_WALK_DONE 0F 00 00 */
+    { 0x21B7, trial5_Emerald3InHole1 },    /* MSG_USE 6F 21 00 */
+    { 0x21DE, trial5_Emerald3Placed1 },    /* MSG_WALK_DONE 12 00 00 */
+    { 0x223D, trial5_Sapphire1InHole1 },    /* MSG_USE 70 21 00 */
+    { 0x2264, trial5_Sapphire1Placed1 },    /* MSG_WALK_DONE 15 00 00 */
+    { 0x22C3, trial5_Sapphire2InHole1 },    /* MSG_USE 71 21 00 */
+    { 0x22EA, trial5_Sapphire2Placed1 },    /* MSG_WALK_DONE 18 00 00 */
+    { 0x2349, trial5_Sapphire3InHole1 },    /* MSG_USE 72 21 00 */
+    { 0x2370, trial5_Sapphire3Placed1 },    /* MSG_WALK_DONE 1B 00 00 */
+    { 0x23CF, trial5_Ruby1InHole2 },    /* MSG_USE 6A 22 00 */
+    { 0x23F6, trial5_Ruby1Placed2 },    /* MSG_WALK_DONE 04 00 00 */
+    { 0x2455, trial5_Ruby2InHole2 },    /* MSG_USE 6B 22 00 */
+    { 0x247C, trial5_Ruby2Placed2 },    /* MSG_WALK_DONE 07 00 00 */
+    { 0x24DB, trial5_Ruby3InHole2 },    /* MSG_USE 6C 22 00 */
+    { 0x2502, trial5_Ruby3Placed2 },    /* MSG_WALK_DONE 0A 00 00 */
+    { 0x2561, trial5_Emerald1InHole2 },    /* MSG_USE 6D 22 00 */
+    { 0x2588, trial5_Emerald1Placed2 },    /* MSG_WALK_DONE 0D 00 00 */
+    { 0x25E7, trial5_Emerald2InHole2 },    /* MSG_USE 6E 22 00 */
+    { 0x260E, trial5_Emerald2Placed2 },    /* MSG_WALK_DONE 10 00 00 */
+    { 0x266D, trial5_Emerald3InHole2 },    /* MSG_USE 6F 22 00 */
+    { 0x2694, trial5_Emerald3Placed2 },    /* MSG_WALK_DONE 13 00 00 */
+    { 0x26F3, trial5_Sapphire1InHole2 },    /* MSG_USE 70 22 00 */
+    { 0x271A, trial5_Sapphire1Placed2 },    /* MSG_WALK_DONE 16 00 00 */
+    { 0x2779, trial5_Sapphire2InHole2 },    /* MSG_USE 71 22 00 */
+    { 0x27A0, trial5_Sapphire2Placed2 },    /* MSG_WALK_DONE 19 00 00 */
+    { 0x27FF, trial5_Sapphire3InHole2 },    /* MSG_USE 72 22 00 */
+    { 0x2826, trial5_Sapphire3Placed2 },    /* MSG_WALK_DONE 1C 00 00 */
+    { 0x2885, trial5_Ruby1InHole3 },    /* MSG_USE 6A 23 00 */
+    { 0x28AC, trial5_Ruby1Placed3 },    /* MSG_WALK_DONE 05 00 00 */
+    { 0x290B, trial5_Ruby2InHole3 },    /* MSG_USE 6B 23 00 */
+    { 0x2932, trial5_Ruby2Placed3 },    /* MSG_WALK_DONE 08 00 00 */
+    { 0x2991, trial5_Ruby3InHole3 },    /* MSG_USE 6C 23 00 */
+    { 0x29B8, trial5_Ruby3Placed3 },    /* MSG_WALK_DONE 0B 00 00 */
+    { 0x2A17, trial5_Emerald1InHole3 },    /* MSG_USE 6D 23 00 */
+    { 0x2A3E, trial5_Emerald1Placed3 },    /* MSG_WALK_DONE 0E 00 00 */
+    { 0x2A9D, trial5_Emerald2InHole3 },    /* MSG_USE 6E 23 00 */
+    { 0x2AC4, trial5_Emerald2Placed3 },    /* MSG_WALK_DONE 11 00 00 */
+    { 0x2B23, trial5_Emerald3InHole3 },    /* MSG_USE 6F 23 00 */
+    { 0x2B4A, trial5_Emerald3Placed3 },    /* MSG_WALK_DONE 14 00 00 */
+    { 0x2BA9, trial5_Sapphire1InHole3 },    /* MSG_USE 70 23 00 */
+    { 0x2BD0, trial5_Sapphire1Placed3 },    /* MSG_WALK_DONE 17 00 00 */
+    { 0x2C2F, trial5_Sapphire2InHole3 },    /* MSG_USE 71 23 00 */
+    { 0x2C56, trial5_Sapphire2Placed3 },    /* MSG_WALK_DONE 1A 00 00 */
+    { 0x2CB5, trial5_Sapphire3InHole3 },    /* MSG_USE 72 23 00 */
+    { 0x2CDC, trial5_Sapphire3Placed3 },    /* MSG_WALK_DONE 1D 00 00 */
+    { 0x3904, trial5_Travelled },    /* MSG_ANIM_DONE 20 00 00 */
+    { 0x3A00, trial5_UseMedkit },    /* MSG_USE 7F FF 00 */
+    { 0, 0 }
+};

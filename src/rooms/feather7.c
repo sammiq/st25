@@ -1,0 +1,262 @@
+/* FEATHER7.RDF: the room's scripts, translated from the machine code in the room file
+ * (src/rdf/feather7.asm) by tools/rdf2c.py.  They run on the loaded file (CS_B/CS_W) and the
+ * room state (`room`), and call the game through the svc_ macros of rooms.h.
+ *
+ * FEATHER7.RDF - "The Feathered Serpent", Quetzecoatl's chamber, the end
+ * of the mission. Quetzecoatl reveals that the jungle was a test of the
+ * party, hears the truth about the Aztecs, and agrees to come to the
+ * Enterprise to answer to the Klingons.
+ *
+ * Actors: 8 Quetzecoatl.
+ *
+ * Labels: H_ script headers, L branch targets, C_ conversations,
+ * T_/N_/S_ strings; talk_buf: the conversation buffer of Say.
+ *
+ * Quirks of the original:
+ * - The script chain runs on into code at 03E3: the engine reads its bytes
+ * as key 50 6A 03 2E and next 1EFF (beyond rdf_scripts_end, so the search
+ * stops).
+ */
+
+#include "rooms.h"
+
+/* where the file keeps its strings, conversations and tables */
+enum {
+    N_s5r7qn = 0x00CB,
+    N_s5r7qw = 0x00D2,
+    N_s5r7qt = 0x00D9,
+    N_s5r7ks = 0x00E0,
+    N_s5r7ss = 0x00E7,
+    N_s5r7ms = 0x00EE,
+    N_s5r7ku = 0x00F5,
+    N_s5r7su = 0x00FC,
+    N_s5r7mu = 0x0103,
+    N_FEA7LOOP = 0x0112,
+    N_Capt_Kirk = 0x0428,
+    N_Dr_McCoy = 0x0433,
+    N_Mr_Spock = 0x043D,
+    N_Quetzecoatl = 0x0453,
+    T_FEA7_017 = 0x0460,
+    T_FEA7_022 = 0x04BE,
+    T_FEA7_021 = 0x0536,
+    T_FEA7_027 = 0x05D2,
+    T_FEA7_023 = 0x060B,
+    T_FEA7_020 = 0x07FC,
+    T_FEA7_019 = 0x0845,
+    T_FEA7_016 = 0x08CA,
+    T_FEA7_029 = 0x08F7,
+    T_FEA7_030 = 0x0AF6,
+    T_FEA7_018 = 0x0BFD,
+    T_FEA7_026 = 0x0CE1,
+    T_FEA7_014 = 0x0E1E,
+    T_FEA7_024 = 0x0E8C,
+    T_FEA7_025 = 0x1044,
+    T_FEA7_028 = 0x111D,
+    T_FEA7_015 = 0x115B,
+    T_FEA7_013 = 0x11FA,
+    T_FEA7_003 = 0x1242,
+    T_FEA7_002 = 0x12C2,
+    T_FEA7_001 = 0x12EA,
+    talk_buf = 0x133A,
+    KirkOnTests = 0x1340,
+    KirkOnAztecs = 0x134A,
+    KirkOnProgress = 0x1354,
+};
+
+/* the room's variables: in the room state, and in the file itself */
+#define fv_harsh CS_B(0xCA)
+#define fv_talk_buf CS_W(0x133A)
+#define rv_died_in_cave ROOM_B(0x29)
+#define rv_knocked_out ROOM_B(0x33)
+#define rv_score ROOM_W(0x36)
+
+/* functions */
+static void feather7_StartRoom(void);
+static void feather7_QuetzecoatlSpeaks(void);
+static void feather7_KirkSits(void);
+static void feather7_SpockSits(void);
+static void feather7_McCoySits(void);
+static void feather7_QuetzecoatlSits(void);
+static void feather7_TalkWithQuetzecoatl(void);
+static void feather7_BeamUp(void);
+static uint16_t feather7_Talk(uint16_t ax);
+static void feather7_Say(uint16_t ax, uint16_t bx);
+
+/* The room starts: Quetzecoatl, the party unable to move.
+ * [MSG_TICK 01 00 00] */
+static void feather7_StartRoom(void)
+{
+    svc_Sfx(N_FEA7LOOP);
+    svc_Music(0x21, STALE_ARG);
+    room.busy = 2;
+    svc_Anim0(8, N_s5r7qn, 0x106, 0x98, 0);
+    return;
+}
+
+/* Tick 40: Quetzecoatl apologises (if Kirk died), praises Stragey's
+ * sacrifice, regrets Tlaoxac (if knocked out), and has everyone sit
+ * (walk msgs 1-3, anim msg 4).
+ * [MSG_TICK 28 00 00] */
+static void feather7_QuetzecoatlSpeaks(void)
+{
+    if (rv_died_in_cave == 1) {
+        feather7_Say(N_Quetzecoatl, T_FEA7_017);
+    }
+    feather7_Say(N_Quetzecoatl, T_FEA7_022);
+    if (room.redshirt_dead == 1) {
+        feather7_Say(N_Quetzecoatl, T_FEA7_021);
+        if (rv_knocked_out == 1) {
+            feather7_Say(N_Quetzecoatl, T_FEA7_023);
+        }
+    }
+    feather7_Say(N_Quetzecoatl, T_FEA7_027);
+    svc_Walk(0, 0x6C, 0x93, 1);
+    svc_Walk(1, 0xBB, 0x8C, 2);
+    svc_Walk(2, 0x8D, 0x8C, 3);
+    svc_Anim(8, N_s5r7qw, -1, -1, 4);
+    return;
+}
+
+/* [MSG_WALK_DONE 01 00 00] */
+static void feather7_KirkSits(void)
+{
+    svc_Anim(0, N_s5r7ks, -1, -1, 1);
+    return;
+}
+
+/* [MSG_WALK_DONE 02 00 00] */
+static void feather7_SpockSits(void)
+{
+    svc_Anim(1, N_s5r7ss, -1, -1, 0);
+    return;
+}
+
+/* [MSG_WALK_DONE 03 00 00] */
+static void feather7_McCoySits(void)
+{
+    svc_Anim(2, N_s5r7ms, -1, -1, 0);
+    return;
+}
+
+/* [MSG_ANIM_DONE 04 00 00] */
+static void feather7_QuetzecoatlSits(void)
+{
+    svc_Anim(8, N_s5r7qn, 0x97, 0x98, 0);
+    return;
+}
+
+/* Seated (anim msg 1): the conversation. Quetzecoatl decides to give up
+ * his power and stand trial among the Klingons (anim msg 2).
+ * [MSG_ANIM_DONE 01 00 00] */
+static void feather7_TalkWithQuetzecoatl(void)
+{
+    uint16_t ax = 0;
+    ax = (uint16_t)feather7_Talk(KirkOnTests);
+    if (ax == 0) {
+        fv_harsh = 1;
+    } else {
+        if (ax == 1) {
+            goto L028A;
+        }
+        goto L0295;
+    }
+    feather7_Say(N_Quetzecoatl, T_FEA7_020);
+    goto L029E;
+L028A:;
+    feather7_Say(N_Quetzecoatl, T_FEA7_019);
+    goto L029E;
+L0295:;
+    feather7_Say(N_Quetzecoatl, T_FEA7_016);
+L029E:;
+    feather7_Say(N_Quetzecoatl, T_FEA7_029);
+    ax = (uint16_t)feather7_Talk(KirkOnAztecs);
+    if (ax == 0) {
+        fv_harsh = 1;
+    } else {
+        if (ax == 1) {
+            goto L02D4;
+        }
+        fv_harsh = 1;
+        goto L02DF;
+    }
+    feather7_Say(N_Quetzecoatl, T_FEA7_030);
+    goto L02E8;
+L02D4:;
+    feather7_Say(N_Quetzecoatl, T_FEA7_018);
+    goto L02E8;
+L02DF:;
+    feather7_Say(N_Quetzecoatl, T_FEA7_026);
+L02E8:;
+    feather7_Say(N_Mr_Spock, T_FEA7_014);
+    feather7_Say(N_Quetzecoatl, T_FEA7_024);
+    ax = (uint16_t)feather7_Talk(KirkOnProgress);
+    if (ax == 0) {
+        fv_harsh = 1;
+    } else {
+        if (ax == 1) {
+            goto L0324;
+        }
+        goto L032D;
+    }
+    feather7_Say(N_Quetzecoatl, T_FEA7_025);
+    goto L032D;
+L0324:;
+    feather7_Say(N_Quetzecoatl, T_FEA7_028);
+L032D:;
+    feather7_Say(N_Quetzecoatl, T_FEA7_015);
+    feather7_Say(N_Dr_McCoy, T_FEA7_013);
+    feather7_Say(N_Capt_Kirk, T_FEA7_003);
+    svc_Anim(0, N_s5r7ku, -1, -1, 2);
+    svc_Anim(1, N_s5r7su, -1, -1, 0);
+    svc_Anim(2, N_s5r7mu, -1, -1, 0);
+    return;
+}
+
+/* The end: four or five to beam up (+1 with Stragey alive), +2 unless
+ * Kirk was harsh, +4; BeamUp(score, 19, 0).
+ * [MSG_ANIM_DONE 02 00 00] */
+static void feather7_BeamUp(void)
+{
+    if (room.redshirt_dead == 1) {
+        feather7_Say(N_Capt_Kirk, T_FEA7_002);
+    } else {
+        rv_score += 1;
+        feather7_Say(N_Capt_Kirk, T_FEA7_001);
+    }
+    if (fv_harsh != 1) {
+        rv_score += 2;
+    }
+    rv_score += 4;
+    svc_Anim(8, N_s5r7qt, -1, -1, 0);
+    svc_BeamUp(rv_score, 0x13, 0);
+    return;
+}
+
+/* Talk: conversation AX (speaker, choices, 0); returns the choice. */
+static uint16_t feather7_Talk(uint16_t ax)
+{
+    ax = (uint16_t)svc_Talk(ax);
+    return ax;
+}
+
+/* Say: one line, BX, said by AX (0: narration). */
+static void feather7_Say(uint16_t ax, uint16_t bx)
+{
+    fv_talk_buf = ax;
+    CS_W(0x133C) = bx;
+    feather7_Talk(talk_buf);
+    return;
+}
+
+/* the scripts, by the offset of their code in the room file */
+const RoomScript feather7_scripts[] = {
+    { 0x0110, feather7_StartRoom },    /* MSG_TICK 01 00 00 */
+    { 0x0158, feather7_QuetzecoatlSpeaks },    /* MSG_TICK 28 00 00 */
+    { 0x01EE, feather7_KirkSits },    /* MSG_WALK_DONE 01 00 00 */
+    { 0x020A, feather7_SpockSits },    /* MSG_WALK_DONE 02 00 00 */
+    { 0x0226, feather7_McCoySits },    /* MSG_WALK_DONE 03 00 00 */
+    { 0x0242, feather7_QuetzecoatlSits },    /* MSG_ANIM_DONE 04 00 00 */
+    { 0x0260, feather7_TalkWithQuetzecoatl },    /* MSG_ANIM_DONE 01 00 00 */
+    { 0x038E, feather7_BeamUp },    /* MSG_ANIM_DONE 02 00 00 */
+    { 0, 0 }
+};

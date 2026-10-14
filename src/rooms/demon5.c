@@ -1,0 +1,707 @@
+/* DEMON5.RDF: the room's scripts, translated from the machine code in the room file
+ * (src/rdf/demon5.asm) by tools/rdf2c.py.  They run on the loaded file (CS_B/CS_W) and the
+ * room state (`room`), and call the game through the svc_ macros of rooms.h.
+ *
+ * DEMON5.RDF - "Demon World", the chapel, where the colonists who met the
+ * demons wait: Brother Roberts, Brother Chub (injured by them), Brother
+ * Grisnash the Tellarite, and Brother Stephen. McCoy examines them all;
+ * Chub needs a Hypo-Dytoxin made from Laraxian berries (room 2, made in
+ * room 6), and giving it to him cures him.
+ *
+ * Actors: 8 Brother Roberts, 9 Brother Chub, 10 (0Ah) Brother Grisnash,
+ * 11 (0Bh) Brother Stephen, 12 (0Ch) the door.
+ * Objects: 8-0Bh the brothers, 0Ch/22h the door, 20h the skylight,
+ * 21h the supplies.
+ * Region 0: the doorstep. The door leads back to the colony (room 0).
+ *
+ * Labels: H_ script headers, L branch targets, C_ conversations,
+ * T_/N_/S_ strings; talk_buf: the conversation buffer of Say.
+ *
+ * Quirks of the original:
+ * - The script chain runs on into code at 0CF8: the engine reads its bytes
+ * as key 50 B8 03 00 and next 2E50 (beyond rdf_scripts_end, so the search
+ * stops).
+ */
+
+#include "rooms.h"
+
+/* where the file keeps its strings, conversations and tables */
+enum {
+    N_oldman = 0x00D6,
+    N_brorob = 0x00DD,
+    N_crip = 0x00E4,
+    N_brotel = 0x00E9,
+    N_s0r6d1 = 0x00F0,
+    N_s0r6d2 = 0x00F7,
+    N_musemn = 0x00FE,
+    N_sscans = 0x0105,
+    N_mscane = 0x0113,
+    N_mscanw = 0x011A,
+    N_DEM5LOOP = 0x0129,
+    T_DEM5_006 = 0x027C,
+    T_DEM5_007 = 0x02E7,
+    T_DEM5_039 = 0x0387,
+    T_DEM5_036 = 0x0438,
+    T_DEM5_033 = 0x0483,
+    T_DEM5_037 = 0x04DE,
+    T_DEM5L027 = 0x058F,
+    T_DEM5_008 = 0x05E2,
+    T_DEM5_009 = 0x061F,
+    T_DEM5N010 = 0x0713,
+    T_DEM5N013 = 0x0783,
+    T_DEM5N011 = 0x0812,
+    T_DEM5_035 = 0x08AF,
+    T_DEM5_032 = 0x0904,
+    T_DEM5_038 = 0x095E,
+    T_DEM5_034 = 0x09B8,
+    T_DEM5_010 = 0x0B7E,
+    T_DEM5N012 = 0x0CCC,
+    N_Capt_Kirk = 0x0DCA,
+    N_Dr_McCoy = 0x0DD5,
+    N_Mr_Spock = 0x0DDF,
+    N_Ensign_Everts = 0x0DE9,
+    N_Brother_Roberts = 0x0DF7,
+    N_Brother_Chub = 0x0E07,
+    N_Brother_Grisnash = 0x0E14,
+    N_Brother_Stephen = 0x0E25,
+    T_DEM5N001 = 0x0E35,
+    T_DEM5L028 = 0x0E74,
+    T_DEM5N009 = 0x0EC1,
+    T_DEM5N003 = 0x0F4E,
+    T_DEM5N002 = 0x0FC1,
+    T_DEM5N004 = 0x100F,
+    T_DEM5N000 = 0x1057,
+    T_DEM5N007 = 0x1095,
+    T_DEM5N005 = 0x10CA,
+    T_DEM5N008 = 0x111A,
+    T_DEM5N006 = 0x1158,
+    T_DEM5_030 = 0x11AE,
+    T_DEM5L029 = 0x12A4,
+    T_DEM5_002 = 0x1340,
+    T_DEM5L030 = 0x1376,
+    T_DEM5_005 = 0x14E0,
+    T_DEM5L031 = 0x150D,
+    T_DEM5_028 = 0x1520,
+    T_DEM5_024 = 0x1606,
+    T_DEM5_029 = 0x16B8,
+    T_DEM5_025 = 0x16CE,
+    T_DEM5_041 = 0x1709,
+    T_DEM5_022 = 0x183B,
+    T_DEM5_043 = 0x188E,
+    T_DEM5_031 = 0x19D3,
+    T_DEM5_042 = 0x1A18,
+    T_DEM5_001 = 0x1B58,
+    T_DEM5_027 = 0x1B8F,
+    T_DEM5_018 = 0x1BE0,
+    T_DEM5_045 = 0x1C64,
+    T_DEM5_021 = 0x1CFF,
+    T_DEM5_003 = 0x1D52,
+    T_DEM5_017 = 0x1D8C,
+    T_DEM5_023 = 0x1DE5,
+    T_DEM5_004 = 0x1E76,
+    T_DEM5_044 = 0x1EA9,
+    T_DEM5_020 = 0x1F05,
+    T_DEM5_026 = 0x1F37,
+    T_DEM5_019 = 0x1F63,
+    T_DEM5_012 = 0x1F96,
+    T_DEM5_040 = 0x20DB,
+    T_DEM5_015 = 0x2201,
+    T_DEM5_016 = 0x2268,
+    T_DEM5_013 = 0x2326,
+    T_DEM5_014 = 0x238D,
+    T_DEM5_011 = 0x2408,
+    talk_buf = 0x24E3,
+};
+
+/* the room's variables: in the room state, and in the file itself */
+#define fv_door_steps CS_B(0xD4)
+#define fv_going_out CS_B(0xD5)
+#define fv_scanned_chub CS_B(0xCB)
+#define fv_scanned_grisnash CS_B(0xCC)
+#define fv_scanned_roberts CS_B(0xCA)
+#define fv_scanned_stephen CS_B(0xCD)
+#define fv_scans CS_B(0xCE)
+#define fv_talk_buf CS_W(0x24E3)
+#define fv_talked_chub CS_B(0xD1)
+#define fv_talked_grisnash CS_B(0xD2)
+#define fv_talked_roberts CS_B(0xD0)
+#define fv_talked_stephen CS_B(0xD3)
+#define fv_talks CS_B(0xCF)
+#define rv_cured_chub ROOM_B(0x3D)
+#define rv_examined_chub ROOM_B(0x3E)
+#define rv_got_berries ROOM_B(0x50)
+#define rv_hand_repaired ROOM_B(0x3B)
+#define rv_made_hypo ROOM_B(0x51)
+#define rv_need_berries ROOM_B(0x3F)
+#define rv_saw_klingons ROOM_B(0x37)
+#define rv_score ROOM_W(0x58)
+
+/* functions */
+static void demon5_StartRoom(void);
+static void demon5_E_01C6(void);
+static void demon5_WalkToDoor(void);
+static void demon5_ReachDoor(void);
+static void demon5_E_0225(void);
+static void demon5_GoOut(void);
+static void demon5_SpockScansSupplies(void);
+static void demon5_E_02D3(void);
+static void demon5_PhaserColonist(void);
+static void demon5_ShowHandToStephen(void);
+static void demon5_ShowBerriesToStephen(void);
+static void demon5_GiveHypoToChub(void);
+static void demon5_McCoyAtChub(void);
+static void demon5_ChubCured(void);
+static void demon5_GiveHypo(void);
+static void demon5_GiveBerriesToChub(void);
+static void demon5_LookAtRoberts(void);
+static void demon5_LookAtGrisnash(void);
+static void demon5_LookAtStephen(void);
+static void demon5_LookAtKirk(void);
+static void demon5_LookAtSpock(void);
+static void demon5_LookAtMcCoy(void);
+static void demon5_LookAtRedshirt(void);
+static void demon5_LookAtSkylight(void);
+static void demon5_LookAtSupplies(void);
+static void demon5_LookAtScene(void);
+static void demon5_LookAtChub(void);
+static void demon5_TalkToRoberts(void);
+static void demon5_TalkToChub(void);
+static void demon5_TalkToGrisnash(void);
+static void demon5_TalkToStephen(void);
+static void demon5_TalkToKirk(void);
+static void demon5_TalkToSpock(void);
+static void demon5_TalkToRedshirt(void);
+static void demon5_TalkToMcCoy(void);
+static void demon5_McCoyScansRoberts(void);
+static void demon5_E_0B33(void);
+static void demon5_McCoyHelpsChub(void);
+static void demon5_McCoyScansChub(void);
+static void demon5_McCoyScansGrisnash(void);
+static void demon5_McCoyScansStephen(void);
+static void demon5_part_0C9B(void);
+static void demon5_GetSupplies(void);
+static void demon5_Talk(uint16_t ax);
+static void demon5_Say(uint16_t ax, uint16_t bx);
+
+/* The room starts: the brothers (Stephen only until Chub is cured and
+ * the Klingons have been met) and the door.
+ * [MSG_TICK 01 00 00] */
+static void demon5_StartRoom(void)
+{
+    svc_Sfx(N_DEM5LOOP);
+    if (rv_cured_chub != 0) {
+        if (rv_saw_klingons == 1)
+            goto L0163;
+    }
+    svc_Anim0(0xB, N_oldman, 0x7A, 0xB0, 0);
+L0163:;
+    svc_Anim0(8, N_brorob, 0xC9, 0xA8, 0);
+    svc_Anim0(9, N_crip, 0xE3, 0xA8, 0);
+    svc_Anim0(0xA, N_brotel, 0xF9, 0xBC, 0);
+    svc_Anim0(0xC, N_s0r6d2, 0xA0, 0x92, 0);
+    return;
+}
+
+/* Leaving: walk to the door (msg 1); at the doorstep it opens (anim
+ * msg 1), and when both are done, back to the colony.
+ * [MSG_WALK 22 00 00] */
+static void demon5_E_01C6(void)
+{
+    { demon5_WalkToDoor(); return; }
+}
+
+/* [MSG_WALK 0C 00 00] */
+static void demon5_WalkToDoor(void)
+{
+    room.busy = 1;
+    fv_going_out = 1;
+    svc_Walk(0, 0xA0, 0x94, 1);
+    return;
+}
+
+/* [MSG_REGION 00 00 00] */
+static void demon5_ReachDoor(void)
+{
+    if (fv_going_out == 1) {
+        svc_Anim0(0xC, N_s0r6d1, 0xA0, 0x92, 1);
+        svc_BridgeSfx(5);
+    }
+    return;
+}
+
+/* [MSG_WALK_DONE 01 00 00] */
+static void demon5_E_0225(void)
+{
+    { demon5_GoOut(); return; }
+}
+
+/* [MSG_ANIM_DONE 01 00 00] */
+static void demon5_GoOut(void)
+{
+    fv_door_steps++;
+    if (fv_door_steps != 2) {
+        return;
+    }
+    svc_GotoRoom(0, 1);
+    return;
+}
+
+/* Spock's tricorder, and phasers.
+ * [MSG_USE 44 21 00] */
+static void demon5_SpockScansSupplies(void)
+{
+    svc_Anim(1, N_sscans, -1, -1, 0);
+    svc_BridgeSfx(4);
+    demon5_Say(N_Mr_Spock, T_DEM5_006);
+    return;
+}
+
+/* [MSG_USE 41 FF 00] */
+static void demon5_E_02D3(void)
+{
+    { demon5_PhaserColonist(); return; }
+}
+
+/* [MSG_USE 40 FF 00] */
+static void demon5_PhaserColonist(void)
+{
+    demon5_Say(N_Mr_Spock, T_DEM5_007);
+    return;
+}
+
+/* Showing Brother Stephen the hand and the berries.
+ * [MSG_USE 42 0B 00] */
+static void demon5_ShowHandToStephen(void)
+{
+    if (rv_hand_repaired == 1) {
+    } else {
+        demon5_Say(N_Brother_Stephen, T_DEM5_039);
+        return;
+    }
+    demon5_Say(N_Brother_Stephen, T_DEM5_036);
+    return;
+}
+
+/* [MSG_USE 7B 0B 00] */
+static void demon5_ShowBerriesToStephen(void)
+{
+    if (rv_need_berries == 1) {
+        demon5_Say(N_Brother_Stephen, T_DEM5_033);
+        return;
+    }
+    demon5_Say(N_Brother_Stephen, T_DEM5_037);
+    return;
+}
+
+/* McCoy gives Chub the Hypo-Dytoxin (msgs 2): +2 score.
+ * [MSG_USE 7A 09 00] */
+static void demon5_GiveHypoToChub(void)
+{
+    svc_Walk(2, 0xE1, 0xB0, 2);
+    return;
+}
+
+/* [MSG_WALK_DONE 02 00 00] */
+static void demon5_McCoyAtChub(void)
+{
+    svc_Anim(2, N_musemn, -1, -1, 2);
+    return;
+}
+
+/* [MSG_ANIM_DONE 02 00 00] */
+static void demon5_ChubCured(void)
+{
+    svc_Walk(2, 0xC8, 0xBA, 0);
+    room.fall[2] = 3;
+    demon5_Say(N_Brother_Chub, T_DEM5L027);
+    svc_TakeItem(IT_DETOXIN);
+    rv_cured_chub = 1;
+    rv_score += 2;
+    return;
+}
+
+/* The Hypo-Dytoxin or the raw berries elsewhere.
+ * [MSG_USE 7A FF 00] */
+static void demon5_GiveHypo(void)
+{
+    demon5_Say(N_Dr_McCoy, T_DEM5_008);
+    return;
+}
+
+/* [MSG_USE 7B 09 00] */
+static void demon5_GiveBerriesToChub(void)
+{
+    demon5_Say(N_Dr_McCoy, T_DEM5_009);
+    return;
+}
+
+/* Looking at things.
+ * [MSG_LOOK 08 00 00] */
+static void demon5_LookAtRoberts(void)
+{
+    demon5_Say(0, T_DEM5N001);
+    return;
+}
+
+/* [MSG_LOOK 0A 00 00] */
+static void demon5_LookAtGrisnash(void)
+{
+    demon5_Say(0, T_DEM5N009);
+    return;
+}
+
+/* [MSG_LOOK 0B 00 00] */
+static void demon5_LookAtStephen(void)
+{
+    demon5_Say(0, T_DEM5N003);
+    return;
+}
+
+/* [MSG_LOOK 00 00 00] */
+static void demon5_LookAtKirk(void)
+{
+    demon5_Say(0, T_DEM5N006);
+    return;
+}
+
+/* [MSG_LOOK 01 00 00] */
+static void demon5_LookAtSpock(void)
+{
+    demon5_Say(0, T_DEM5N008);
+    return;
+}
+
+/* [MSG_LOOK 02 00 00] */
+static void demon5_LookAtMcCoy(void)
+{
+    demon5_Say(0, T_DEM5N007);
+    return;
+}
+
+/* [MSG_LOOK 03 00 00] */
+static void demon5_LookAtRedshirt(void)
+{
+    demon5_Say(0, T_DEM5N005);
+    return;
+}
+
+/* [MSG_LOOK 20 00 00] */
+static void demon5_LookAtSkylight(void)
+{
+    demon5_Say(0, T_DEM5N002);
+    return;
+}
+
+/* [MSG_LOOK 21 00 00] */
+static void demon5_LookAtSupplies(void)
+{
+    demon5_Say(0, T_DEM5N004);
+    return;
+}
+
+/* [MSG_LOOK FF 00 00] */
+static void demon5_LookAtScene(void)
+{
+    demon5_Say(0, T_DEM5N000);
+    return;
+}
+
+/* [MSG_LOOK 09 00 00] */
+static void demon5_LookAtChub(void)
+{
+    demon5_Say(N_Brother_Chub, T_DEM5L028);
+    return;
+}
+
+/* Talking to the brothers: each counts once towards McCoy's verdict.
+ * [MSG_TALK 08 00 00] */
+static void demon5_TalkToRoberts(void)
+{
+    if (rv_cured_chub != 1) {
+        demon5_Say(0, T_DEM5N010);
+        return;
+    }
+    demon5_Say(N_Brother_Roberts, T_DEM5_030);
+    if (fv_talked_roberts != 1) {
+        fv_talked_roberts = 1;
+        fv_talks++;
+    }
+    { demon5_part_0C9B(); return; }
+}
+
+/* [MSG_TALK 09 00 00] */
+static void demon5_TalkToChub(void)
+{
+    if (rv_cured_chub != 1) {
+        demon5_Say(0, T_DEM5N013);
+        return;
+    }
+    demon5_Say(N_Brother_Chub, T_DEM5L029);
+    demon5_Say(N_Capt_Kirk, T_DEM5_002);
+    demon5_Say(N_Brother_Chub, T_DEM5L030);
+    demon5_Say(N_Capt_Kirk, T_DEM5_005);
+    demon5_Say(N_Brother_Chub, T_DEM5L031);
+    if (fv_talked_chub != 1) {
+        fv_talked_chub = 1;
+        fv_talks++;
+    }
+    { demon5_part_0C9B(); return; }
+}
+
+/* [MSG_TALK 0A 00 00] */
+static void demon5_TalkToGrisnash(void)
+{
+    if (rv_cured_chub != 1) {
+        demon5_Say(0, T_DEM5N011);
+        return;
+    }
+    demon5_Say(N_Brother_Grisnash, T_DEM5_028);
+    demon5_Say(N_Mr_Spock, T_DEM5_024);
+    demon5_Say(N_Brother_Grisnash, T_DEM5_029);
+    demon5_Say(N_Mr_Spock, T_DEM5_025);
+    if (fv_talked_grisnash != 1) {
+        fv_talked_grisnash = 1;
+        fv_talks++;
+    }
+    { demon5_part_0C9B(); return; }
+}
+
+/* [MSG_TALK 0B 00 00] */
+static void demon5_TalkToStephen(void)
+{
+    if (rv_cured_chub == 1) {
+    } else {
+        if (rv_need_berries != 1) {
+        } else {
+            if (rv_made_hypo == 1) {
+                demon5_Say(N_Brother_Stephen, T_DEM5_035);
+                return;
+            }
+            if (rv_got_berries == 1) {
+                demon5_Say(N_Brother_Stephen, T_DEM5_032);
+                rv_examined_chub = 0;
+                return;
+            }
+            if (rv_examined_chub == 1) {
+                demon5_Say(N_Brother_Stephen, T_DEM5_038);
+                return;
+            }
+        }
+        demon5_Say(N_Brother_Stephen, T_DEM5_034);
+        return;
+    }
+    demon5_Say(N_Brother_Stephen, T_DEM5_041);
+    demon5_Say(N_Dr_McCoy, T_DEM5_022);
+    demon5_Say(N_Brother_Stephen, T_DEM5_043);
+    demon5_Say(N_Brother_Roberts, T_DEM5_031);
+    demon5_Say(N_Brother_Stephen, T_DEM5_042);
+    if (fv_talked_stephen != 1) {
+        fv_talked_stephen = 1;
+        fv_talks++;
+    }
+    { demon5_part_0C9B(); return; }
+}
+
+/* Talking to the crew.
+ * [MSG_TALK 00 00 00] */
+static void demon5_TalkToKirk(void)
+{
+    demon5_Say(N_Capt_Kirk, T_DEM5_001);
+    return;
+}
+
+/* [MSG_TALK 01 00 00] */
+static void demon5_TalkToSpock(void)
+{
+    demon5_Say(N_Mr_Spock, T_DEM5_027);
+    demon5_Say(N_Dr_McCoy, T_DEM5_018);
+    return;
+}
+
+/* [MSG_TALK 03 00 00] */
+static void demon5_TalkToRedshirt(void)
+{
+    demon5_Say(N_Ensign_Everts, T_DEM5_045);
+    demon5_Say(N_Dr_McCoy, T_DEM5_021);
+    demon5_Say(N_Capt_Kirk, T_DEM5_003);
+    return;
+}
+
+/* [MSG_TALK 02 00 00] */
+static void demon5_TalkToMcCoy(void)
+{
+    if (rv_cured_chub != 1) {
+        demon5_Say(N_Dr_McCoy, T_DEM5_017);
+        return;
+    }
+    demon5_Say(N_Dr_McCoy, T_DEM5_023);
+    demon5_Say(N_Capt_Kirk, T_DEM5_004);
+    if (room.redshirt_dead != 1) {
+        demon5_Say(N_Ensign_Everts, T_DEM5_044);
+        demon5_Say(N_Dr_McCoy, T_DEM5_020);
+        demon5_Say(N_Mr_Spock, T_DEM5_026);
+        demon5_Say(N_Dr_McCoy, T_DEM5_019);
+    }
+    return;
+}
+
+/* McCoy examines the brothers, each once. Chub's examination finds the
+ * need for the berries. When all four have been examined and talked to,
+ * McCoy finds nothing wrong with any of them.
+ * [MSG_USE 45 08 00] */
+static void demon5_McCoyScansRoberts(void)
+{
+    if (fv_scanned_roberts != 1) {
+        svc_Anim(2, N_mscane, -1, -1, 0);
+        svc_BridgeSfx(4);
+        demon5_Say(N_Dr_McCoy, T_DEM5_015);
+        fv_scanned_roberts = 1;
+        fv_scans++;
+    }
+    { demon5_part_0C9B(); return; }
+}
+
+/* [MSG_USE 7F 09 00] */
+static void demon5_E_0B33(void)
+{
+    { demon5_McCoyHelpsChub(); return; }
+}
+
+/* [MSG_USE 02 09 00] */
+static void demon5_McCoyHelpsChub(void)
+{
+    { demon5_McCoyScansChub(); return; }
+}
+
+/* [MSG_USE 45 09 00] */
+static void demon5_McCoyScansChub(void)
+{
+    svc_Anim(2, N_mscane, -1, -1, 0);
+    svc_BridgeSfx(4);
+    if (rv_cured_chub == 1) {
+    } else {
+        if (rv_examined_chub == 1) {
+            demon5_Say(N_Dr_McCoy, T_DEM5_010);
+            return;
+        }
+        demon5_Say(N_Dr_McCoy, T_DEM5_012);
+        demon5_Say(N_Brother_Stephen, T_DEM5_040);
+        rv_need_berries = 1;
+        rv_examined_chub = 1;
+        return;
+    }
+    if (fv_scanned_chub != 1) {
+        demon5_Say(N_Dr_McCoy, T_DEM5_016);
+        fv_scanned_chub = 1;
+        fv_scans++;
+    }
+    { demon5_part_0C9B(); return; }
+}
+
+/* [MSG_USE 45 0A 00] */
+static void demon5_McCoyScansGrisnash(void)
+{
+    if (fv_scanned_grisnash != 1) {
+        svc_Anim(2, N_mscane, -1, -1, 0);
+        svc_BridgeSfx(4);
+        demon5_Say(N_Dr_McCoy, T_DEM5_013);
+        fv_scanned_grisnash = 1;
+        fv_scans++;
+    }
+    { demon5_part_0C9B(); return; }
+}
+
+/* [MSG_USE 45 0B 00] */
+static void demon5_McCoyScansStephen(void)
+{
+    if (fv_scanned_stephen == 1)
+        { demon5_part_0C9B(); return; }
+    svc_Anim(2, N_mscanw, -1, -1, 0);
+    svc_BridgeSfx(4);
+    demon5_Say(N_Dr_McCoy, T_DEM5_014);
+    fv_scanned_stephen = 1;
+    fv_scans++;
+    { demon5_part_0C9B(); return; }
+}
+
+static void demon5_part_0C9B(void)
+{
+    if (fv_scans == 4) {
+        if (fv_talks == 4) {
+            demon5_Say(N_Dr_McCoy, T_DEM5_011);
+            fv_talks = 5;
+        }
+    }
+    return;
+}
+
+/* Getting the supplies.
+ * [MSG_GET 21 00 00] */
+static void demon5_GetSupplies(void)
+{
+    demon5_Say(0, T_DEM5N012);
+    return;
+}
+
+/* Talk: conversation AX (speaker, choices, 0); returns the choice. */
+static void demon5_Talk(uint16_t ax)
+{
+    svc_Talk(ax);
+    return;
+}
+
+/* Say: one line, BX, said by AX (0: narration). */
+static void demon5_Say(uint16_t ax, uint16_t bx)
+{
+    fv_talk_buf = ax;
+    CS_W(0x24E5) = bx;
+    demon5_Talk(talk_buf);
+    return;
+}
+
+/* the scripts, by the offset of their code in the room file */
+const RoomScript demon5_scripts[] = {
+    { 0x0127, demon5_StartRoom },    /* MSG_TICK 01 00 00 */
+    { 0x01C6, demon5_E_01C6 },    /* MSG_WALK 22 00 00 */
+    { 0x01CE, demon5_WalkToDoor },    /* MSG_WALK 0C 00 00 */
+    { 0x01F3, demon5_ReachDoor },    /* MSG_REGION 00 00 00 */
+    { 0x0225, demon5_E_0225 },    /* MSG_WALK_DONE 01 00 00 */
+    { 0x022D, demon5_GoOut },    /* MSG_ANIM_DONE 01 00 00 */
+    { 0x0250, demon5_SpockScansSupplies },    /* MSG_USE 44 21 00 */
+    { 0x02D3, demon5_E_02D3 },    /* MSG_USE 41 FF 00 */
+    { 0x02DB, demon5_PhaserColonist },    /* MSG_USE 40 FF 00 */
+    { 0x0372, demon5_ShowHandToStephen },    /* MSG_USE 42 0B 00 */
+    { 0x0472, demon5_ShowBerriesToStephen },    /* MSG_USE 7B 0B 00 */
+    { 0x0535, demon5_GiveHypoToChub },    /* MSG_USE 7A 09 00 */
+    { 0x0550, demon5_McCoyAtChub },    /* MSG_WALK_DONE 02 00 00 */
+    { 0x056C, demon5_ChubCured },    /* MSG_ANIM_DONE 02 00 00 */
+    { 0x05D7, demon5_GiveHypo },    /* MSG_USE 7A FF 00 */
+    { 0x0614, demon5_GiveBerriesToChub },    /* MSG_USE 7B 09 00 */
+    { 0x065C, demon5_LookAtRoberts },    /* MSG_LOOK 08 00 00 */
+    { 0x066B, demon5_LookAtGrisnash },    /* MSG_LOOK 0A 00 00 */
+    { 0x067A, demon5_LookAtStephen },    /* MSG_LOOK 0B 00 00 */
+    { 0x0689, demon5_LookAtKirk },    /* MSG_LOOK 00 00 00 */
+    { 0x0698, demon5_LookAtSpock },    /* MSG_LOOK 01 00 00 */
+    { 0x06A7, demon5_LookAtMcCoy },    /* MSG_LOOK 02 00 00 */
+    { 0x06B6, demon5_LookAtRedshirt },    /* MSG_LOOK 03 00 00 */
+    { 0x06C5, demon5_LookAtSkylight },    /* MSG_LOOK 20 00 00 */
+    { 0x06D4, demon5_LookAtSupplies },    /* MSG_LOOK 21 00 00 */
+    { 0x06E3, demon5_LookAtScene },    /* MSG_LOOK FF 00 00 */
+    { 0x06F2, demon5_LookAtChub },    /* MSG_LOOK 09 00 00 */
+    { 0x0702, demon5_TalkToRoberts },    /* MSG_TALK 08 00 00 */
+    { 0x0772, demon5_TalkToChub },    /* MSG_TALK 09 00 00 */
+    { 0x0801, demon5_TalkToGrisnash },    /* MSG_TALK 0A 00 00 */
+    { 0x088C, demon5_TalkToStephen },    /* MSG_TALK 0B 00 00 */
+    { 0x0A4F, demon5_TalkToKirk },    /* MSG_TALK 00 00 00 */
+    { 0x0A5F, demon5_TalkToSpock },    /* MSG_TALK 01 00 00 */
+    { 0x0A78, demon5_TalkToRedshirt },    /* MSG_TALK 03 00 00 */
+    { 0x0A9A, demon5_TalkToMcCoy },    /* MSG_TALK 02 00 00 */
+    { 0x0AED, demon5_McCoyScansRoberts },    /* MSG_USE 45 08 00 */
+    { 0x0B33, demon5_E_0B33 },    /* MSG_USE 7F 09 00 */
+    { 0x0B3B, demon5_McCoyHelpsChub },    /* MSG_USE 02 09 00 */
+    { 0x0B43, demon5_McCoyScansChub },    /* MSG_USE 45 09 00 */
+    { 0x0C19, demon5_McCoyScansGrisnash },    /* MSG_USE 45 0A 00 */
+    { 0x0C5E, demon5_McCoyScansStephen },    /* MSG_USE 45 0B 00 */
+    { 0x0CC1, demon5_GetSupplies },    /* MSG_GET 21 00 00 */
+    { 0, 0 }
+};

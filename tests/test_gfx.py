@@ -338,7 +338,7 @@ for blur in (0, 1):
         dst = hostbuf(dstpx)
         tb = hostbuf(tex)
         lib.DrawTexRow(c.addressof(tb), c.addressof(dst), n, u, v, du, dv, blur, d)
-        report('DrawTexRow%d' % blur, dst.raw[:400] == want and want != dstpx, it, n, d)
+        report('DrawTexRow%d' % blur, dst.raw[:400] == want and (want != dstpx or n < 12), it, n, d)   # short rows can be all transparent
 print('after texture rows: %d mismatches' % bad)
 
 # ---------------- planet loops (blocks of DrawPlanetLarge / DrawPlanetSmall) ----------------

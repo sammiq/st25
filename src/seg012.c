@@ -46,6 +46,9 @@ void FreeRoom(void);
 void MsgBox(char *title, char *msg, int16_t a, int16_t b, int16_t c, int16_t d);    /* seg008: message box */
 
 void GameMain(int argc, char **argv);
+extern char mission[16];                 /* seg029 */
+extern int16_t word_45ABA;              /* the room to start in */
+void SetTextFile(char *name);
 void InitScreens(void);
 void InitPlayerShip(void);
 int16_t LeverPuzzle(void);
@@ -135,6 +138,21 @@ void GameMain(int argc, char **argv)
         PlaySfx(sfx_name);
     if (game_mode == 0)
         game_mode = 1;
+    {
+        /* test hook: STARTREK_ROOM=mission:n starts the away team in that room */
+        static int tried;
+        const char *t = tried ? NULL : getenv("STARTREK_ROOM");
+
+
+        tried = 1;
+        if (t && strchr(t, ':')) {
+            strcpy(mission, t);
+            *strchr(mission, ':') = 0;
+            word_45ABA = atoi(strchr(t, ':') + 1);
+            SetTextFile(mission);
+            game_mode = 2;
+        }
+    }
     for (;;) {
         if (game_mode != prev_mode) {
             if (prev_mode != -1) {
@@ -401,7 +419,7 @@ void Turbolift(int16_t unused, int16_t deck)
     int16_t timeout;
     char *p;
     char name[16];
-    char msg[76];
+    char msg[100];
     char unkb2[40];
     int16_t unkdc;
     Event ev;
@@ -563,7 +581,7 @@ int16_t ItemCase(int16_t mask)
     Event ev;
     Sprite *hit;
     int32_t t;
-    char name[10];
+    char name[16];
 
     count = 0;
     FadeOut();

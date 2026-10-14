@@ -1,0 +1,925 @@
+/* DEMON4.RDF: the room's scripts, translated from the machine code in the room file
+ * (src/rdf/demon4.asm) by tools/rdf2c.py.  They run on the loaded file (CS_B/CS_W) and the
+ * room state (`room`), and call the game through the svc_ macros of rooms.h.
+ *
+ * DEMON4.RDF - "Demon World", the alien chamber behind the door, and the
+ * end of the mission. The "demons" are made by the machines here, which
+ * guard a Nauian who sleeps in a cryogenic chamber. Working the lever panel
+ * (the lever puzzle) wakes it. Kirk can then talk to the Nauian, and give it
+ * the key (the metal piece from Brother Stephen) to shut the guardians down
+ * and the skull to show it its kind survived. Phasers anger it, and it kills
+ * the landing party. With the key in, timer 1 beams the party up.
+ *
+ * Actors: 8 the Nauian, 9 the lever panel, 10 (0Ah) the chamber.
+ * Objects: 8 the Nauian, 0Ah the chamber, 20h the art (an eclipse), 21h
+ * the lever panel, 22h the security console, 23h the floor.
+ * Exit 1: back out (room 3).
+ * Timers: 0 the chamber opens, 1 beaming up, 2-5 the Nauian kills Spock,
+ * Everts, McCoy and Kirk, 6 McCoy remembers the skull.
+ *
+ * Labels: H_ script headers, L branch targets, C_ conversations,
+ * T_/N_/S_ strings; talk_buf: the conversation buffer of Say.
+ *
+ * Quirks of the original:
+ * - never_set is never set, so the Federation ending in TalkToNauian (the
+ * same lines as KeyTurned) can't be reached.
+ * - The script chain runs on into code at 0EA7: the engine reads its bytes
+ * as key 50 B8 03 00 and next 2E50 (beyond rdf_scripts_end, so the search
+ * stops).
+ */
+
+#include "rooms.h"
+
+/* where the file keeps its strings, conversations and tables */
+enum {
+    N_bxfire = 0x00D3,
+    N_bxrise = 0x00DA,
+    N_bxrise2 = 0x00E1,
+    N_ctrl = 0x00E9,
+    N_stpout = 0x00EE,
+    N_stpout2 = 0x00F5,
+    N_takesk = 0x00FD,
+    N_usekey = 0x0104,
+    N_kkille = 0x010B,
+    N_skille = 0x0112,
+    N_mkille = 0x0119,
+    N_rkille = 0x0120,
+    N_kusemn = 0x013C,
+    N_sscane = 0x0143,
+    N_mscane = 0x014A,
+    N_DEM4LOOP = 0x0159,
+    T_DEM4_010 = 0x0254,
+    T_DEM4_035 = 0x02F3,
+    T_DEM4_030 = 0x0392,
+    N_SE2POWER = 0x03F5,
+    T_DEM4_011 = 0x041F,
+    N_V0SPOCKT = 0x05C1,
+    T_DEM4N014 = 0x0642,
+    T_DEM4_031 = 0x07B3,
+    S_086A = 0x086A,
+    S_08FA = 0x08FA,
+    S_098A = 0x098A,
+    T_DEM4N012 = 0x0A6A,
+    T_DEM4N013 = 0x0B34,
+    T_DEM4_001 = 0x0BA4,
+    T_DEM4_012 = 0x0C7B,
+    N_Capt_Kirk = 0x0F3E,
+    N_Nauian = 0x0F49,
+    N_Dr_McCoy = 0x0F50,
+    N_Mr_Spock = 0x0F5A,
+    N_Ensign_Everts = 0x0F64,
+    T_DEM4_038 = 0x16BD,
+    T_DEM4_037 = 0x1783,
+    T_DEM4N002 = 0x189D,
+    T_DEM4N008 = 0x1913,
+    T_DEM4N007 = 0x195B,
+    T_DEM4N000 = 0x19B0,
+    T_DEM4N005 = 0x19D5,
+    T_DEM4N001 = 0x1A0B,
+    T_DEM4N004 = 0x1A3B,
+    T_DEM4N003 = 0x1A6D,
+    T_DEM4_015 = 0x1AA6,
+    T_DEM4_024 = 0x1AE2,
+    T_DEM4_046 = 0x1B8F,
+    T_DEM4_019 = 0x1BC0,
+    T_DEM4_022 = 0x1C04,
+    T_DEM4_047 = 0x1C89,
+    T_DEM4_021 = 0x1CA6,
+    T_DEM4_020 = 0x1CD0,
+    T_DEM4_014 = 0x1D3C,
+    T_DEM4_025 = 0x1E4C,
+    T_DEM4_023 = 0x1F3F,
+    T_DEM4_027 = 0x1FD2,
+    T_DEM4_026 = 0x202F,
+    T_DEM4_029 = 0x20ED,
+    T_DEM4_033 = 0x21BD,
+    T_DEM4_032 = 0x220E,
+    T_DEM4_013 = 0x224C,
+    T_DEM4_045 = 0x2284,
+    T_DEM4_018 = 0x22C7,
+    T_DEM4N011 = 0x22DC,
+    T_DEM4_034 = 0x235B,
+    T_DEM4_017 = 0x24C7,
+    T_DEM4_036 = 0x2543,
+    T_DEM4N009 = 0x2784,
+    T_DEM4N006 = 0x27D2,
+    N_dialog_error = 0x280C,
+    talk_buf = 0x2819,
+    NauianWakes = 0x281F,
+    KirkGreets = 0x2825,
+    NauianOnTrespass = 0x282F,
+    NauianOnSleep = 0x2835,
+    NauianOnRepairs = 0x283B,
+    KirkAsks = 0x2841,
+    NauianOnCivilization = 0x2849,
+    NauianOnDemons = 0x284F,
+    KirkOnSkull = 0x2855,
+};
+
+/* the room's variables: in the room state, and in the file itself */
+#define fv_beaming CS_B(0xCE)
+#define fv_dead CS_B(0xCD)
+#define fv_lever_crew CS_W(0xCF)
+#define fv_nauian_out CS_B(0xCB)
+#define fv_never_set CS_B(0xCC)
+#define fv_talk_buf CS_W(0x2819)
+#define fv_warned CS_B(0xCA)
+#define rv_chamber_music ROOM_B(0x57)
+#define rv_gave_skull ROOM_B(0x47)
+#define rv_healed_miner ROOM_B(0x3C)
+#define rv_insulted_stephen ROOM_W(0x2B)
+#define rv_miner_dead ROOM_B(0x40)
+#define rv_nauian_awake ROOM_B(0x4E)
+#define rv_rude_to_nauian ROOM_W(0x2D)
+#define rv_score ROOM_W(0x58)
+#define rv_taken_items ROOM_B(0x4F)
+#define rv_talked_to_nauian ROOM_B(0x53)
+
+/* functions */
+static void demon4_StartRoom(void);
+static void demon4_NauianStepsOut(void);
+static void demon4_PartyKilled(void);
+static void demon4_KeyTurned(void);
+static void demon4_ChamberOpens(void);
+static void demon4_BeamUp(void);
+static void demon4_CrewInPlace(void);
+static void demon4_KillSpock(void);
+static void demon4_KillEverts(void);
+static void demon4_KillMcCoy(void);
+static void demon4_KillKirk(void);
+static void demon4_McCoyOnSkull(void);
+static void demon4_E_0580(void);
+static void demon4_PhaserNauian(void);
+static void demon4_UseKeyOnConsole(void);
+static void demon4_KirkAtConsole(void);
+static void demon4_KeyWontTurn(void);
+static void demon4_GiveKey(void);
+static void demon4_KirkAtNauian(void);
+static void demon4_GiveSkull(void);
+static void demon4_ShowSkull(void);
+static void demon4_PhaserLevers(void);
+static void demon4_PhaserArt(void);
+static void demon4_PhaserMcCoy(void);
+static void demon4_E_0796(void);
+static void demon4_TalkToNauian(void);
+static void demon4_part_09B9(void);
+static void demon4_LookAtArt(void);
+static void demon4_LookAtNauian(void);
+static void demon4_LookAtScene(void);
+static void demon4_LookAtConsole(void);
+static void demon4_LookAtFloor(void);
+static void demon4_LookAtKirk(void);
+static void demon4_LookAtMcCoy(void);
+static void demon4_LookAtSpock(void);
+static void demon4_LookAtRedshirt(void);
+static void demon4_LookAtChamber(void);
+static void demon4_LookAtLevers(void);
+static void demon4_KirkUsesLevers(void);
+static void demon4_SpockUsesLevers(void);
+static void demon4_McCoyUsesLevers(void);
+static void demon4_EvertsUsesLevers(void);
+static void demon4_part_0AE7(void);
+static void demon4_AtLevers(void);
+static void demon4_TalkToKirk(void);
+static void demon4_TalkToMcCoy(void);
+static void demon4_TalkToSpock(void);
+static void demon4_TalkToRedshirt(void);
+static void demon4_SpockScansChamber(void);
+static void demon4_SpockScansArt(void);
+static void demon4_McCoyScansArt(void);
+static void demon4_SpockScansLevers(void);
+static void demon4_McCoyScansLevers(void);
+static void demon4_E_0D77(void);
+static void demon4_SpockScans(void);
+static void demon4_E_0DB0(void);
+static void demon4_McCoyScans(void);
+static void demon4_SpockScansNauian(void);
+static void demon4_McCoyScansNauian(void);
+static void demon4_SpockScansConsole(void);
+static void demon4_McCoyScansConsole(void);
+static uint16_t demon4_Talk(uint16_t ax);
+static void demon4_Say(uint16_t ax, uint16_t bx);
+
+/* The room starts. The miner dies now if McCoy didn't treat him (room 3).
+ * If the Nauian is awake, it stands outside its chamber, and if the skull
+ * hasn't been shown, timer 6 has McCoy suggest it.
+ * [MSG_TICK 01 00 00] */
+static void demon4_StartRoom(void)
+{
+    svc_Sfx(N_DEM4LOOP);
+    if (rv_healed_miner != 1) {
+        rv_miner_dead = 1;
+    }
+    if (rv_nauian_awake == 1) {
+        svc_Anim0(0xA, N_bxrise2, 0x122, 0x91, 0);
+        svc_Anim0(8, N_stpout2, 0x107, 0x92, 0);
+        fv_nauian_out = 1;
+        if ((rv_taken_items & 0x10) != 0) {
+            if (rv_gave_skull != 1) {
+                room.timers[6] = 0x14;
+            }
+        }
+    }
+    if (rv_chamber_music != 1) {
+        rv_chamber_music = 1;
+        svc_Music(1, -1);
+    }
+    return;
+}
+
+/* The chamber has opened (anim msg 1): the Nauian steps out.
+ * [MSG_ANIM_DONE 01 00 00] */
+static void demon4_NauianStepsOut(void)
+{
+    svc_Anim0(8, N_stpout, 0x107, 0x92, 5);
+    fv_nauian_out = 1;
+    if ((rv_taken_items & 0x10) != 0) {
+        room.timers[6] = 0x2D;
+    }
+    return;
+}
+
+/* Kirk has been killed (anim msg 2): game over, once.
+ * [MSG_ANIM_DONE 02 00 00] */
+static void demon4_PartyKilled(void)
+{
+    if (fv_dead != 1) {
+        fv_dead = 1;
+        demon4_Say(0, T_DEM4N011);
+    }
+    svc_GameOver();
+    room.busy = 0;
+    return;
+}
+
+/* The Nauian has turned the key (anim msg 3): the guardians stop, and
+ * the Nauian asks to join the Federation; +5 score, and timer 1.
+ * [MSG_ANIM_DONE 03 00 00] */
+static void demon4_KeyTurned(void)
+{
+    demon4_Say(N_Nauian, T_DEM4_034);
+    demon4_Say(N_Capt_Kirk, T_DEM4_010);
+    demon4_Say(N_Nauian, T_DEM4_035);
+    demon4_Say(N_Mr_Spock, T_DEM4_030);
+    room.busy = 1;
+    rv_score += 5;
+    room.timers[1] = 0x14;
+    return;
+}
+
+/* Timer 0, after the levers: the chamber rises (msg 1).
+ * [MSG_TIMER 00 00 00] */
+static void demon4_ChamberOpens(void)
+{
+    svc_Anim0(0xA, N_bxrise, 0x122, 0x91, 1);
+    room.fall[0] = 2;
+    svc_StopAnim(0);
+    svc_Sfx(N_SE2POWER);
+    return;
+}
+
+/* Timer 1: the crew gather (msg 4)...
+ * [MSG_TIMER 01 00 00] */
+static void demon4_BeamUp(void)
+{
+    demon4_Say(N_Capt_Kirk, T_DEM4_011);
+    svc_Walk(0, 0xBE, 0xA5, 4);
+    svc_Walk(1, 0xB4, 0x9B, 4);
+    svc_Walk(2, 0xC8, 0x9B, 4);
+    fv_beaming++;
+    if (room.redshirt_dead != 1) {
+        svc_Walk(3, 0xC1, 0x91, 4);
+        fv_beaming--;
+    }
+    return;
+}
+
+/* ...and once all four are there, beam up. +3 if Kirk didn't insult
+ * Brother Stephen, +2 if Everts is alive.
+ * [MSG_WALK_DONE 04 00 00] */
+static void demon4_CrewInPlace(void)
+{
+    fv_beaming++;
+    if (fv_beaming != 4) {
+        return;
+    }
+    if (rv_insulted_stephen != 1) {
+        rv_score += 3;
+    }
+    if (room.redshirt_dead == 0) {
+        rv_score += 2;
+    }
+    svc_BeamUp(rv_score, 0x24, 0);
+    room.busy = 0;
+    return;
+}
+
+/* Timers 2-5: the Nauian kills the party, Kirk last (msg 2).
+ * [MSG_TIMER 02 00 00] */
+static void demon4_KillSpock(void)
+{
+    svc_Anim(1, N_skille, -1, -1, 0);
+    return;
+}
+
+/* [MSG_TIMER 03 00 00] */
+static void demon4_KillEverts(void)
+{
+    svc_Anim(3, N_rkille, -1, -1, 0);
+    return;
+}
+
+/* [MSG_TIMER 04 00 00] */
+static void demon4_KillMcCoy(void)
+{
+    svc_Anim(2, N_mkille, -1, -1, 0);
+    return;
+}
+
+/* [MSG_TIMER 05 00 00] */
+static void demon4_KillKirk(void)
+{
+    svc_Anim(0, N_kkille, -1, -1, 2);
+    return;
+}
+
+/* Timer 6: McCoy on the skull.
+ * [MSG_TIMER 06 00 00] */
+static void demon4_McCoyOnSkull(void)
+{
+    demon4_Say(N_Dr_McCoy, T_DEM4_017);
+    return;
+}
+
+/* Phasers on the Nauian: a warning, then it kills the party (msg 2,
+ * and timers 2-5).
+ * [MSG_USE 41 08 00] */
+static void demon4_E_0580(void)
+{
+    { demon4_PhaserNauian(); return; }
+}
+
+/* [MSG_USE 40 08 00] */
+static void demon4_PhaserNauian(void)
+{
+    if (fv_warned != 1) {
+        demon4_Say(N_Nauian, T_DEM4_033);
+        fv_warned = 1;
+    } else {
+        demon4_Say(N_Nauian, T_DEM4_032);
+        svc_Anim(0xA, N_bxfire, 0, 0, 2);
+        svc_Sfx(N_V0SPOCKT);
+        room.busy = 1;
+        room.timers[2] = 7;
+        room.timers[3] = 8;
+        room.timers[4] = 7;
+        room.timers[5] = 8;
+    }
+    return;
+}
+
+/* The key in the console: it fits, but won't turn.
+ * [MSG_USE 59 22 00] */
+static void demon4_UseKeyOnConsole(void)
+{
+    room.busy = 1;
+    svc_Walk(0, 0xF5, 0x90, 5);
+    return;
+}
+
+/* [MSG_WALK_DONE 05 00 00] */
+static void demon4_KirkAtConsole(void)
+{
+    svc_Anim(0, N_kusemn, -1, -1, 4);
+    return;
+}
+
+/* [MSG_ANIM_DONE 04 00 00] */
+static void demon4_KeyWontTurn(void)
+{
+    room.busy = 0;
+    demon4_Say(0, T_DEM4N014);
+    return;
+}
+
+/* The key to the Nauian (msgs 1, 3): +2 score.
+ * [MSG_USE 59 08 00] */
+static void demon4_GiveKey(void)
+{
+    svc_Walk(0, 0xE9, 0x90, 1);
+    room.fall[0] = 2;
+    return;
+}
+
+/* [MSG_WALK_DONE 01 00 00] */
+static void demon4_KirkAtNauian(void)
+{
+    svc_Anim(8, N_usekey, 0x107, 0x8E, 3);
+    svc_TakeItem(IT_METAL);
+    rv_score += 2;
+    rv_taken_items &= 0xFE;
+    return;
+}
+
+/* The skull to the Nauian (msg 2): +1 score.
+ * [MSG_USE 5A 08 00] */
+static void demon4_GiveSkull(void)
+{
+    svc_Walk(0, 0xE9, 0x90, 2);
+    return;
+}
+
+/* [MSG_WALK_DONE 02 00 00] */
+static void demon4_ShowSkull(void)
+{
+    uint16_t ax = 0;
+    demon4_Say(N_Nauian, T_DEM4_036);
+    ax = (uint16_t)demon4_Talk(KirkOnSkull);
+    if (ax == 0) {
+    } else {
+        if (ax == 1) {
+            goto L075F;
+        }
+        if (ax == 2) {
+            goto L075F;
+        }
+        { demon4_part_09B9(); return; }
+    }
+    rv_score += 1;
+    svc_Anim(8, N_takesk, 0x107, 0x8E, 0);
+    svc_TakeItem(IT_SKULL);
+    rv_taken_items &= 0xEF;
+    rv_gave_skull = 1;
+L075F:;
+    return;
+}
+
+/* Phasers on the furniture and the crew.
+ * [MSG_USE 40 21 00] */
+static void demon4_PhaserLevers(void)
+{
+    demon4_Say(N_Mr_Spock, T_DEM4_013);
+    return;
+}
+
+/* [MSG_USE 40 20 00] */
+static void demon4_PhaserArt(void)
+{
+    demon4_Say(N_Mr_Spock, T_DEM4_045);
+    return;
+}
+
+/* [MSG_USE 40 02 00] */
+static void demon4_PhaserMcCoy(void)
+{
+    demon4_Say(N_Dr_McCoy, T_DEM4_018);
+    return;
+}
+
+/* Talking to the Nauian, the first time a conversation (rude_to_nauian
+ * if Kirk is rude), then "Have you found the key?".
+ * [MSG_ANIM_DONE 05 00 00] */
+static void demon4_E_0796(void)
+{
+    { demon4_TalkToNauian(); return; }
+}
+
+/* [MSG_TALK 08 00 00] */
+static void demon4_TalkToNauian(void)
+{
+    uint16_t ax = 0;
+    room.busy = 0;
+    if (rv_talked_to_nauian == 1) {
+        demon4_Say(N_Nauian, T_DEM4_031);
+        return;
+    }
+    rv_talked_to_nauian = 1;
+    demon4_Talk(NauianWakes);
+    ax = (uint16_t)demon4_Talk(KirkGreets);
+    if (ax == 0) {
+        rv_rude_to_nauian = 1;
+    } else {
+        if (ax == 1) {
+            goto L0810;
+        }
+        if (ax == 2) {
+            goto L0818;
+        }
+        { demon4_part_09B9(); return; }
+    }
+    demon4_Talk(NauianOnTrespass);
+L0810:;
+    demon4_Talk(NauianOnSleep);
+    goto L0820;
+L0818:;
+    demon4_Talk(NauianOnRepairs);
+    goto L0810;
+L0820:;
+    ax = (uint16_t)demon4_Talk(KirkAsks);
+    if (ax == 0) {
+        rv_rude_to_nauian = 1;
+    } else {
+        if (ax == 1) {
+            goto L0844;
+        }
+        { demon4_part_09B9(); return; }
+    }
+    demon4_Talk(NauianOnCivilization);
+L0844:;
+    demon4_Talk(NauianOnDemons);
+    if (fv_never_set != 1) {
+    } else {
+        demon4_Say(N_Nauian, T_DEM4_037);
+        demon4_Say(N_Capt_Kirk, S_086A);
+        demon4_Say(N_Nauian, S_08FA);
+        demon4_Say(N_Mr_Spock, S_098A);
+        room.busy = 1;
+        rv_score += 5;
+        room.timers[1] = 0x14;
+        return;
+    }
+    demon4_Say(N_Nauian, T_DEM4_038);
+    return;
+}
+
+static void demon4_part_09B9(void)
+{
+    demon4_Say(0, N_dialog_error);
+    return;
+}
+
+/* Looking at things.
+ * [MSG_LOOK 20 00 00] */
+static void demon4_LookAtArt(void)
+{
+    demon4_Say(0, T_DEM4N002);
+    return;
+}
+
+/* [MSG_LOOK 08 00 00] */
+static void demon4_LookAtNauian(void)
+{
+    demon4_Say(0, T_DEM4N007);
+    return;
+}
+
+/* [MSG_LOOK FF 00 00] */
+static void demon4_LookAtScene(void)
+{
+    demon4_Say(0, T_DEM4N004);
+    return;
+}
+
+/* [MSG_LOOK 22 00 00] */
+static void demon4_LookAtConsole(void)
+{
+    demon4_Say(0, T_DEM4N008);
+    return;
+}
+
+/* [MSG_LOOK 23 00 00] */
+static void demon4_LookAtFloor(void)
+{
+    demon4_Say(0, T_DEM4N009);
+    return;
+}
+
+/* [MSG_LOOK 00 00 00] */
+static void demon4_LookAtKirk(void)
+{
+    demon4_Say(0, T_DEM4N003);
+    return;
+}
+
+/* [MSG_LOOK 02 00 00] */
+static void demon4_LookAtMcCoy(void)
+{
+    demon4_Say(0, T_DEM4N000);
+    return;
+}
+
+/* [MSG_LOOK 01 00 00] */
+static void demon4_LookAtSpock(void)
+{
+    demon4_Say(0, T_DEM4N005);
+    return;
+}
+
+/* [MSG_LOOK 03 00 00] */
+static void demon4_LookAtRedshirt(void)
+{
+    demon4_Say(0, T_DEM4N001);
+    return;
+}
+
+/* [MSG_LOOK 0A 00 00] */
+static void demon4_LookAtChamber(void)
+{
+    demon4_Say(0, T_DEM4N006);
+    return;
+}
+
+/* [MSG_LOOK 21 00 00] */
+static void demon4_LookAtLevers(void)
+{
+    demon4_Say(0, T_DEM4N012);
+    return;
+}
+
+/* A crew member on the levers (lever_crew): walk there (msg 3) and play
+ * the lever puzzle; solved: +3 score, and timer 0 opens the chamber.
+ * [MSG_USE 00 21 00] */
+static void demon4_KirkUsesLevers(void)
+{
+    fv_lever_crew = 0;
+    { demon4_part_0AE7(); return; }
+}
+
+/* [MSG_USE 01 21 00] */
+static void demon4_SpockUsesLevers(void)
+{
+    fv_lever_crew = 1;
+    { demon4_part_0AE7(); return; }
+}
+
+/* [MSG_USE 02 21 00] */
+static void demon4_McCoyUsesLevers(void)
+{
+    fv_lever_crew = 2;
+    { demon4_part_0AE7(); return; }
+}
+
+/* [MSG_USE 03 21 00] */
+static void demon4_EvertsUsesLevers(void)
+{
+    fv_lever_crew = 3;
+    { demon4_part_0AE7(); return; }
+}
+
+static void demon4_part_0AE7(void)
+{
+    uint16_t bx = 0;
+    if (rv_nauian_awake != 1) {
+        svc_Walk(fv_lever_crew, 0xDA, 0x83, 3);
+        bx = fv_lever_crew;
+        bx = bx - 0;
+        room.fall[bx] = 0;
+        room.busy = 1;
+    }
+    return;
+}
+
+/* [MSG_WALK_DONE 03 00 00] */
+static void demon4_AtLevers(void)
+{
+    uint16_t ax = 0;
+    uint16_t t0;
+    uint16_t t1;
+    ax = (uint16_t)svc_Levers();
+    ax = ax | ax;
+    if (ax == 0) {
+        t0 = ax;
+        demon4_Say(0, T_DEM4N013);
+    } else {
+        rv_nauian_awake = 1;
+        t1 = ax;
+        svc_Anim0(9, N_ctrl, 0, 0, 0);
+        rv_score += 3;
+        room.timers[0] = 0xA;
+    }
+    svc_Walk(fv_lever_crew, 0xAE, 0x93, 0);
+    room.busy = 0;
+    return;
+}
+
+/* Talking to the crew.
+ * [MSG_TALK 00 00 00] */
+static void demon4_TalkToKirk(void)
+{
+    demon4_Say(N_Capt_Kirk, T_DEM4_001);
+    return;
+}
+
+/* [MSG_TALK 02 00 00] */
+static void demon4_TalkToMcCoy(void)
+{
+    if (fv_nauian_out != 1) {
+        demon4_Say(N_Dr_McCoy, T_DEM4_015);
+        return;
+    }
+    demon4_Say(N_Dr_McCoy, T_DEM4_019);
+    return;
+}
+
+/* [MSG_TALK 01 00 00] */
+static void demon4_TalkToSpock(void)
+{
+    if (fv_nauian_out != 1) {
+        demon4_Say(N_Mr_Spock, T_DEM4_024);
+        return;
+    }
+    demon4_Say(N_Mr_Spock, T_DEM4_022);
+    return;
+}
+
+/* [MSG_TALK 03 00 00] */
+static void demon4_TalkToRedshirt(void)
+{
+    if (fv_nauian_out != 1) {
+        demon4_Say(N_Ensign_Everts, T_DEM4_046);
+        return;
+    }
+    demon4_Say(N_Ensign_Everts, T_DEM4_047);
+    return;
+}
+
+/* Tricorders.
+ * [MSG_USE 44 0A 00] */
+static void demon4_SpockScansChamber(void)
+{
+    svc_Anim(1, N_sscane, -1, -1, 0);
+    svc_BridgeSfx(4);
+    demon4_Say(N_Mr_Spock, T_DEM4_012);
+    return;
+}
+
+/* [MSG_USE 44 20 00] */
+static void demon4_SpockScansArt(void)
+{
+    svc_Anim(1, N_sscane, -1, -1, 0);
+    svc_BridgeSfx(4);
+    demon4_Say(N_Mr_Spock, T_DEM4_014);
+    demon4_Say(N_Mr_Spock, T_DEM4_025);
+    return;
+}
+
+/* [MSG_USE 45 20 00] */
+static void demon4_McCoyScansArt(void)
+{
+    demon4_Say(N_Dr_McCoy, T_DEM4_021);
+    return;
+}
+
+/* [MSG_USE 44 21 00] */
+static void demon4_SpockScansLevers(void)
+{
+    svc_Anim(1, N_sscane, -1, -1, 0);
+    svc_BridgeSfx(4);
+    demon4_Say(N_Mr_Spock, T_DEM4_027);
+    return;
+}
+
+/* [MSG_USE 45 21 00] */
+static void demon4_McCoyScansLevers(void)
+{
+    svc_Anim(2, N_mscane, -1, -1, 0);
+    svc_BridgeSfx(4);
+    demon4_Say(N_Dr_McCoy, T_DEM4_027);
+    return;
+}
+
+/* [MSG_USE 44 23 00] */
+static void demon4_E_0D77(void)
+{
+    { demon4_SpockScans(); return; }
+}
+
+/* [MSG_USE 44 FF 00] */
+static void demon4_SpockScans(void)
+{
+    svc_Anim(1, N_sscane, -1, -1, 0);
+    svc_BridgeSfx(4);
+    demon4_Say(N_Mr_Spock, T_DEM4_023);
+    return;
+}
+
+/* [MSG_USE 45 23 00] */
+static void demon4_E_0DB0(void)
+{
+    { demon4_McCoyScans(); return; }
+}
+
+/* [MSG_USE 45 FF 00] */
+static void demon4_McCoyScans(void)
+{
+    svc_Anim(2, N_mscane, -1, -1, 0);
+    svc_BridgeSfx(4);
+    demon4_Say(N_Dr_McCoy, T_DEM4_020);
+    return;
+}
+
+/* [MSG_USE 44 08 00] */
+static void demon4_SpockScansNauian(void)
+{
+    svc_Anim(1, N_sscane, -1, -1, 0);
+    svc_BridgeSfx(4);
+    demon4_Say(N_Mr_Spock, T_DEM4_029);
+    return;
+}
+
+/* [MSG_USE 45 08 00] */
+static void demon4_McCoyScansNauian(void)
+{
+    svc_Anim(2, N_mscane, -1, -1, 0);
+    svc_BridgeSfx(4);
+    demon4_Say(N_Mr_Spock, T_DEM4_029);
+    return;
+}
+
+/* [MSG_USE 44 22 00] */
+static void demon4_SpockScansConsole(void)
+{
+    svc_Anim(1, N_sscane, -1, -1, 0);
+    svc_BridgeSfx(4);
+    demon4_Say(N_Mr_Spock, T_DEM4_026);
+    return;
+}
+
+/* [MSG_USE 45 22 00] */
+static void demon4_McCoyScansConsole(void)
+{
+    svc_Anim(2, N_mscane, -1, -1, 0);
+    svc_BridgeSfx(4);
+    demon4_Say(N_Mr_Spock, T_DEM4_026);
+    return;
+}
+
+/* Talk: conversation AX (speaker, choices, 0); returns the choice. */
+static uint16_t demon4_Talk(uint16_t ax)
+{
+    ax = (uint16_t)svc_Talk(ax);
+    return ax;
+}
+
+/* Say: one line, BX, said by AX (0: narration). */
+static void demon4_Say(uint16_t ax, uint16_t bx)
+{
+    fv_talk_buf = ax;
+    CS_W(0x281B) = bx;
+    demon4_Talk(talk_buf);
+    return;
+}
+
+/* the scripts, by the offset of their code in the room file */
+const RoomScript demon4_scripts[] = {
+    { 0x0157, demon4_StartRoom },    /* MSG_TICK 01 00 00 */
+    { 0x01E5, demon4_NauianStepsOut },    /* MSG_ANIM_DONE 01 00 00 */
+    { 0x0214, demon4_PartyKilled },    /* MSG_ANIM_DONE 02 00 00 */
+    { 0x023F, demon4_KeyTurned },    /* MSG_ANIM_DONE 03 00 00 */
+    { 0x03CC, demon4_ChamberOpens },    /* MSG_TIMER 00 00 00 */
+    { 0x0414, demon4_BeamUp },    /* MSG_TIMER 01 00 00 */
+    { 0x04C2, demon4_CrewInPlace },    /* MSG_WALK_DONE 04 00 00 */
+    { 0x0500, demon4_KillSpock },    /* MSG_TIMER 02 00 00 */
+    { 0x051C, demon4_KillEverts },    /* MSG_TIMER 03 00 00 */
+    { 0x0538, demon4_KillMcCoy },    /* MSG_TIMER 04 00 00 */
+    { 0x0554, demon4_KillKirk },    /* MSG_TIMER 05 00 00 */
+    { 0x0570, demon4_McCoyOnSkull },    /* MSG_TIMER 06 00 00 */
+    { 0x0580, demon4_E_0580 },    /* MSG_USE 41 08 00 */
+    { 0x0588, demon4_PhaserNauian },    /* MSG_USE 40 08 00 */
+    { 0x05F8, demon4_UseKeyOnConsole },    /* MSG_USE 59 22 00 */
+    { 0x0617, demon4_KirkAtConsole },    /* MSG_WALK_DONE 05 00 00 */
+    { 0x0633, demon4_KeyWontTurn },    /* MSG_ANIM_DONE 04 00 00 */
+    { 0x069D, demon4_GiveKey },    /* MSG_USE 59 08 00 */
+    { 0x06BC, demon4_KirkAtNauian },    /* MSG_WALK_DONE 01 00 00 */
+    { 0x06EE, demon4_GiveSkull },    /* MSG_USE 5A 08 00 */
+    { 0x0709, demon4_ShowSkull },    /* MSG_WALK_DONE 02 00 00 */
+    { 0x0766, demon4_PhaserLevers },    /* MSG_USE 40 21 00 */
+    { 0x0776, demon4_PhaserArt },    /* MSG_USE 40 20 00 */
+    { 0x0786, demon4_PhaserMcCoy },    /* MSG_USE 40 02 00 */
+    { 0x0796, demon4_E_0796 },    /* MSG_ANIM_DONE 05 00 00 */
+    { 0x079E, demon4_TalkToNauian },    /* MSG_TALK 08 00 00 */
+    { 0x09C9, demon4_LookAtArt },    /* MSG_LOOK 20 00 00 */
+    { 0x09D8, demon4_LookAtNauian },    /* MSG_LOOK 08 00 00 */
+    { 0x09E7, demon4_LookAtScene },    /* MSG_LOOK FF 00 00 */
+    { 0x09F6, demon4_LookAtConsole },    /* MSG_LOOK 22 00 00 */
+    { 0x0A05, demon4_LookAtFloor },    /* MSG_LOOK 23 00 00 */
+    { 0x0A14, demon4_LookAtKirk },    /* MSG_LOOK 00 00 00 */
+    { 0x0A23, demon4_LookAtMcCoy },    /* MSG_LOOK 02 00 00 */
+    { 0x0A32, demon4_LookAtSpock },    /* MSG_LOOK 01 00 00 */
+    { 0x0A41, demon4_LookAtRedshirt },    /* MSG_LOOK 03 00 00 */
+    { 0x0A50, demon4_LookAtChamber },    /* MSG_LOOK 0A 00 00 */
+    { 0x0A5F, demon4_LookAtLevers },    /* MSG_LOOK 21 00 00 */
+    { 0x0AB3, demon4_KirkUsesLevers },    /* MSG_USE 00 21 00 */
+    { 0x0AC2, demon4_SpockUsesLevers },    /* MSG_USE 01 21 00 */
+    { 0x0AD1, demon4_McCoyUsesLevers },    /* MSG_USE 02 21 00 */
+    { 0x0AE0, demon4_EvertsUsesLevers },    /* MSG_USE 03 21 00 */
+    { 0x0B1B, demon4_AtLevers },    /* MSG_WALK_DONE 03 00 00 */
+    { 0x0B99, demon4_TalkToKirk },    /* MSG_TALK 00 00 00 */
+    { 0x0BE9, demon4_TalkToMcCoy },    /* MSG_TALK 02 00 00 */
+    { 0x0C0B, demon4_TalkToSpock },    /* MSG_TALK 01 00 00 */
+    { 0x0C2D, demon4_TalkToRedshirt },    /* MSG_TALK 03 00 00 */
+    { 0x0C4F, demon4_SpockScansChamber },    /* MSG_USE 44 0A 00 */
+    { 0x0CCB, demon4_SpockScansArt },    /* MSG_USE 44 20 00 */
+    { 0x0D05, demon4_McCoyScansArt },    /* MSG_USE 45 20 00 */
+    { 0x0D15, demon4_SpockScansLevers },    /* MSG_USE 44 21 00 */
+    { 0x0D46, demon4_McCoyScansLevers },    /* MSG_USE 45 21 00 */
+    { 0x0D77, demon4_E_0D77 },    /* MSG_USE 44 23 00 */
+    { 0x0D7F, demon4_SpockScans },    /* MSG_USE 44 FF 00 */
+    { 0x0DB0, demon4_E_0DB0 },    /* MSG_USE 45 23 00 */
+    { 0x0DB8, demon4_McCoyScans },    /* MSG_USE 45 FF 00 */
+    { 0x0DE9, demon4_SpockScansNauian },    /* MSG_USE 44 08 00 */
+    { 0x0E1A, demon4_McCoyScansNauian },    /* MSG_USE 45 08 00 */
+    { 0x0E4B, demon4_SpockScansConsole },    /* MSG_USE 44 22 00 */
+    { 0x0E7C, demon4_McCoyScansConsole },    /* MSG_USE 45 22 00 */
+    { 0, 0 }
+};

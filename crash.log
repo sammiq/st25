@@ -1,0 +1,59 @@
+
+This GDB supports auto-downloading debuginfo from the following URLs:
+  <ima:enforcing>
+  <https://debuginfod.fedoraproject.org/>
+  <ima:ignore>
+Enable debuginfod for this session? (y or [n]) [answered N; input not from terminal]
+Debuginfod has been disabled.
+To make this setting permanent, add 'set debuginfod enabled off' to .gdbinit.
+[Thread debugging using libthread_db enabled]
+Using host libthread_db library "/lib64/libthread_db.so.1".
+[New Thread 0x7ffff76666c0 (LWP 2692432)]
+[New Thread 0x7ffff6d626c0 (LWP 2692446)]
+[New Thread 0x7ffff63db6c0 (LWP 2692448)]
+[New Thread 0x7ffff5b3c6c0 (LWP 2692449)]
+[New Thread 0x7ffff533b6c0 (LWP 2692450)]
+[New Thread 0x7fffe4ee16c0 (LWP 2692510)]
+[New Thread 0x7fffc7fff6c0 (LWP 2692512)]
+[New Thread 0x7fffc77fe6c0 (LWP 2692513)]
+[New Thread 0x7fffc6ffd6c0 (LWP 2692517)]
+
+Thread 1 "startrek" received signal SIGSEGV, Segmentation fault.
+0x00007ffff7d60cc9 in __memset_avx2_unaligned_erms () from /lib64/libc.so.6
+#0  0x00007ffff7d60cc9 in __memset_avx2_unaligned_erms () from /lib64/libc.so.6
+#1  0x0000000000414159 in MemSet (dst=0xa0000000, n=64000, c=0) at /home/sam/Projects/startrek/src/seg013.c:160
+#2  0x000000000042293b in OrbitArrive () at /home/sam/Projects/startrek/src/seg025.c:165
+#3  0x000000000046ad16 in Orbit (arrive=1, say=1) at /home/sam/Projects/startrek/src/seg001.c:1476
+#4  0x000000000046a98b in CrewOrder (cmd=80) at /home/sam/Projects/startrek/src/seg001.c:1369
+#5  0x0000000000469e3f in BridgeMsg () at /home/sam/Projects/startrek/src/seg001.c:1157
+#6  0x000000000046fdf3 in DemonTravel () at /home/sam/Projects/startrek/src/seg029.c:258
+#7  0x0000000000467d63 in BridgeLoop () at /home/sam/Projects/startrek/src/seg001.c:435
+#8  0x0000000000412281 in GameMain (argc=1, argv=0x7fffffffdd98) at /home/sam/Projects/startrek/src/seg012.c:197
+#9  0x0000000000400afa in main (argc=1, argv=0x7fffffffdd98) at /home/sam/Projects/startrek/platform/main.c:10
+rax            0xa0000000          2684354560
+rbx            0x0                 0
+rcx            0x0                 0
+rdx            0xfa00              64000
+rsi            0x0                 0
+rdi            0xa0000000          2684354560
+rbp            0x7fffffffd8b0      0x7fffffffd8b0
+rsp            0x7fffffffd898      0x7fffffffd898
+r8             0x80                128
+r9             0x140               320
+r10            0x141               321
+r11            0xcd3c1ebc5a594     3610529558275476
+r12            0x7fffffffdd98      140737488346520
+r13            0x3                 3
+r14            0x7ffff7ffd000      140737354125312
+r15            0x4b3de0            4931040
+rip            0x7ffff7d60cc9      0x7ffff7d60cc9 <__memset_avx2_unaligned_erms+73>
+eflags         0x210213            [ CF AF IF RF ID ]
+cs             0x33                51
+ss             0x2b                43
+ds             0x0                 0
+es             0x0                 0
+fs             0x0                 0
+gs             0x0                 0
+pl3_ssp        <unavailable>
+fs_base        0x7ffff7c13740      140737350022976
+gs_base        0x0                 0

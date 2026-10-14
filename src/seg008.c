@@ -21,14 +21,15 @@
 #include "actor.h"
 #include "room.h"
 #include "obj3d.h"
-#include "rdfvm.h"
+#include "rooms.h"
 
 /* Globals this file owns (declared in the headers). */
 Actor actors[MAX_ACTORS];
 MemHandle rdf_handle;
 Rdf *rdf;
-static uint32_t rdf_size;            /* bytes in the .rdf image */
-static int32_t ScriptServiceVM(int16_t *a);
+uint8_t *rdf_image;
+uint8_t stray_mem[0x400];            /* where scripts that use SI as an index write (rooms.h) */                  /* the loaded .rdf, which the scripts' variables live in */
+static const RoomScript *room_scripts;   /* this room's scripts (src/rooms) */
 int32_t ScriptService(int16_t cmd, int16_t a1, int16_t a2, int16_t a3, int16_t a4, uint16_t a5);
 char room_mission[16];
 RoomState room;
@@ -569,9 +570,12 @@ void LoadRoom(char *mission, int16_t n)
     BlitToScreen(&screen_rect);
     rdf_handle = getanyfile(room_name, "rdf");
     rdf = LockMem(rdf_handle);
-    rdf->service = 0;                   /* the scripts' game call is ScriptServiceVM */
-    rdf->state = RDF_ROOM_BASE;
-    rdf_size = GetFileSize(room_name, "rdf");
+    rdf->service = 0;                   /* the scripts are C now: they call ScriptService directly */
+    rdf->state = 0;
+    rdf_image = (uint8_t *)rdf;
+    room_scripts = FindRoomScripts(room_name);
+    if (room_scripts == 0)
+        Fatal("no scripts for room %s", room_name);
     UnlockMem(rdf_handle);
     room.action = 1;
     strcpy(room_file, room_name);
@@ -1217,24 +1221,20 @@ void RoomMsg(void)
     }
 }
 
-/* Run a script's machine code with SI at the room state. */
+/* Run a script: code is where it sits in the room file (the offset the
+ * machine code ran from); room_scripts has the C that replaces it. */
 void CallScript(void *code)
 {
-    uint16_t ip;
+    uint16_t offset = (char *)code - (char *)rdf;
+    const RoomScript *p;
 
-    if (RdfRun((unsigned char *)rdf, rdf_size, (unsigned char *)code - (unsigned char *)rdf, &room,
-               sizeof(room), ScriptServiceVM)) {
-        const char *why = RdfError(&ip);
-
-        Fatal("room script: %s at %04X", why, ip);
-    }
-}
-
-/* The scripts' call into the game: the words on their stack are ScriptService's
- * arguments. */
-static int32_t ScriptServiceVM(int16_t *a)
-{
-    return ScriptService(a[0], a[1], a[2], a[3], a[4], a[5]);
+    rdf_image = (uint8_t *)rdf;
+    for (p = room_scripts; p->fn; p++)
+        if (p->offset == offset) {
+            p->fn();
+            return;
+        }
+    Fatal("room %s has no script at %04X", room_name, offset);
 }
 
 /* Play name.anm as actor n at (x, y) (its sprite's place for -1) and

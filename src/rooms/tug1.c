@@ -1,0 +1,750 @@
+/* TUG1.RDF: the room's scripts, translated from the machine code in the room file
+ * (src/rdf/tug1.asm) by tools/rdf2c.py.  They run on the loaded file (CS_B/CS_W) and the
+ * room state (`room`), and call the game through the svc_ macros of rooms.h.
+ *
+ * TUG1.RDF - "Hijacked", the corridor outside the Masada's bridge. A
+ * forcefield covers the bridge door; the pile of junk holds the pieces for
+ * the transporter repair (room 0): dead phasers, an empty phaser welder,
+ * wire scraps and junk metal. Charged from a phaser, the welder on the
+ * door just feeds the field, but on the spot beside it (20h) it shorts the
+ * field out, and the door opens.
+ *
+ * Actors: 8 the junk pile, 9 the door's effects (phaser, welder, opening).
+ * Objects: 8 the junk, 20h beside the door (the field's power), 21h/22h the
+ * forcefield, 23h the viewscreen, 24h debris, 25h the brig entrance.
+ * Exits: 0 the bridge (room 3), 1 the transporter room (room 0), 2 the
+ * brig (room 2).
+ *
+ * Labels: H_ script headers, L branch targets, C_ conversations,
+ * T_/N_/S_ strings; talk_buf: the conversation buffer of Say.
+ */
+
+#include "rooms.h"
+
+/* where the file keeps its strings, conversations and tables */
+enum {
+    N_TUG1LOOP = 0x014E,
+    N_jnkpil = 0x0173,
+    N_sscann = 0x01AB,
+    T_TUG1_014 = 0x01E2,
+    T_TUG1N005 = 0x025E,
+    N_sscann_2 = 0x02B7,
+    T_TUG1_002 = 0x02EF,
+    T_TUG1N007 = 0x03F9,
+    N_kfiren = 0x0439,
+    N_t1phas = 0x045E,
+    T_TUG1_010 = 0x04D1,
+    N_sscann_3 = 0x057D,
+    T_TUG1_009 = 0x05B5,
+    T_TUG1N000 = 0x0654,
+    N_kpicke = 0x0748,
+    T_TUG1N004 = 0x07F8,
+    T_TUG1N009 = 0x083B,
+    T_TUG1_012 = 0x08CD,
+    T_TUG1_017 = 0x097A,
+    T_TUG1N008 = 0x09F8,
+    T_TUG1N007_2 = 0x0A71,
+    N_MUR4E9S = 0x0ADA,
+    N_kusemn = 0x0AF3,
+    N_t1weld = 0x0B11,
+    T_TUG1_016 = 0x0B4F,
+    N_MUR4E9S_2 = 0x0B8E,
+    N_kuseln = 0x0BA7,
+    N_t1weld_2 = 0x0BC5,
+    T_TUG1_015 = 0x0C03,
+    T_TUG1N002 = 0x0C8D,
+    T_TUG1L005 = 0x0CF0,
+    N_sscann_4 = 0x0D5A,
+    T_TUG1N010 = 0x0DA1,
+    T_TUG1N011 = 0x0E0A,
+    T_TUG1N001 = 0x0E6D,
+    N_sscann_5 = 0x0EE8,
+    T_TUG1_018 = 0x0F20,
+    T_TUG1_001 = 0x0FD2,
+    T_TUG1_008 = 0x100A,
+    T_TUG1_011 = 0x107F,
+    N_h1do = 0x1152,
+    N_mscann = 0x11BF,
+    T_TUG1_003 = 0x11F6,
+    N_mscann_2 = 0x1265,
+    T_TUG1_007 = 0x129C,
+    N_mscann_3 = 0x1300,
+    T_TUG1_005 = 0x1338,
+    T_TUG1_013 = 0x13EA,
+    T_TUG1L000 = 0x1493,
+    T_TUG1_004 = 0x1504,
+    N_Capt_Kirk = 0x15AD,
+    N_Dr_McCoy = 0x15B8,
+    N_Mr_Spock = 0x15C2,
+    N_Lt_Christensen = 0x15CC,
+    T_TUG1N003 = 0x15DC,
+    T_TUG1N006 = 0x1606,
+    T_TUG1N013 = 0x163A,
+    T_SIN3_012 = 0x1671,
+    T_TUG1_006 = 0x169C,
+    talk_buf = 0x16C8,
+};
+
+/* the room's variables: in the room state, and in the file itself */
+#define fv_talk_buf CS_W(0x16C8)
+#define rv_field_down ROOM_B(0x47)
+#define rv_score ROOM_W(0x29)
+#define rv_took_junk ROOM_W(0x3F)
+
+/* functions */
+static void tug1_StartRoom(void);
+static void tug1_SpockScans(void);
+static void tug1_LookAtField(void);
+static void tug1_SpockScansField(void);
+static void tug1_E_03B6(void);
+static void tug1_PhaserField(void);
+static void tug1_KirkAtField(void);
+static void tug1_KirkFires(void);
+static void tug1_FieldHolds(void);
+static void tug1_TalkToSpock(void);
+static void tug1_SpockScansJunk(void);
+static void tug1_LookAtJunk(void);
+static void tug1_GetJunk(void);
+static void tug1_KirkAtJunk(void);
+static void tug1_TookJunk(void);
+static void tug1_E_07CD(void);
+static void tug1_ChargeWelder(void);
+static void tug1_WeldWireScraps(void);
+static void tug1_WeldJunkMetal(void);
+static void tug1_FitCombBit(void);
+static void tug1_E_09DA(void);
+static void tug1_WeldField(void);
+static void tug1_WeldBesideDoor(void);
+static void tug1_KirkWeldsField(void);
+static void tug1_FieldAbsorbs(void);
+static void tug1_KirkWeldsBesideDoor(void);
+static void tug1_FieldDown(void);
+static void tug1_LookAtScene(void);
+static void tug1_LookAtMcCoy(void);
+static void tug1_LookAtSpock(void);
+static void tug1_LookAtRedshirt(void);
+static void tug1_TalkToMcCoy(void);
+static void tug1_TalkToRedshirt(void);
+static void tug1_SpockScans2(void);
+static void tug1_LookAtViewscreen(void);
+static void tug1_LookAtDebris(void);
+static void tug1_LookAtBrig(void);
+static void tug1_SpockScansBrig(void);
+static void tug1_TalkToKirk(void);
+static void tug1_UseCommunicator(void);
+static void tug1_WalkToBridgeDoor(void);
+static void tug1_AtBridgeDoor(void);
+static void tug1_DoorOpen(void);
+static void tug1_WalkToBrig(void);
+static void tug1_McCoyScans(void);
+static void tug1_E_124F(void);
+static void tug1_E_1257(void);
+static void tug1_McCoyScansField(void);
+static void tug1_McCoyScansBrig(void);
+static void tug1_E_13C5(void);
+static void tug1_E_13CD(void);
+static void tug1_SpockUsesField(void);
+static void tug1_E_1472(void);
+static void tug1_E_147A(void);
+static void tug1_ChristensenUsesField(void);
+static void tug1_E_14E3(void);
+static void tug1_E_14EB(void);
+static void tug1_MedkitOnField(void);
+static void tug1_Talk(uint16_t ax);
+static void tug1_Say(uint16_t ax, uint16_t bx);
+
+/* The room starts: the junk, until Kirk takes it.
+ * [MSG_TICK 01 00 00] */
+static void tug1_StartRoom(void)
+{
+    svc_Sfx(N_TUG1LOOP);
+    if (rv_took_junk != 1) {
+        svc_Anim(8, N_jnkpil, 0xFD, 0xA0, 0);
+    }
+    return;
+}
+
+/* Spock's tricorder and the forcefield.
+ * [MSG_USE 44 FF 00] */
+static void tug1_SpockScans(void)
+{
+    room.fall[1] = 0;
+    svc_Anim(1, N_sscann, -1, -1, 0);
+    svc_BridgeSfx(4);
+    tug1_Say(N_Mr_Spock, T_TUG1_014);
+    return;
+}
+
+/* [MSG_LOOK 21 00 00] */
+static void tug1_LookAtField(void)
+{
+    if (rv_field_down != 1) {
+        tug1_Say(0, T_TUG1N005);
+        goto L02A1;
+    }
+L02A1:;
+    return;
+}
+
+/* [MSG_USE 44 21 00] */
+static void tug1_SpockScansField(void)
+{
+    if (rv_field_down == 1) {
+    } else {
+        room.fall[1] = 0;
+        svc_Anim(1, N_sscann_2, -1, -1, 0);
+        svc_BridgeSfx(4);
+        tug1_Say(N_Mr_Spock, T_TUG1_002);
+        goto L03AF;
+    }
+L03AF:;
+    return;
+}
+
+/* Phasers on the field (msgs 3, 4, 5): no effect.
+ * [MSG_USE 40 21 00] */
+static void tug1_E_03B6(void)
+{
+    { tug1_PhaserField(); return; }
+}
+
+/* [MSG_USE 41 21 00] */
+static void tug1_PhaserField(void)
+{
+    if (rv_field_down == 0) {
+        room.busy = 1;
+        room.fall[0] = 0;
+        svc_Walk(0, 0xBE, 0x78, 3);
+    }
+    if (rv_field_down == 1) {
+        tug1_Say(0, T_TUG1N007);
+        goto L0430;
+    }
+L0430:;
+    return;
+}
+
+/* [MSG_WALK_DONE 03 00 00] */
+static void tug1_KirkAtField(void)
+{
+    svc_Anim(0, N_kfiren, -1, -1, 4);
+    return;
+}
+
+/* [MSG_ANIM_DONE 04 00 00] */
+static void tug1_KirkFires(void)
+{
+    svc_Anim(9, N_t1phas, 0, 0, 5);
+    svc_BridgeSfx(6);
+    return;
+}
+
+/* [MSG_ANIM_DONE 05 00 00] */
+static void tug1_FieldHolds(void)
+{
+    room.busy = 0;
+    svc_StopAnim(0);
+    svc_StopAnim(9);
+    return;
+}
+
+/* [MSG_TALK 01 00 00] */
+static void tug1_TalkToSpock(void)
+{
+    if (rv_field_down == 1) {
+    } else {
+        tug1_Say(N_Mr_Spock, T_TUG1_010);
+        goto L0570;
+    }
+L0570:;
+    return;
+}
+
+/* The junk: Kirk takes all of it (msgs 1, 2), +1 score.
+ * [MSG_USE 44 08 00] */
+static void tug1_SpockScansJunk(void)
+{
+    room.fall[1] = 0;
+    svc_Anim(1, N_sscann_3, -1, -1, 0);
+    svc_BridgeSfx(4);
+    tug1_Say(N_Mr_Spock, T_TUG1_009);
+    return;
+}
+
+/* [MSG_LOOK 08 00 00] */
+static void tug1_LookAtJunk(void)
+{
+    tug1_Say(0, T_TUG1N000);
+    return;
+}
+
+/* [MSG_GET 08 00 00] */
+static void tug1_GetJunk(void)
+{
+    svc_Walk(0, 0xE1, 0xAA, 1);
+    return;
+}
+
+/* [MSG_WALK_DONE 01 00 00] */
+static void tug1_KirkAtJunk(void)
+{
+    svc_Anim(0, N_kpicke, 0xE1, 0xAA, 2);
+    return;
+}
+
+/* [MSG_ANIM_DONE 02 00 00] */
+static void tug1_TookJunk(void)
+{
+    rv_took_junk = 1;
+    svc_GiveItem(IT_DEADPH);
+    svc_GiveItem(IT_PWE);
+    rv_score += 1;
+    svc_GiveItem(IT_WIRSCRP);
+    svc_GiveItem(IT_JNKMETL);
+    svc_StopAnim(8);
+    svc_StopAnim(0);
+    return;
+}
+
+/* Inventory, as in room 0, but charging the welder here is worth +3
+ * (+1 there). The comb bit's line is missing its "T" here.
+ * [MSG_USE 40 56 00] */
+static void tug1_E_07CD(void)
+{
+    { tug1_ChargeWelder(); return; }
+}
+
+/* [MSG_USE 41 56 00] */
+static void tug1_ChargeWelder(void)
+{
+    svc_TakeItem(IT_PWE);
+    svc_GiveItem(IT_PWF);
+    tug1_Say(0, T_TUG1N004);
+    rv_score += 3;
+    return;
+}
+
+/* [MSG_USE 55 54 00] */
+static void tug1_WeldWireScraps(void)
+{
+    tug1_Say(0, T_TUG1N009);
+    svc_TakeItem(IT_WIRSCRP);
+    return;
+}
+
+/* [MSG_USE 55 52 00] */
+static void tug1_WeldJunkMetal(void)
+{
+    tug1_Say(N_Mr_Spock, T_TUG1_012);
+    svc_TakeItem(IT_JNKMETL);
+    svc_GiveItem(IT_COMBBIT);
+    return;
+}
+
+/* [MSG_USE 51 4F 00] */
+static void tug1_FitCombBit(void)
+{
+    tug1_Say(N_Mr_Spock, T_TUG1_017);
+    svc_TakeItem(IT_COMBBIT);
+    svc_TakeItem(IT_RT);
+    svc_GiveItem(IT_RTWB);
+    return;
+}
+
+/* The charged welder on the field (msgs 6, 7) is absorbed; beside the door
+ * (msgs 8, 9) it brings the field down, +1 score.
+ * [MSG_USE 55 22 00] */
+static void tug1_E_09DA(void)
+{
+    { tug1_WeldField(); return; }
+}
+
+/* [MSG_USE 55 21 00] */
+static void tug1_WeldField(void)
+{
+    if (rv_field_down == 1) {
+        tug1_Say(0, T_TUG1N008);
+        return;
+    }
+    room.busy = 1;
+    room.fall[0] = 0;
+    svc_Walk(0, 0xC2, 0x6A, 6);
+    return;
+}
+
+/* [MSG_USE 55 20 00] */
+static void tug1_WeldBesideDoor(void)
+{
+    if (rv_field_down == 1) {
+        tug1_Say(0, T_TUG1N007_2);
+        return;
+    }
+    room.busy = 1;
+    room.fall[0] = 0;
+    svc_Walk(0, 0xB1, 0x6A, 8);
+    return;
+}
+
+/* [MSG_WALK_DONE 06 00 00] */
+static void tug1_KirkWeldsField(void)
+{
+    svc_Sfx(N_MUR4E9S);
+    svc_Anim(0, N_kusemn, -1, -1, 0);
+    svc_Anim(9, N_t1weld, 0, 0, 7);
+    return;
+}
+
+/* [MSG_ANIM_DONE 07 00 00] */
+static void tug1_FieldAbsorbs(void)
+{
+    svc_StopAnim(9);
+    tug1_Say(N_Mr_Spock, T_TUG1_016);
+    room.busy = 0;
+    return;
+}
+
+/* [MSG_WALK_DONE 08 00 00] */
+static void tug1_KirkWeldsBesideDoor(void)
+{
+    svc_Sfx(N_MUR4E9S_2);
+    svc_Anim(0, N_kuseln, -1, -1, 0);
+    svc_Anim(9, N_t1weld_2, 0, 0, 9);
+    return;
+}
+
+/* [MSG_ANIM_DONE 09 00 00] */
+static void tug1_FieldDown(void)
+{
+    svc_StopAnim(9);
+    tug1_Say(N_Mr_Spock, T_TUG1_015);
+    rv_field_down = 1;
+    room.busy = 0;
+    rv_score += 1;
+    return;
+}
+
+/* Looking and talking.
+ * [MSG_LOOK FF 00 00] */
+static void tug1_LookAtScene(void)
+{
+    tug1_Say(0, T_TUG1N013);
+    return;
+}
+
+/* [MSG_LOOK 02 00 00] */
+static void tug1_LookAtMcCoy(void)
+{
+    tug1_Say(0, T_TUG1N003);
+    return;
+}
+
+/* [MSG_LOOK 01 00 00] */
+static void tug1_LookAtSpock(void)
+{
+    tug1_Say(0, T_TUG1N006);
+    return;
+}
+
+/* [MSG_LOOK 03 00 00] */
+static void tug1_LookAtRedshirt(void)
+{
+    tug1_Say(0, T_TUG1N002);
+    return;
+}
+
+/* [MSG_TALK 02 00 00] */
+static void tug1_TalkToMcCoy(void)
+{
+    tug1_Say(N_Dr_McCoy, T_SIN3_012);
+    return;
+}
+
+/* [MSG_TALK 03 00 00] */
+static void tug1_TalkToRedshirt(void)
+{
+    tug1_Say(N_Lt_Christensen, T_TUG1L005);
+    return;
+}
+
+/* [MSG_USE 44 FF 00] */
+static void tug1_SpockScans2(void)
+{
+    room.fall[1] = 0;
+    svc_Anim(1, N_sscann_4, -1, -1, 0);
+    svc_BridgeSfx(4);
+    tug1_Say(N_Mr_Spock, T_TUG1_006);
+    return;
+}
+
+/* [MSG_LOOK 23 00 00] */
+static void tug1_LookAtViewscreen(void)
+{
+    tug1_Say(0, T_TUG1N010);
+    return;
+}
+
+/* [MSG_LOOK 24 00 00] */
+static void tug1_LookAtDebris(void)
+{
+    tug1_Say(0, T_TUG1N011);
+    return;
+}
+
+/* [MSG_LOOK 25 00 00] */
+static void tug1_LookAtBrig(void)
+{
+    tug1_Say(0, T_TUG1N001);
+    return;
+}
+
+/* [MSG_USE 44 25 00] */
+static void tug1_SpockScansBrig(void)
+{
+    room.fall[1] = 0;
+    svc_Anim(1, N_sscann_5, -1, -1, 0);
+    svc_BridgeSfx(4);
+    tug1_Say(N_Mr_Spock, T_TUG1_018);
+    return;
+}
+
+/* [MSG_TALK 00 00 00] */
+static void tug1_TalkToKirk(void)
+{
+    tug1_Say(N_Capt_Kirk, T_TUG1_001);
+    tug1_Say(N_Dr_McCoy, T_TUG1_008);
+    return;
+}
+
+/* [MSG_USE 47 FF 00] */
+static void tug1_UseCommunicator(void)
+{
+    tug1_Say(N_Mr_Spock, T_TUG1_011);
+    return;
+}
+
+/* Walking to the bridge door, once the field is down: it opens (msgs
+ * 10, 11) and Kirk walks through (exit 0).
+ * [MSG_WALK 21 00 00] */
+static void tug1_WalkToBridgeDoor(void)
+{
+    if (rv_field_down == 1) {
+        room.fall[0] = 0;
+        svc_Walk(0, 0xC2, 0x6E, 0xA);
+    }
+    return;
+}
+
+/* [MSG_WALK_DONE 0A 00 00] */
+static void tug1_AtBridgeDoor(void)
+{
+    room.busy = 1;
+    svc_Anim(9, N_h1do, 0, 0, 0xB);
+    return;
+}
+
+/* [MSG_ANIM_DONE 0B 00 00] */
+static void tug1_DoorOpen(void)
+{
+    svc_Walk(0, 0xC2, 0x63, 0);
+    return;
+}
+
+/* [MSG_WALK 25 00 00] */
+static void tug1_WalkToBrig(void)
+{
+    svc_Walk(0, 0xE9, 0x81, 0);
+    return;
+}
+
+/* McCoy's tricorder.
+ * [MSG_USE 45 FF 00] */
+static void tug1_McCoyScans(void)
+{
+    room.fall[2] = 0;
+    svc_Anim(2, N_mscann, -1, -1, 0);
+    svc_BridgeSfx(4);
+    tug1_Say(N_Dr_McCoy, T_TUG1_003);
+    return;
+}
+
+/* [MSG_USE 45 21 00] */
+static void tug1_E_124F(void)
+{
+    { tug1_McCoyScansField(); return; }
+}
+
+/* [MSG_USE 45 20 00] */
+static void tug1_E_1257(void)
+{
+    { tug1_McCoyScansField(); return; }
+}
+
+/* [MSG_USE 45 22 00] */
+static void tug1_McCoyScansField(void)
+{
+    room.fall[2] = 0;
+    svc_Anim(2, N_mscann_2, -1, -1, 0);
+    svc_BridgeSfx(4);
+    tug1_Say(N_Dr_McCoy, T_TUG1_007);
+    return;
+}
+
+/* [MSG_USE 45 25 00] */
+static void tug1_McCoyScansBrig(void)
+{
+    room.fall[2] = 0;
+    svc_Anim(2, N_mscann_3, -1, -1, 0);
+    svc_BridgeSfx(4);
+    tug1_Say(N_Dr_McCoy, T_TUG1_005);
+    return;
+}
+
+/* The crew on the field, before it is down.
+ * [MSG_USE 01 20 00] */
+static void tug1_E_13C5(void)
+{
+    { tug1_SpockUsesField(); return; }
+}
+
+/* [MSG_USE 01 21 00] */
+static void tug1_E_13CD(void)
+{
+    { tug1_SpockUsesField(); return; }
+}
+
+/* [MSG_USE 01 22 00] */
+static void tug1_SpockUsesField(void)
+{
+    if (rv_field_down != 0) {
+    } else {
+        tug1_Say(N_Mr_Spock, T_TUG1_013);
+        goto L146B;
+    }
+L146B:;
+    return;
+}
+
+/* [MSG_USE 03 20 00] */
+static void tug1_E_1472(void)
+{
+    { tug1_ChristensenUsesField(); return; }
+}
+
+/* [MSG_USE 03 21 00] */
+static void tug1_E_147A(void)
+{
+    { tug1_ChristensenUsesField(); return; }
+}
+
+/* [MSG_USE 03 22 00] */
+static void tug1_ChristensenUsesField(void)
+{
+    if (rv_field_down == 0) {
+        tug1_Say(N_Lt_Christensen, T_TUG1L000);
+        goto L14DC;
+    }
+L14DC:;
+    return;
+}
+
+/* [MSG_USE 7F 20 00] */
+static void tug1_E_14E3(void)
+{
+    { tug1_MedkitOnField(); return; }
+}
+
+/* [MSG_USE 7F 21 00] */
+static void tug1_E_14EB(void)
+{
+    { tug1_MedkitOnField(); return; }
+}
+
+/* [MSG_USE 7F 22 00] */
+static void tug1_MedkitOnField(void)
+{
+    if (rv_field_down == 0) {
+        tug1_Say(N_Dr_McCoy, T_TUG1_004);
+        goto L1552;
+    }
+L1552:;
+    return;
+}
+
+/* Talk: conversation AX (speaker, choices, 0); returns the choice. */
+static void tug1_Talk(uint16_t ax)
+{
+    svc_Talk(ax);
+    return;
+}
+
+/* Say: one line, BX, said by AX (0: narration). */
+static void tug1_Say(uint16_t ax, uint16_t bx)
+{
+    fv_talk_buf = ax;
+    CS_W(0x16CA) = bx;
+    tug1_Talk(talk_buf);
+    return;
+}
+
+/* the scripts, by the offset of their code in the room file */
+const RoomScript tug1_scripts[] = {
+    { 0x014C, tug1_StartRoom },    /* MSG_TICK 01 00 00 */
+    { 0x01A5, tug1_SpockScans },    /* MSG_USE 44 FF 00 */
+    { 0x024D, tug1_LookAtField },    /* MSG_LOOK 21 00 00 */
+    { 0x02A8, tug1_SpockScansField },    /* MSG_USE 44 21 00 */
+    { 0x03B6, tug1_E_03B6 },    /* MSG_USE 40 21 00 */
+    { 0x03BE, tug1_PhaserField },    /* MSG_USE 41 21 00 */
+    { 0x0437, tug1_KirkAtField },    /* MSG_WALK_DONE 03 00 00 */
+    { 0x045C, tug1_KirkFires },    /* MSG_ANIM_DONE 04 00 00 */
+    { 0x0491, tug1_FieldHolds },    /* MSG_ANIM_DONE 05 00 00 */
+    { 0x04BC, tug1_TalkToSpock },    /* MSG_TALK 01 00 00 */
+    { 0x0577, tug1_SpockScansJunk },    /* MSG_USE 44 08 00 */
+    { 0x0648, tug1_LookAtJunk },    /* MSG_LOOK 08 00 00 */
+    { 0x0723, tug1_GetJunk },    /* MSG_GET 08 00 00 */
+    { 0x0746, tug1_KirkAtJunk },    /* MSG_WALK_DONE 01 00 00 */
+    { 0x076D, tug1_TookJunk },    /* MSG_ANIM_DONE 02 00 00 */
+    { 0x07CD, tug1_E_07CD },    /* MSG_USE 40 56 00 */
+    { 0x07D5, tug1_ChargeWelder },    /* MSG_USE 41 56 00 */
+    { 0x0830, tug1_WeldWireScraps },    /* MSG_USE 55 54 00 */
+    { 0x08C1, tug1_WeldJunkMetal },    /* MSG_USE 55 52 00 */
+    { 0x096F, tug1_FitCombBit },    /* MSG_USE 51 4F 00 */
+    { 0x09DA, tug1_E_09DA },    /* MSG_USE 55 22 00 */
+    { 0x09E2, tug1_WeldField },    /* MSG_USE 55 21 00 */
+    { 0x0A5B, tug1_WeldBesideDoor },    /* MSG_USE 55 20 00 */
+    { 0x0AD8, tug1_KirkWeldsField },    /* MSG_WALK_DONE 06 00 00 */
+    { 0x0B34, tug1_FieldAbsorbs },    /* MSG_ANIM_DONE 07 00 00 */
+    { 0x0B8C, tug1_KirkWeldsBesideDoor },    /* MSG_WALK_DONE 08 00 00 */
+    { 0x0BE8, tug1_FieldDown },    /* MSG_ANIM_DONE 09 00 00 */
+    { 0x0C55, tug1_LookAtScene },    /* MSG_LOOK FF 00 00 */
+    { 0x0C64, tug1_LookAtMcCoy },    /* MSG_LOOK 02 00 00 */
+    { 0x0C73, tug1_LookAtSpock },    /* MSG_LOOK 01 00 00 */
+    { 0x0C82, tug1_LookAtRedshirt },    /* MSG_LOOK 03 00 00 */
+    { 0x0CD5, tug1_TalkToMcCoy },    /* MSG_TALK 02 00 00 */
+    { 0x0CE5, tug1_TalkToRedshirt },    /* MSG_TALK 03 00 00 */
+    { 0x0D54, tug1_SpockScans2 },    /* MSG_USE 44 FF 00 */
+    { 0x0D96, tug1_LookAtViewscreen },    /* MSG_LOOK 23 00 00 */
+    { 0x0DFF, tug1_LookAtDebris },    /* MSG_LOOK 24 00 00 */
+    { 0x0E62, tug1_LookAtBrig },    /* MSG_LOOK 25 00 00 */
+    { 0x0EE2, tug1_SpockScansBrig },    /* MSG_USE 44 25 00 */
+    { 0x0FC7, tug1_TalkToKirk },    /* MSG_TALK 00 00 00 */
+    { 0x1073, tug1_UseCommunicator },    /* MSG_USE 47 FF 00 */
+    { 0x111F, tug1_WalkToBridgeDoor },    /* MSG_WALK 21 00 00 */
+    { 0x114C, tug1_AtBridgeDoor },    /* MSG_WALK_DONE 0A 00 00 */
+    { 0x1173, tug1_DoorOpen },    /* MSG_ANIM_DONE 0B 00 00 */
+    { 0x1196, tug1_WalkToBrig },    /* MSG_WALK 25 00 00 */
+    { 0x11B9, tug1_McCoyScans },    /* MSG_USE 45 FF 00 */
+    { 0x124F, tug1_E_124F },    /* MSG_USE 45 21 00 */
+    { 0x1257, tug1_E_1257 },    /* MSG_USE 45 20 00 */
+    { 0x125F, tug1_McCoyScansField },    /* MSG_USE 45 22 00 */
+    { 0x12FA, tug1_McCoyScansBrig },    /* MSG_USE 45 25 00 */
+    { 0x13C5, tug1_E_13C5 },    /* MSG_USE 01 20 00 */
+    { 0x13CD, tug1_E_13CD },    /* MSG_USE 01 21 00 */
+    { 0x13D5, tug1_SpockUsesField },    /* MSG_USE 01 22 00 */
+    { 0x1472, tug1_E_1472 },    /* MSG_USE 03 20 00 */
+    { 0x147A, tug1_E_147A },    /* MSG_USE 03 21 00 */
+    { 0x1482, tug1_ChristensenUsesField },    /* MSG_USE 03 22 00 */
+    { 0x14E3, tug1_E_14E3 },    /* MSG_USE 7F 20 00 */
+    { 0x14EB, tug1_E_14EB },    /* MSG_USE 7F 21 00 */
+    { 0x14F3, tug1_MedkitOnField },    /* MSG_USE 7F 22 00 */
+    { 0, 0 }
+};

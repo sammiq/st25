@@ -1,0 +1,1077 @@
+/* SINS3.RDF: the room's scripts, translated from the machine code in the room file
+ * (src/rdf/sins3.asm) by tools/rdf2c.py.  They run on the loaded file (CS_B/CS_W) and the
+ * room state (`room`), and call the game through the svc_ macros of rooms.h.
+ *
+ * SINS3.RDF - "Sins of Omission", an old mining room with a laser drill.
+ * With the pattern of the keycard lock (room 4) the drill cuts a mould in
+ * the stone, and with the silver-bearing rocks from the surface (room 0)
+ * in the mould it fuses a keycard. A box holds a connector.
+ *
+ * Actors: 8 the mould, 11 (0Bh) the box.
+ * Objects: 8 the mould, 0Bh/22h the box, 20h the drill, 21h its controls,
+ * 23h the ore, 24h the way out, 25h/26h the displays. Exit 3: room 4.
+ *
+ * Labels: H_ script headers, L branch targets, C_ conversations,
+ * T_/N_/S_ strings; talk_buf: the conversation buffer of Say.
+ *
+ * Quirks of the original:
+ * - UseDrillNever is keyed MSG_USE, 20h, ANY; 20h is no item, so it never runs.
+ * - The conversation at 00D8 is built at run time.
+ */
+
+#include "rooms.h"
+
+/* where the file keeps its strings, conversations and tables */
+enum {
+    N_sscans = 0x00CA,
+    N_mscans = 0x00D1,
+    talk_buf = 0x00D8,
+    N_Capt_Kirk = 0x0121,
+    N_Dr_McCoy = 0x012C,
+    N_Mr_Spock = 0x0136,
+    N_Ensign_Mosher = 0x0140,
+    N_Lt_Uhura = 0x014E,
+    N_SIN3LOOP = 0x023C,
+    N_s3bxo = 0x0266,
+    N_s3bxe = 0x028B,
+    N_s3mold = 0x02B0,
+    N_s3rock = 0x02D4,
+    N_s3card = 0x02F8,
+    N_sscans_2 = 0x032F,
+    T_SIN3_003 = 0x0366,
+    N_sscann = 0x03C4,
+    T_SIN3_018 = 0x03FB,
+    T_SIN3_017 = 0x0486,
+    N_sscane = 0x050B,
+    T_SIN3_016 = 0x0542,
+    N_sscane_2 = 0x05B1,
+    T_SIN3_019 = 0x05EE,
+    T_SIN3_015 = 0x0660,
+    T_SIN3N012 = 0x0718,
+    T_SIN3N011 = 0x0759,
+    T_SIN3N007 = 0x07A7,
+    T_SIN3N013 = 0x07F6,
+    N_sscane_3 = 0x0857,
+    T_SIN3_023 = 0x088E,
+    T_SIN3N000 = 0x08F5,
+    T_SIN3N008 = 0x0936,
+    T_SIN3N005 = 0x0982,
+    N_kusele = 0x09DE,
+    N_s3bxop = 0x09FC,
+    N_susele = 0x0A78,
+    N_s3bxop_2 = 0x0A96,
+    N_musele = 0x0AF7,
+    N_s3bxop_3 = 0x0B15,
+    N_rusele = 0x0B76,
+    N_s3bxop_4 = 0x0B94,
+    N_s3bxo_2 = 0x0BC4,
+    N_kusele_2 = 0x0C42,
+    N_s3bxe_2 = 0x0C67,
+    T_SIN3_012 = 0x0CAC,
+    T_SIN3_024 = 0x0CE2,
+    T_SIN3_013 = 0x0D40,
+    T_SIN3_001 = 0x0D97,
+    S_0E15 = 0x0E15,
+    S_0E38 = 0x0E38,
+    S_0E5B = 0x0E5B,
+    N_cancel = 0x0E7E,
+    T_SIN3_005 = 0x0EE4,
+    N_susemn = 0x0F6F,
+    N_LAZERD2 = 0x0F8D,
+    N_susemn_2 = 0x100B,
+    N_LAZERD2_2 = 0x1029,
+    T_SIN3_006 = 0x1079,
+    N_kuseme = 0x1119,
+    N_s3rock_2 = 0x114A,
+    N_s3las1 = 0x1194,
+    N_s3las2 = 0x11C3,
+    N_s3las3 = 0x11FB,
+    N_s3las4 = 0x1233,
+    N_s3las5 = 0x126B,
+    N_s3hole = 0x12C4,
+    N_s3mold_2 = 0x12E9,
+    N_s3card_2 = 0x130E,
+    T_SIN3_021 = 0x133C,
+    T_SIN3N009 = 0x139E,
+    N_kuseme_2 = 0x1445,
+    N_s3mold_3 = 0x1476,
+    T_SIN3N006 = 0x14BB,
+    T_SIN3N014 = 0x151C,
+    T_SIN3N010 = 0x1568,
+    T_SIN3N003 = 0x15C4,
+    T_SIN3N004 = 0x1613,
+    T_SIN3N001 = 0x167B,
+    T_SIN3N002 = 0x16CC,
+    T_SIN3_002 = 0x174E,
+    T_SIN3_020 = 0x178D,
+    T_SIN3_011 = 0x1802,
+    T_SIN3_026 = 0x1871,
+    T_SIN3_014 = 0x18B5,
+    T_SIN3_027 = 0x18F5,
+    T_SIN3_022 = 0x194D,
+    T_SIN3U072 = 0x19D3,
+    T_SIN3_004 = 0x1A13,
+    T_SIN3_009 = 0x1A71,
+    T_SIN3_025 = 0x1AE5,
+    T_SIN3_010 = 0x1B6D,
+    T_SIN3_008 = 0x1BF2,
+    rdf_scripts_end = 0x1C59,
+};
+
+/* the room's variables: in the room state, and in the file itself */
+#define fv_choice_jumps CS_W(0xEC)
+#define fv_talk_buf CS_W(0xD8)
+#define rv_box ROOM_B(0x41)
+#define rv_drill_power ROOM_B(0x37)
+#define rv_drill_ready ROOM_B(0x38)
+#define rv_mould ROOM_B(0x40)
+#define rv_rocks_known ROOM_B(0x39)
+#define rv_scanned_lock ROOM_B(0x36)
+#define rv_seen_mine ROOM_B(0x45)
+
+/* functions */
+static void sins3_Talk(uint16_t ax);
+static void sins3_Say(uint16_t ax, uint16_t bx);
+static void sins3_StartRoom(void);
+static void sins3_SpockScansBox(void);
+static void sins3_E_03BA(void);
+static void sins3_SpockScansDisplays(void);
+static void sins3_SpockScans(void);
+static void sins3_SpockScansDrill(void);
+static void sins3_SpockScansControls(void);
+static void sins3_LookAtDrill(void);
+static void sins3_LookAtControls(void);
+static void sins3_E_0794(void);
+static void sins3_LookAtDisplays(void);
+static void sins3_LookAtScene(void);
+static void sins3_SpockScansOre(void);
+static void sins3_E_08DC(void);
+static void sins3_LookAtBox(void);
+static void sins3_KirkOpensBox(void);
+static void sins3_KirkAtBox(void);
+static void sins3_part_0A27(void);
+static void sins3_Timer0Sound(void);
+static void sins3_SpockOpensBox(void);
+static void sins3_SpockAtBox(void);
+static void sins3_part_0ABD(void);
+static void sins3_McCoyOpensBox(void);
+static void sins3_McCoyAtBox(void);
+static void sins3_part_0B3C(void);
+static void sins3_MosherOpensBox(void);
+static void sins3_MosherAtBox(void);
+static void sins3_part_0BBB(void);
+static void sins3_BoxOpen(void);
+static void sins3_E_0BEC(void);
+static void sins3_GetConnector(void);
+static void sins3_KirkAtBox2(void);
+static void sins3_TookConnector(void);
+static void sins3_FirstLook(void);
+static void sins3_SpockHasIdea(void);
+static void sins3_KirkOnControls(void);
+static void sins3_SpockOnControls(void);
+static void sins3_SpockAtControls(void);
+static void sins3_E_10D5(void);
+static void sins3_RocksInMould(void);
+static void sins3_KirkAtMould(void);
+static void sins3_RocksPlaced(void);
+static void sins3_DrillFires(void);
+static void sins3_DrillDone(void);
+static void sins3_HoleCut(void);
+static void sins3_MouldCut(void);
+static void sins3_CardMade(void);
+static void sins3_RockVaporized(void);
+static void sins3_UseDrillNever(void);
+static void sins3_GetCard(void);
+static void sins3_KirkAtCard(void);
+static void sins3_TookCard(void);
+static void sins3_LookAtMould(void);
+static void sins3_LookAtKirk(void);
+static void sins3_LookAtSpock(void);
+static void sins3_LookAtMcCoy(void);
+static void sins3_LookAtRedshirt(void);
+static void sins3_TalkToKirk(void);
+static void sins3_TalkToSpock(void);
+static void sins3_TalkToMcCoy(void);
+static void sins3_TalkToRedshirt(void);
+static void sins3_SpockScansOre2(void);
+static void sins3_UseCommunicator(void);
+static void sins3_SpockOnDrill(void);
+static void sins3_McCoyOnDrill(void);
+static void sins3_MosherOnDrill(void);
+static void sins3_WalkOut(void);
+static void sins3_E_1B4A(void);
+static void sins3_MedkitOnSpock(void);
+static void sins3_MedkitOnMcCoy(void);
+static void sins3_MedkitOnRedshirt(void);
+static void sins3_E_1BAE(void);
+static void sins3_E_1BB6(void);
+static void sins3_E_1BBE(void);
+static void sins3_McCoyScansRedshirt(void);
+
+/* Talk: conversation AX (speaker, choices, 0); returns the choice. */
+static void sins3_Talk(uint16_t ax)
+{
+    svc_Talk(ax);
+    return;
+}
+
+/* Say: one line, BX, said by AX (0: narration). */
+static void sins3_Say(uint16_t ax, uint16_t bx)
+{
+    fv_talk_buf = ax;
+    CS_W(0xDA) = bx;
+    CS_W(0xDC) = 0;
+    sins3_Talk(talk_buf);
+    return;
+}
+
+/* The room starts: the box, the mould and what is in it.
+ * [MSG_TICK 01 00 00] */
+static void sins3_StartRoom(void)
+{
+    svc_Sfx(N_SIN3LOOP);
+    if (rv_seen_mine == 0) {
+        room.busy = 2;
+    }
+    if (rv_box == 1) {
+        svc_Anim(0xB, N_s3bxo, 0xAF, 0xB8, 0);
+    }
+    if (rv_box == 2) {
+        svc_Anim(0xB, N_s3bxe, 0xAF, 0xB8, 0);
+    }
+    if (rv_mould == 2) {
+        svc_Anim(8, N_s3mold, 0, 0, 0);
+    }
+    if (rv_mould == 3) {
+        svc_Anim(8, N_s3rock, 0, 0, 0);
+    }
+    if (rv_mould == 4) {
+        svc_Anim(8, N_s3card, 0, 0, 0);
+    }
+    rv_rocks_known |= 2;
+    svc_Music(0x1B, -3);
+    return;
+}
+
+/* Tricorders.
+ * [MSG_USE 44 22 00] */
+static void sins3_SpockScansBox(void)
+{
+    svc_Anim(1, N_sscans_2, -1, -1, 0);
+    svc_BridgeSfx(4);
+    sins3_Say(N_Mr_Spock, T_SIN3_003);
+    return;
+}
+
+/* [MSG_USE 44 25 00] */
+static void sins3_E_03BA(void)
+{
+    { sins3_SpockScansDisplays(); return; }
+}
+
+/* [MSG_USE 44 26 00] */
+static void sins3_SpockScansDisplays(void)
+{
+    svc_Anim(1, N_sscann, -1, -1, 0);
+    svc_BridgeSfx(4);
+    sins3_Say(N_Mr_Spock, T_SIN3_018);
+    return;
+}
+
+/* [MSG_USE 44 FF 00] */
+static void sins3_SpockScans(void)
+{
+    svc_Anim(1, N_sscans, -1, -1, 0);
+    svc_BridgeSfx(4);
+    sins3_Say(N_Mr_Spock, T_SIN3_017);
+    return;
+}
+
+/* [MSG_USE 44 20 00] */
+static void sins3_SpockScansDrill(void)
+{
+    svc_Anim(1, N_sscane, -1, -1, 0);
+    svc_BridgeSfx(4);
+    sins3_Say(N_Mr_Spock, T_SIN3_016);
+    return;
+}
+
+/* [MSG_USE 44 21 00] */
+static void sins3_SpockScansControls(void)
+{
+    svc_Anim(1, N_sscane_2, -1, -1, 0);
+    svc_BridgeSfx(4);
+    if (rv_scanned_lock == 0) {
+        sins3_Say(N_Mr_Spock, T_SIN3_019);
+        return;
+    }
+    sins3_Say(N_Mr_Spock, T_SIN3_015);
+    rv_drill_ready = 1;
+    return;
+}
+
+/* Looking.
+ * [MSG_LOOK 20 00 00] */
+static void sins3_LookAtDrill(void)
+{
+    sins3_Say(0, T_SIN3N012);
+    return;
+}
+
+/* [MSG_LOOK 21 00 00] */
+static void sins3_LookAtControls(void)
+{
+    sins3_Say(0, T_SIN3N011);
+    return;
+}
+
+/* [MSG_LOOK 25 00 00] */
+static void sins3_E_0794(void)
+{
+    { sins3_LookAtDisplays(); return; }
+}
+
+/* [MSG_LOOK 26 00 00] */
+static void sins3_LookAtDisplays(void)
+{
+    sins3_Say(0, T_SIN3N007);
+    return;
+}
+
+/* [MSG_LOOK FF 00 00] */
+static void sins3_LookAtScene(void)
+{
+    sins3_Say(0, T_SIN3N013);
+    return;
+}
+
+/* [MSG_USE 44 23 00] */
+static void sins3_SpockScansOre(void)
+{
+    svc_Anim(1, N_sscane_3, -1, -1, 0);
+    svc_BridgeSfx(4);
+    sins3_Say(N_Mr_Spock, T_SIN3_023);
+    return;
+}
+
+/* The box: anyone opens it (msgs 4-8, timer 0); inside, the connector
+ * (msgs 3, 17).
+ * [MSG_LOOK 0B 00 00] */
+static void sins3_E_08DC(void)
+{
+    { sins3_LookAtBox(); return; }
+}
+
+/* [MSG_LOOK 22 00 00] */
+static void sins3_LookAtBox(void)
+{
+    if (rv_box == 0) {
+        sins3_Say(0, T_SIN3N000);
+        return;
+    }
+    if (rv_box == 1) {
+        sins3_Say(0, T_SIN3N008);
+        return;
+    }
+    if (rv_box == 2) {
+        sins3_Say(0, T_SIN3N005);
+        return;
+    }
+    return;
+}
+
+/* [MSG_USE 00 22 00] */
+static void sins3_KirkOpensBox(void)
+{
+    if (rv_box != 0)
+        { sins3_part_0A27(); return; }
+    room.busy = 1;
+    room.fall[0] = 2;
+    svc_Walk(0, 0x8F, 0xA9, 4);
+    return;
+}
+
+/* [MSG_WALK_DONE 04 00 00] */
+static void sins3_KirkAtBox(void)
+{
+    svc_Anim(0, N_kusele, -1, -1, 0);
+    svc_Anim(0xB, N_s3bxop, 0xAF, 0xB8, 8);
+    room.timers[0] = 0xA;
+    rv_box = 1;
+    { sins3_part_0A27(); return; }
+}
+
+static void sins3_part_0A27(void)
+{
+    return;
+}
+
+/* [MSG_TIMER 00 00 00] */
+static void sins3_Timer0Sound(void)
+{
+    svc_BridgeSfx(0xC);
+    return;
+}
+
+/* [MSG_USE 01 22 00] */
+static void sins3_SpockOpensBox(void)
+{
+    if (rv_box != 0)
+        { sins3_part_0ABD(); return; }
+    room.busy = 1;
+    room.fall[1] = 2;
+    svc_Walk(1, 0x8F, 0xA9, 5);
+    return;
+}
+
+/* [MSG_WALK_DONE 05 00 00] */
+static void sins3_SpockAtBox(void)
+{
+    svc_Anim(1, N_susele, -1, -1, 0);
+    svc_Anim(0xB, N_s3bxop_2, 0xAF, 0xB8, 8);
+    rv_box = 1;
+    { sins3_part_0ABD(); return; }
+}
+
+static void sins3_part_0ABD(void)
+{
+    return;
+}
+
+/* [MSG_USE 02 22 00] */
+static void sins3_McCoyOpensBox(void)
+{
+    if (rv_box != 0)
+        { sins3_part_0B3C(); return; }
+    room.busy = 1;
+    room.fall[2] = 2;
+    svc_Walk(2, 0x8F, 0xA9, 6);
+    return;
+}
+
+/* [MSG_WALK_DONE 06 00 00] */
+static void sins3_McCoyAtBox(void)
+{
+    svc_Anim(2, N_musele, -1, -1, 0);
+    svc_Anim(0xB, N_s3bxop_3, 0xAF, 0xB8, 8);
+    rv_box = 1;
+    { sins3_part_0B3C(); return; }
+}
+
+static void sins3_part_0B3C(void)
+{
+    return;
+}
+
+/* [MSG_USE 03 22 00] */
+static void sins3_MosherOpensBox(void)
+{
+    if (rv_box != 0)
+        { sins3_part_0BBB(); return; }
+    room.busy = 1;
+    room.fall[3] = 2;
+    svc_Walk(3, 0x8F, 0xA9, 7);
+    return;
+}
+
+/* [MSG_WALK_DONE 07 00 00] */
+static void sins3_MosherAtBox(void)
+{
+    svc_Anim(3, N_rusele, -1, -1, 0);
+    svc_Anim(0xB, N_s3bxop_4, 0xAF, 0xB8, 8);
+    rv_box = 1;
+    { sins3_part_0BBB(); return; }
+}
+
+static void sins3_part_0BBB(void)
+{
+    return;
+}
+
+/* [MSG_ANIM_DONE 08 00 00] */
+static void sins3_BoxOpen(void)
+{
+    svc_Anim(0xB, N_s3bxo_2, 0xAF, 0xB8, 0);
+    room.busy = 0;
+    return;
+}
+
+/* [MSG_GET 0B 00 00] */
+static void sins3_E_0BEC(void)
+{
+    { sins3_GetConnector(); return; }
+}
+
+/* [MSG_GET 22 00 00] */
+static void sins3_GetConnector(void)
+{
+    if (rv_box == 0) {
+        return;
+    }
+    if (rv_box == 1) {
+        room.busy = 1;
+        room.fall[0] = 2;
+        svc_Walk(0, 0x91, 0xAB, 3);
+        return;
+    }
+    if (rv_box == 2) {
+        return;
+    }
+    return;
+}
+
+/* [MSG_WALK_DONE 03 00 00] */
+static void sins3_KirkAtBox2(void)
+{
+    svc_GiveItem(IT_CONECT);
+    svc_Anim(0, N_kusele_2, -1, -1, 0x11);
+    return;
+}
+
+/* [MSG_ANIM_DONE 11 00 00] */
+static void sins3_TookConnector(void)
+{
+    svc_Anim(0xB, N_s3bxe_2, 0xAF, 0xB8, 0);
+    rv_box = 2;
+    room.busy = 0;
+    return;
+}
+
+/* Tick 30, the first time: the crew on the room.
+ * [MSG_TICK 1E 00 00] */
+static void sins3_FirstLook(void)
+{
+    if (rv_seen_mine != 0) {
+    } else {
+        sins3_Say(N_Dr_McCoy, T_SIN3_012);
+        sins3_Say(N_Mr_Spock, T_SIN3_024);
+        sins3_Say(N_Dr_McCoy, T_SIN3_013);
+        rv_seen_mine = 1;
+        room.busy = 0;
+    }
+    return;
+}
+
+/* Tick 60: with the silver rocks and the lock scanned, Spock's idea: a keycard.
+ * [MSG_TICK 3C 00 00] */
+static void sins3_SpockHasIdea(void)
+{
+    if (rv_rocks_known == 7) {
+        sins3_Say(N_Mr_Spock, rdf_scripts_end);
+        rv_rocks_known |= 8;
+    }
+    return;
+}
+
+/* The drill controls: Spock (msg 10) programs the drill with the lock's
+ * pattern and a power setting; it cuts the mould.
+ * [MSG_USE 00 21 00] */
+static void sins3_KirkOnControls(void)
+{
+    sins3_Say(N_Capt_Kirk, T_SIN3_001);
+    { sins3_SpockOnControls(); return; }
+}
+
+/* [MSG_USE 01 21 00] */
+static void sins3_SpockOnControls(void)
+{
+    svc_Walk(1, 0x96, 0x78, 0xA);
+    return;
+}
+
+/* [MSG_WALK_DONE 0A 00 00] */
+static void sins3_SpockAtControls(void)
+{
+    uint16_t ax = 0, si = 0;
+    fv_talk_buf = N_Capt_Kirk;
+    CS_W(0xDA) = S_0E15;
+    fv_choice_jumps = 0xEB0;
+    CS_W(0xDC) = S_0E38;
+    CS_W(0xEE) = 0xEBD;
+    CS_W(0xDE) = S_0E5B;
+    CS_W(0xF0) = 0xECA;
+    CS_W(0xE0) = N_cancel;
+    CS_W(0xF2) = 0xF52;
+    CS_W(0xE2) = 0;
+    ax = (uint16_t)svc_Talk(talk_buf);
+    ax = ax << 1;
+    si = ax;
+    switch (CS_W(0xEC + si)) {
+    case 0x0EB0: goto L0EB0;
+    case 0x0EBD: goto L0EBD;
+    case 0x0ECA: goto L0ECA;
+    case 0x0F52: goto L0F52;
+    default: return;
+    }
+L0EB0:;
+    rv_drill_power = 1;
+    goto L0F53;
+L0EBD:;
+    rv_drill_power = 2;
+    goto L0F53;
+L0ECA:;
+    rv_drill_power = 3;
+    if (rv_drill_ready == 0) {
+        sins3_Say(N_Mr_Spock, T_SIN3_005);
+        return;
+    }
+    goto L0F53;
+L0F52:;
+    return;
+L0F53:;
+    if (rv_mould == 0xFF) {
+        return;
+    }
+    if (rv_mould != 0) {
+    } else {
+        svc_Anim(1, N_susemn, -1, -1, 0);
+        svc_Sfx(N_LAZERD2);
+        if (rv_drill_ready == 0) {
+            if (rv_drill_power == 1) {
+                goto L1192;
+            }
+        }
+        if (rv_drill_ready == 0) {
+            if (rv_drill_power == 2) {
+                goto L1192;
+            }
+        }
+        if (rv_drill_ready == 0) {
+            if (rv_drill_power == 3) {
+                goto L11C1;
+            }
+        }
+        if (rv_drill_ready == 1) {
+            if (rv_drill_power == 1) {
+                goto L1192;
+            }
+        }
+        if (rv_drill_ready == 1) {
+            if (rv_drill_power == 2) {
+                goto L1192;
+            }
+        }
+        if (rv_drill_ready == 1) {
+            if (rv_drill_power == 3) {
+                goto L11F9;
+            }
+        }
+    }
+    if (rv_mould == 3) {
+        svc_Anim(1, N_susemn_2, -1, -1, 0);
+        svc_Sfx(N_LAZERD2_2);
+        if (rv_drill_ready == 2) {
+            if (rv_drill_power == 1) {
+                goto L1231;
+            }
+        }
+        if (rv_drill_ready == 2) {
+            if (rv_drill_power == 2) {
+                goto L1231;
+            }
+        }
+        if (rv_drill_ready == 2) {
+            if (rv_drill_power == 3) {
+                goto L1269;
+            }
+        }
+        return;
+    }
+    sins3_Say(N_Mr_Spock, T_SIN3_006);
+    return;
+L1192:;
+    svc_Anim(8, N_s3las1, 0, 0, 0xB);
+    svc_BridgeSfx(6);
+    return;
+L11C1:;
+    svc_Anim(8, N_s3las2, 0, 0, 0xC);
+    svc_BridgeSfx(6);
+    rv_mould = 0xFF;
+    return;
+L11F9:;
+    svc_Anim(8, N_s3las3, 0, 0, 0xD);
+    svc_BridgeSfx(6);
+    rv_mould = 2;
+    return;
+L1231:;
+    svc_Anim(8, N_s3las4, 0, 0, 0xE);
+    svc_BridgeSfx(6);
+    rv_mould = 4;
+    return;
+L1269:;
+    svc_Anim(8, N_s3las5, 0, 0, 0x13);
+    svc_BridgeSfx(6);
+    rv_mould = 2;
+    rv_drill_ready = 1;
+    return;
+}
+
+/* The rocks in the mould (msgs 1, 18, 2): the drill fuses them into a
+ * keycard at the right setting (anim msgs 11-14), or vaporizes them (19).
+ * [MSG_USE 74 08 00] */
+static void sins3_E_10D5(void)
+{
+    { sins3_RocksInMould(); return; }
+}
+
+/* [MSG_USE 74 23 00] */
+static void sins3_RocksInMould(void)
+{
+    if (rv_mould == 2) {
+        rv_mould = 3;
+        rv_drill_ready = 2;
+        room.busy = 1;
+        svc_Walk(0, 0x10F, 0xA7, 1);
+    }
+    return;
+}
+
+/* [MSG_WALK_DONE 01 00 00] */
+static void sins3_KirkAtMould(void)
+{
+    svc_Anim(0, N_kuseme, -1, -1, 0x12);
+    return;
+}
+
+/* [MSG_ANIM_DONE 12 00 00] */
+static void sins3_RocksPlaced(void)
+{
+    svc_TakeItem(IT_S8ROCKS);
+    svc_Anim(8, N_s3rock_2, 0, 0, 0);
+    room.fall[0] = 2;
+    svc_Walk(0, 0xFA, 0xAA, 2);
+    return;
+}
+
+/* [MSG_WALK_DONE 02 00 00] */
+static void sins3_DrillFires(void)
+{
+    room.busy = 0;
+    return;
+}
+
+/* [MSG_ANIM_DONE 0B 00 00] */
+static void sins3_DrillDone(void)
+{
+    svc_StopAnim(8);
+    return;
+}
+
+/* [MSG_ANIM_DONE 0C 00 00] */
+static void sins3_HoleCut(void)
+{
+    svc_Anim(8, N_s3hole, 0, 0, 0);
+    return;
+}
+
+/* [MSG_ANIM_DONE 0D 00 00] */
+static void sins3_MouldCut(void)
+{
+    svc_Anim(8, N_s3mold_2, 0, 0, 0);
+    return;
+}
+
+/* [MSG_ANIM_DONE 0E 00 00] */
+static void sins3_CardMade(void)
+{
+    svc_Anim(8, N_s3card_2, 0, 0, 0);
+    return;
+}
+
+/* [MSG_ANIM_DONE 13 00 00] */
+static void sins3_RockVaporized(void)
+{
+    sins3_Say(N_Mr_Spock, T_SIN3_021);
+    return;
+}
+
+/* Key MSG_USE, 20h, ANY: 20h is not an item, so this never runs.
+ * [MSG_USE 20 FF 00] */
+static void sins3_UseDrillNever(void)
+{
+    sins3_Say(0, T_SIN3N009);
+    return;
+}
+
+/* The keycard (msgs 15, 16).
+ * [MSG_GET 08 00 00] */
+static void sins3_GetCard(void)
+{
+    if (rv_mould == 4) {
+        svc_Walk(0, 0x10F, 0xA7, 0xF);
+        room.busy = 1;
+    }
+    return;
+}
+
+/* [MSG_WALK_DONE 0F 00 00] */
+static void sins3_KirkAtCard(void)
+{
+    svc_Anim(0, N_kuseme_2, -1, -1, 0x10);
+    return;
+}
+
+/* [MSG_ANIM_DONE 10 00 00] */
+static void sins3_TookCard(void)
+{
+    svc_GiveItem(IT_IDCARD);
+    svc_Anim(8, N_s3mold_3, 0, 0, 0);
+    rv_mould = 2;
+    rv_drill_ready = 1;
+    room.busy = 0;
+    return;
+}
+
+/* The mould.
+ * [MSG_LOOK 08 00 00] */
+static void sins3_LookAtMould(void)
+{
+    if (rv_mould == 2) {
+        sins3_Say(0, T_SIN3N006);
+        goto L150B;
+    }
+L150B:;
+    if (rv_mould == 3) {
+        sins3_Say(0, T_SIN3N014);
+        goto L1557;
+    }
+L1557:;
+    if (rv_mould == 4) {
+        sins3_Say(0, T_SIN3N010);
+        goto L15B2;
+    }
+L15B2:;
+    return;
+}
+
+/* [MSG_LOOK 00 00 00] */
+static void sins3_LookAtKirk(void)
+{
+    sins3_Say(0, T_SIN3N003);
+    return;
+}
+
+/* [MSG_LOOK 01 00 00] */
+static void sins3_LookAtSpock(void)
+{
+    sins3_Say(0, T_SIN3N004);
+    return;
+}
+
+/* [MSG_LOOK 02 00 00] */
+static void sins3_LookAtMcCoy(void)
+{
+    sins3_Say(N_Dr_McCoy, T_SIN3N001);
+    return;
+}
+
+/* [MSG_LOOK 03 00 00] */
+static void sins3_LookAtRedshirt(void)
+{
+    sins3_Say(0, T_SIN3N002);
+    return;
+}
+
+/* [MSG_TALK 00 00 00] */
+static void sins3_TalkToKirk(void)
+{
+    sins3_Say(N_Capt_Kirk, T_SIN3_002);
+    return;
+}
+
+/* [MSG_TALK 01 00 00] */
+static void sins3_TalkToSpock(void)
+{
+    sins3_Say(N_Mr_Spock, T_SIN3_020);
+    return;
+}
+
+/* [MSG_TALK 02 00 00] */
+static void sins3_TalkToMcCoy(void)
+{
+    sins3_Say(N_Dr_McCoy, T_SIN3_011);
+    return;
+}
+
+/* [MSG_TALK 03 00 00] */
+static void sins3_TalkToRedshirt(void)
+{
+    sins3_Say(N_Ensign_Mosher, T_SIN3_026);
+    sins3_Say(N_Dr_McCoy, T_SIN3_014);
+    sins3_Say(N_Ensign_Mosher, T_SIN3_027);
+    return;
+}
+
+/* [MSG_USE 44 23 00] */
+static void sins3_SpockScansOre2(void)
+{
+    svc_Anim(1, N_sscans, -1, -1, 0);
+    svc_BridgeSfx(4);
+    sins3_Say(N_Mr_Spock, T_SIN3_022);
+    return;
+}
+
+/* [MSG_USE 47 FF 00] */
+static void sins3_UseCommunicator(void)
+{
+    sins3_Say(N_Lt_Uhura, T_SIN3U072);
+    return;
+}
+
+/* The crew on the drill.
+ * [MSG_USE 01 20 00] */
+static void sins3_SpockOnDrill(void)
+{
+    sins3_Say(N_Mr_Spock, T_SIN3_004);
+    return;
+}
+
+/* [MSG_USE 02 20 00] */
+static void sins3_McCoyOnDrill(void)
+{
+    sins3_Say(N_Dr_McCoy, T_SIN3_009);
+    return;
+}
+
+/* [MSG_USE 03 20 00] */
+static void sins3_MosherOnDrill(void)
+{
+    sins3_Say(N_Ensign_Mosher, T_SIN3_025);
+    return;
+}
+
+/* The way back (room 4).
+ * [MSG_WALK 24 00 00] */
+static void sins3_WalkOut(void)
+{
+    svc_Walk(0, 0x2B, 0x86, 0);
+    return;
+}
+
+/* [MSG_USE 7F 00 00] */
+static void sins3_E_1B4A(void)
+{
+    { sins3_MedkitOnSpock(); return; }
+}
+
+/* [MSG_USE 7F 01 00] */
+static void sins3_MedkitOnSpock(void)
+{
+    { sins3_MedkitOnMcCoy(); return; }
+}
+
+/* [MSG_USE 7F 02 00] */
+static void sins3_MedkitOnMcCoy(void)
+{
+    { sins3_MedkitOnRedshirt(); return; }
+}
+
+/* [MSG_USE 7F 03 00] */
+static void sins3_MedkitOnRedshirt(void)
+{
+    sins3_Say(N_Dr_McCoy, T_SIN3_010);
+    return;
+}
+
+/* [MSG_USE 45 00 00] */
+static void sins3_E_1BAE(void)
+{
+    { sins3_McCoyScansRedshirt(); return; }
+}
+
+/* [MSG_USE 45 01 00] */
+static void sins3_E_1BB6(void)
+{
+    { sins3_McCoyScansRedshirt(); return; }
+}
+
+/* [MSG_USE 45 02 00] */
+static void sins3_E_1BBE(void)
+{
+    { sins3_McCoyScansRedshirt(); return; }
+}
+
+/* [MSG_USE 45 03 00] */
+static void sins3_McCoyScansRedshirt(void)
+{
+    svc_Anim(2, N_mscans, -1, -1, 0);
+    svc_BridgeSfx(4);
+    sins3_Say(N_Dr_McCoy, T_SIN3_008);
+    return;
+}
+
+/* the scripts, by the offset of their code in the room file */
+const RoomScript sins3_scripts[] = {
+    { 0x023A, sins3_StartRoom },    /* MSG_TICK 01 00 00 */
+    { 0x032D, sins3_SpockScansBox },    /* MSG_USE 44 22 00 */
+    { 0x03BA, sins3_E_03BA },    /* MSG_USE 44 25 00 */
+    { 0x03C2, sins3_SpockScansDisplays },    /* MSG_USE 44 26 00 */
+    { 0x045A, sins3_SpockScans },    /* MSG_USE 44 FF 00 */
+    { 0x0509, sins3_SpockScansDrill },    /* MSG_USE 44 20 00 */
+    { 0x05AF, sins3_SpockScansControls },    /* MSG_USE 44 21 00 */
+    { 0x070D, sins3_LookAtDrill },    /* MSG_LOOK 20 00 00 */
+    { 0x074E, sins3_LookAtControls },    /* MSG_LOOK 21 00 00 */
+    { 0x0794, sins3_E_0794 },    /* MSG_LOOK 25 00 00 */
+    { 0x079C, sins3_LookAtDisplays },    /* MSG_LOOK 26 00 00 */
+    { 0x07EB, sins3_LookAtScene },    /* MSG_LOOK FF 00 00 */
+    { 0x0855, sins3_SpockScansOre },    /* MSG_USE 44 23 00 */
+    { 0x08DC, sins3_E_08DC },    /* MSG_LOOK 0B 00 00 */
+    { 0x08E4, sins3_LookAtBox },    /* MSG_LOOK 22 00 00 */
+    { 0x09AB, sins3_KirkOpensBox },    /* MSG_USE 00 22 00 */
+    { 0x09DC, sins3_KirkAtBox },    /* MSG_WALK_DONE 04 00 00 */
+    { 0x0A2E, sins3_Timer0Sound },    /* MSG_TIMER 00 00 00 */
+    { 0x0A45, sins3_SpockOpensBox },    /* MSG_USE 01 22 00 */
+    { 0x0A76, sins3_SpockAtBox },    /* MSG_WALK_DONE 05 00 00 */
+    { 0x0AC4, sins3_McCoyOpensBox },    /* MSG_USE 02 22 00 */
+    { 0x0AF5, sins3_McCoyAtBox },    /* MSG_WALK_DONE 06 00 00 */
+    { 0x0B43, sins3_MosherOpensBox },    /* MSG_USE 03 22 00 */
+    { 0x0B74, sins3_MosherAtBox },    /* MSG_WALK_DONE 07 00 00 */
+    { 0x0BC2, sins3_BoxOpen },    /* MSG_ANIM_DONE 08 00 00 */
+    { 0x0BEC, sins3_E_0BEC },    /* MSG_GET 0B 00 00 */
+    { 0x0BF4, sins3_GetConnector },    /* MSG_GET 22 00 00 */
+    { 0x0C34, sins3_KirkAtBox2 },    /* MSG_WALK_DONE 03 00 00 */
+    { 0x0C65, sins3_TookConnector },    /* MSG_ANIM_DONE 11 00 00 */
+    { 0x0C98, sins3_FirstLook },    /* MSG_TICK 1E 00 00 */
+    { 0x0D6D, sins3_SpockHasIdea },    /* MSG_TICK 3C 00 00 */
+    { 0x0D8C, sins3_KirkOnControls },    /* MSG_USE 00 21 00 */
+    { 0x0DE9, sins3_SpockOnControls },    /* MSG_USE 01 21 00 */
+    { 0x0E0C, sins3_SpockAtControls },    /* MSG_WALK_DONE 0A 00 00 */
+    { 0x10D5, sins3_E_10D5 },    /* MSG_USE 74 08 00 */
+    { 0x10DD, sins3_RocksInMould },    /* MSG_USE 74 23 00 */
+    { 0x1117, sins3_KirkAtMould },    /* MSG_WALK_DONE 01 00 00 */
+    { 0x113C, sins3_RocksPlaced },    /* MSG_ANIM_DONE 12 00 00 */
+    { 0x118D, sins3_DrillFires },    /* MSG_WALK_DONE 02 00 00 */
+    { 0x12AB, sins3_DrillDone },    /* MSG_ANIM_DONE 0B 00 00 */
+    { 0x12C2, sins3_HoleCut },    /* MSG_ANIM_DONE 0C 00 00 */
+    { 0x12E7, sins3_MouldCut },    /* MSG_ANIM_DONE 0D 00 00 */
+    { 0x130C, sins3_CardMade },    /* MSG_ANIM_DONE 0E 00 00 */
+    { 0x1331, sins3_RockVaporized },    /* MSG_ANIM_DONE 13 00 00 */
+    { 0x1393, sins3_UseDrillNever },    /* MSG_USE 20 FF 00 */
+    { 0x1411, sins3_GetCard },    /* MSG_GET 08 00 00 */
+    { 0x1443, sins3_KirkAtCard },    /* MSG_WALK_DONE 0F 00 00 */
+    { 0x1468, sins3_TookCard },    /* MSG_ANIM_DONE 10 00 00 */
+    { 0x14AA, sins3_LookAtMould },    /* MSG_LOOK 08 00 00 */
+    { 0x15B9, sins3_LookAtKirk },    /* MSG_LOOK 00 00 00 */
+    { 0x1608, sins3_LookAtSpock },    /* MSG_LOOK 01 00 00 */
+    { 0x1670, sins3_LookAtMcCoy },    /* MSG_LOOK 02 00 00 */
+    { 0x16C1, sins3_LookAtRedshirt },    /* MSG_LOOK 03 00 00 */
+    { 0x1743, sins3_TalkToKirk },    /* MSG_TALK 00 00 00 */
+    { 0x1782, sins3_TalkToSpock },    /* MSG_TALK 01 00 00 */
+    { 0x17F7, sins3_TalkToMcCoy },    /* MSG_TALK 02 00 00 */
+    { 0x1866, sins3_TalkToRedshirt },    /* MSG_TALK 03 00 00 */
+    { 0x1921, sins3_SpockScansOre2 },    /* MSG_USE 44 23 00 */
+    { 0x19C8, sins3_UseCommunicator },    /* MSG_USE 47 FF 00 */
+    { 0x1A08, sins3_SpockOnDrill },    /* MSG_USE 01 20 00 */
+    { 0x1A66, sins3_McCoyOnDrill },    /* MSG_USE 02 20 00 */
+    { 0x1ADA, sins3_MosherOnDrill },    /* MSG_USE 03 20 00 */
+    { 0x1B27, sins3_WalkOut },    /* MSG_WALK 24 00 00 */
+    { 0x1B4A, sins3_E_1B4A },    /* MSG_USE 7F 00 00 */
+    { 0x1B52, sins3_MedkitOnSpock },    /* MSG_USE 7F 01 00 */
+    { 0x1B5A, sins3_MedkitOnMcCoy },    /* MSG_USE 7F 02 00 */
+    { 0x1B62, sins3_MedkitOnRedshirt },    /* MSG_USE 7F 03 00 */
+    { 0x1BAE, sins3_E_1BAE },    /* MSG_USE 45 00 00 */
+    { 0x1BB6, sins3_E_1BB6 },    /* MSG_USE 45 01 00 */
+    { 0x1BBE, sins3_E_1BBE },    /* MSG_USE 45 02 00 */
+    { 0x1BC6, sins3_McCoyScansRedshirt },    /* MSG_USE 45 03 00 */
+    { 0, 0 }
+};

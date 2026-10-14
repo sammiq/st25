@@ -19,6 +19,7 @@
 void plat_set_data_dir(const char *dir);
 void plat_audio_init(void);
 void plat_audio_quit(void);
+void audio_poll(void);
 
 /* ---- state ---- */
 
@@ -235,6 +236,7 @@ int plat_key_wait(void)
 /* ---- mouse ---- */
 
 static int mouse_x = 160, mouse_y = 100, mouse_buttons;
+static int pad_buttons;
 static int have_mouse;
 
 int plat_mouse_init(void)
@@ -248,42 +250,132 @@ void plat_mouse_read(int *x, int *y, int *buttons)
     plat_pump();
     *x = mouse_x;
     *y = mouse_y;
-    *buttons = mouse_buttons;
+    *buttons = mouse_buttons | pad_buttons;
 }
 
-/* Window position -> 320x200 */
-static void set_mouse_from_window(int wx, int wy)
+/* Event position -> 320x200.  With a logical render size SDL has already
+ * mapped mouse events from the window to logical (320 x lh) units. */
+static void set_mouse_from_window(int lx, int ly)
 {
-    int w, h;
-    float sx, sy;
-    int x, y;
+    int x = lx;
+    int y = ly * VGA_H / (opt_square_pixels ? VGA_H : 240);
 
-    SDL_GetWindowSize(window, &w, &h);
-    SDL_RenderWindowToLogical(renderer, wx, wy, &sx, &sy);
-    x = (int)sx;
-    y = (int)(sy * VGA_H / (opt_square_pixels ? VGA_H : 240));
     mouse_x = x < 0 ? 0 : x > VGA_W - 1 ? VGA_W - 1 : x;
     mouse_y = y < 0 ? 0 : y > VGA_H - 1 ? VGA_H - 1 : y;
 }
 
+/* The motion event a warp makes comes back rounded (the screen is stretched
+ * by 1.2 vertically); taking it as real input would walk the pointer. */
+static int warp_pending, warp_x, warp_y;
+
 void plat_mouse_set(int x, int y)
 {
-    int lw = VGA_W, lh = opt_square_pixels ? VGA_H : 240;
+    int lh = opt_square_pixels ? VGA_H : 240;
     int wx, wy;
 
+    if (x == mouse_x && y == mouse_y)
+        return;                         /* the game only handed back what it read */
     mouse_x = x;
     mouse_y = y;
     if (!window || !(SDL_GetWindowFlags(window) & SDL_WINDOW_MOUSE_FOCUS))
         return;
-    /* logical -> window coordinates */
-    SDL_RenderLogicalToWindow(renderer, (float)x, (float)y * lh / VGA_H, &wx, &wy);
-    (void)lw;
+    /* logical -> window coordinates, to the middle of the game pixel */
+    SDL_RenderLogicalToWindow(renderer, (float)x + 0.5f, ((float)y + 0.5f) * lh / VGA_H, &wx, &wy);
+    warp_pending = 1;
+    warp_x = x;
+    warp_y = y;
     SDL_WarpMouseInWindow(window, wx, wy);
+}
+
+/* ---- game controller / joystick: drives the pointer like a mouse ---- */
+
+static SDL_Joystick *joy;
+static SDL_GameController *pad;
+static float pad_fx, pad_fy;
+static uint32_t pad_last;
+
+static int pad_axis(int v)
+{
+    const int dead = 8000;
+    float f;
+
+    if (v > -dead && v < dead)
+        return 0;
+    f = (float)(v < 0 ? -v - dead : v - dead) / (32768 - dead);
+    f = f * f * 220.0f + 20.0f;         /* pixels per second */
+    return (int)(v < 0 ? -f : f);
+}
+
+static void pad_open(void)
+{
+    int i, n = SDL_NumJoysticks();
+
+    for (i = 0; i < n && !pad; i++)
+        if (SDL_IsGameController(i))
+            pad = SDL_GameControllerOpen(i);
+    /* other joysticks; keyboards and the like show up too, so want two axes */
+    for (i = 0; i < n && !pad && !joy; i++) {
+        SDL_Joystick *j = SDL_JoystickOpen(i);
+
+        if (j && SDL_JoystickNumAxes(j) >= 2)
+            joy = j;
+        else if (j)
+            SDL_JoystickClose(j);
+    }
+}
+
+static void pad_update(uint32_t now)
+{
+    int ax = 0, ay = 0, b = 0;
+    int dt = (int)(now - pad_last);
+
+    pad_last = now;
+    if (dt > 100)
+        dt = 100;
+    if (pad) {
+        ax = pad_axis(SDL_GameControllerGetAxis(pad, SDL_CONTROLLER_AXIS_LEFTX));
+        ay = pad_axis(SDL_GameControllerGetAxis(pad, SDL_CONTROLLER_AXIS_LEFTY));
+        if (SDL_GameControllerGetButton(pad, SDL_CONTROLLER_BUTTON_DPAD_LEFT))
+            ax = -150;
+        if (SDL_GameControllerGetButton(pad, SDL_CONTROLLER_BUTTON_DPAD_RIGHT))
+            ax = 150;
+        if (SDL_GameControllerGetButton(pad, SDL_CONTROLLER_BUTTON_DPAD_UP))
+            ay = -150;
+        if (SDL_GameControllerGetButton(pad, SDL_CONTROLLER_BUTTON_DPAD_DOWN))
+            ay = 150;
+        b = (SDL_GameControllerGetButton(pad, SDL_CONTROLLER_BUTTON_A) ? 1 : 0)
+          | (SDL_GameControllerGetButton(pad, SDL_CONTROLLER_BUTTON_B) ? 2 : 0);
+    } else if (joy) {
+        int hat = SDL_JoystickNumHats(joy) ? SDL_JoystickGetHat(joy, 0) : 0;
+
+        ax = pad_axis(SDL_JoystickGetAxis(joy, 0));
+        ay = pad_axis(SDL_JoystickGetAxis(joy, 1));
+        if (hat & SDL_HAT_LEFT)
+            ax = -150;
+        if (hat & SDL_HAT_RIGHT)
+            ax = 150;
+        if (hat & SDL_HAT_UP)
+            ay = -150;
+        if (hat & SDL_HAT_DOWN)
+            ay = 150;
+        b = (SDL_JoystickGetButton(joy, 0) ? 1 : 0) | (SDL_JoystickGetButton(joy, 1) ? 2 : 0);
+    } else
+        return;
+    pad_buttons = b;
+    if (ax || ay) {
+        pad_fx += ax * dt / 1000.0f;
+        pad_fy += ay * dt / 1000.0f;
+        mouse_x += (int)pad_fx;
+        mouse_y += (int)pad_fy;
+        pad_fx -= (int)pad_fx;
+        pad_fy -= (int)pad_fy;
+        mouse_x = mouse_x < 0 ? 0 : mouse_x > VGA_W - 1 ? VGA_W - 1 : mouse_x;
+        mouse_y = mouse_y < 0 ? 0 : mouse_y > VGA_H - 1 ? VGA_H - 1 : mouse_y;
+    }
 }
 
 /* ---- joystick ---- */
 
-static SDL_Joystick *joy;
 
 int plat_joy_present(void)
 {
@@ -478,9 +570,19 @@ void plat_pump(void)
             }
             handle_key(&e.key);
             break;
-        case SDL_MOUSEMOTION:
+        case SDL_MOUSEMOTION: {
+            int ox = mouse_x, oy = mouse_y;
+
             set_mouse_from_window(e.motion.x, e.motion.y);
+            if (warp_pending) {
+                warp_pending = 0;
+                if (abs(mouse_x - warp_x) <= 1 && abs(mouse_y - warp_y) <= 1) {
+                    mouse_x = ox;
+                    mouse_y = oy;
+                }
+            }
             break;
+        }
         case SDL_MOUSEBUTTONDOWN:
         case SDL_MOUSEBUTTONUP: {
             int bit = e.button.button == SDL_BUTTON_LEFT ? 1 : e.button.button == SDL_BUTTON_RIGHT ? 2 : 0;
@@ -496,7 +598,9 @@ void plat_pump(void)
             break;
         }
     }
+    pad_update(now);
     run_script(now);
+    audio_poll();
     if (shot_file && nshots) {
         if (shot_next < nshots && now - start_ms >= shot_list[shot_next]) {
             char name[1100];
@@ -559,7 +663,7 @@ int plat_init(int argc, char **argv)
         }
     }
 
-    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_JOYSTICK | SDL_INIT_AUDIO) != 0) {
+    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_JOYSTICK | SDL_INIT_GAMECONTROLLER | SDL_INIT_AUDIO) != 0) {
         fprintf(stderr, "SDL_Init: %s\n", SDL_GetError());
         exit(1);
     }
@@ -580,8 +684,8 @@ int plat_init(int argc, char **argv)
     SDL_RenderSetLogicalSize(renderer, VGA_W, lh);
     texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, VGA_W, VGA_H);
     SDL_ShowCursor(SDL_DISABLE);
-    if (SDL_NumJoysticks() > 0)
-        joy = SDL_JoystickOpen(0);
+    SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1");
+    pad_open();
     start_ms = SDL_GetTicks();
     plat_audio_init();
     return out;
@@ -590,6 +694,9 @@ int plat_init(int argc, char **argv)
 void plat_quit(void)
 {
     plat_audio_quit();
+    if (pad)
+        SDL_GameControllerClose(pad);
+    pad = NULL;
     if (joy)
         SDL_JoystickClose(joy);
     joy = NULL;

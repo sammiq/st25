@@ -1,0 +1,2055 @@
+/* LOVE1.RDF: the room's scripts, translated from the machine code in the room file
+ * (src/rdf/love1.asm) by tools/rdf2c.py.  They run on the loaded file (CS_B/CS_W) and the
+ * room state (`room`), and call the game through the svc_ macros of rooms.h.
+ *
+ * LOVE1.RDF - "Love's Labor Jeopardized", the station's research lab.
+ * McCoy grows the cure here: a dish of Oroborus culture from the freezer
+ * in the replicator's chamber, ammonia on its anti-agent nozzle, and the
+ * replicator makes a cure sample (to be synthesized in room 2). The
+ * distillator turns insulation into polyberylcarbonate. A ladder leads
+ * down to the Romulan-held deck (room 4).
+ *
+ * Actors: 8-10 (0Ah) the doors, 11 (0Bh) the freezer, 12 (0Ch) the
+ * chamber, 13 (0Dh) the hatch, 14 (0Eh) the dish, 15 (0Fh) the bottle.
+ * Objects: 8, 9, 0Ah the doors, 0Bh/22h the freezer, 0Ch/0Eh the chamber,
+ * 0Fh/24h the nozzle, 20h the ladder, 21h the distillator, 23h the
+ * replicator, 25h the neutrino accelerator.
+ * Regions 0 the ladder, 1-3 the doorsteps.
+ *
+ * Labels: H_ script headers, L branch targets, C_ conversations,
+ * T_/N_/S_ strings; talk_buf: the conversation buffer of Say.
+ *
+ * Quirks of the original:
+ * - The communicator's four cases (CallEnterprise) all play the same
+ * placeholder lines, recorded for other missions.
+ */
+
+#include "rooms.h"
+
+/* where the file keeps its strings, conversations and tables */
+enum {
+    N_s3r2d1 = 0x00E1,
+    N_s3r2d1a = 0x00E8,
+    N_s3r2d2 = 0x00F0,
+    N_s3r2d2a = 0x00F7,
+    N_s3r2d3 = 0x00FF,
+    N_s3r2d3a = 0x0106,
+    N_s3r2d4 = 0x010E,
+    N_s3r2d4o = 0x0115,
+    N_s3r2d4a = 0x011D,
+    N_s3r2d5 = 0x0125,
+    N_s3r2d5o = 0x012C,
+    N_s3r2d5c = 0x0134,
+    N_s3r2d6 = 0x013C,
+    N_s3r2s1 = 0x0143,
+    N_s3r2s2 = 0x014A,
+    N_kkillw = 0x0151,
+    N_skillw = 0x0158,
+    N_mkillw = 0x015F,
+    N_rkillw = 0x0166,
+    N_dishes = 0x016D,
+    N_btle1 = 0x0174,
+    N_btle2 = 0x017A,
+    N_btle3 = 0x0180,
+    N_btle4 = 0x0186,
+    N_kusemn = 0x018C,
+    N_musehn = 0x019A,
+    N_kusemw = 0x01A8,
+    N_kuseme = 0x01C4,
+    N_kusehw = 0x01CB,
+    N_susehw = 0x01D2,
+    N_musehw = 0x01D9,
+    N_rusehw = 0x01E0,
+    N_sscans = 0x01E7,
+    N_sscann = 0x01EE,
+    N_sscane = 0x01F5,
+    N_sscanw = 0x01FC,
+    N_mscans = 0x0203,
+    N_mscanw = 0x020A,
+    N_LOV1LOOP = 0x0219,
+    T_LOV1N019 = 0x0577,
+    T_LOV1N022 = 0x05DA,
+    T_LOV1N021 = 0x0628,
+    T_LOV1N020 = 0x0696,
+    T_LOV1N017 = 0x06F6,
+    T_LOV1N016 = 0x077A,
+    T_LOV1N014 = 0x07F6,
+    T_LOV1N013 = 0x0841,
+    T_LOV1N015 = 0x08BF,
+    T_LOV1N023 = 0x0959,
+    T_LOV1N018 = 0x09AE,
+    T_LOV1N012 = 0x09F3,
+    T_LOV1_001 = 0x0A6C,
+    T_LOV1_005 = 0x0AFC,
+    T_LOV1_011 = 0x0B7C,
+    T_LOV1_027 = 0x0C01,
+    T_LOV1_017 = 0x0CAE,
+    T_LOV1_010 = 0x0D3D,
+    T_LOV1_009 = 0x0DB3,
+    T_LOV1_003 = 0x0EDC,
+    T_LOV1_004 = 0x0F3D,
+    T_LOV1N010 = 0x0FFD,
+    T_LOV1N035 = 0x10D9,
+    T_LOV1N009 = 0x1164,
+    T_LOV1N011 = 0x11C4,
+    S_1238 = 0x1238,
+    T_LOV1N007 = 0x1270,
+    T_LOV1_012 = 0x137F,
+    T_LOV1_002 = 0x13CA,
+    T_LOV1_026 = 0x1438,
+    T_LOV1_015 = 0x14D2,
+    T_LOV1_013 = 0x15DE,
+    T_LOV1_014 = 0x164D,
+    N_LD1PROCE = 0x172C,
+    T_LOV1N034 = 0x1756,
+    T_LOV1N008 = 0x194F,
+    T_LOV1_016 = 0x19DA,
+    T_LOV1_008 = 0x1A76,
+    N_Animation_Error = 0x1BD9,
+    T_LOV1_024 = 0x1C12,
+    T_LOV1_025 = 0x1C50,
+    T_LOV1_028 = 0x1CB9,
+    N_musemn = 0x1D1B,
+    N_sgetdn = 0x1D22,
+    N_get_name_error = 0x1D81,
+    T_LOV5_019 = 0x1FF2,
+    T_LOV5_015 = 0x2040,
+    T_LOVA_F55 = 0x2083,
+    T_LOV5_015_2 = 0x20F3,
+    T_LOV5_030 = 0x2193,
+    T_LOV5_038 = 0x21C6,
+    T_LOV5_027 = 0x21F3,
+    S_2228 = 0x2228,
+    T_spokcoff = 0x226B,
+    T_LOVA_F08 = 0x22A2,
+    T_spokcoff_2 = 0x2308,
+    T_LOVA_F54 = 0x233E,
+    T_GENER004 = 0x23D3,
+    T_LOVA_F01 = 0x241A,
+    T_LOVA_F02 = 0x2462,
+    T_LOVA_F04 = 0x24D4,
+    T_LOVA_F03 = 0x2529,
+    T_LOVA_F08_2 = 0x256D,
+    T_TUG2_010 = 0x25CE,
+    T_LOVA_F10 = 0x2614,
+    T_LOVA_100 = 0x2648,
+    T_LOVA_F07 = 0x2695,
+    T_LOV2N005 = 0x26D0,
+    T_LOV2N005_2 = 0x2720,
+    T_MUD2_040 = 0x2759,
+    T_LOV2N005_3 = 0x27B2,
+    N_Lt_Uhura = 0x27FD,
+    T_MUD4_018 = 0x282A,
+    T_BRIDU146 = 0x286F,
+    T_VENA_F41 = 0x28A5,
+    T_MUD4_018_2 = 0x28CE,
+    T_BRIDU146_2 = 0x2913,
+    T_VENA_F41_2 = 0x2949,
+    T_MUD4_018_3 = 0x2977,
+    T_BRIDU146_3 = 0x29BC,
+    T_VENA_F41_3 = 0x29F2,
+    T_MUD4_018_4 = 0x2A1B,
+    T_BRIDU146_4 = 0x2A60,
+    T_VENA_F41_4 = 0x2A96,
+    N_Capt_Kirk = 0x2C10,
+    N_Dr_McCoy = 0x2C1B,
+    N_Mr_Spock = 0x2C25,
+    N_Lt_Ferris = 0x2C2F,
+    N_wes = 0x2C3A,
+    S_2C3E = 0x2C3E,
+    talk_buf = 0x2C3F,
+    T_LOV1N006 = 0x2C75,
+    T_LOV1_018 = 0x2CA9,
+    T_LOV1_019 = 0x2D28,
+    T_LOV1_021 = 0x2D64,
+    T_LOV1N000 = 0x2DA4,
+    T_LOV1N003 = 0x2DF6,
+    T_LOV1N004 = 0x2E1A,
+    T_LOV1N001 = 0x2E58,
+    T_LOV1N002 = 0x2E96,
+    T_LOV1_007 = 0x2EDE,
+    T_LOV1_023 = 0x2F70,
+    T_LOV1_006 = 0x2FCC,
+    T_LOV1_022 = 0x3028,
+    T_LOV0_011 = 0x306D,
+    T_LOV0_020 = 0x308F,
+    T_LOV0_016 = 0x30CB,
+    T_LOV0_012 = 0x30EC,
+    T_LOV0_014 = 0x3128,
+    T_LOV0_022 = 0x3158,
+    T_LOV0_015 = 0x3190,
+    T_LOV0_021 = 0x31C6,
+    T_LOV0_013 = 0x3214,
+    T_LOV0_019 = 0x324A,
+    T_LOV0_017 = 0x329A,
+    T_LOV0_039 = 0x32D7,
+    T_LOV0_048 = 0x32F9,
+    T_LOV0_045 = 0x3335,
+    T_LOV0_040 = 0x3356,
+    T_LOV0_042 = 0x3392,
+    T_LOV0_050 = 0x33C2,
+    T_LOV0_043 = 0x33FA,
+    T_LOV0_049 = 0x3430,
+    T_LOV0_041 = 0x347E,
+    T_LOV0_047 = 0x34B4,
+    T_LOV0_046 = 0x3504,
+    T_LOV0_029 = 0x3541,
+    T_LOV0_033 = 0x357D,
+    T_LOV0_026 = 0x35B9,
+    T_LOV0_124 = 0x3606,
+    T_LOV0_025 = 0x3638,
+    T_LOV0_101 = 0x3689,
+    T_LOV0_102 = 0x36C9,
+    T_LOV0_103 = 0x370F,
+    T_LOV0_104 = 0x3741,
+    T_LOV0_105 = 0x377A,
+    T_LOV0_106 = 0x37EA,
+    T_LOV0_107 = 0x382E,
+};
+
+/* the room's variables: in the room state, and in the file itself */
+#define fv_back_x CS_W(0xD1)
+#define fv_back_y CS_W(0xD3)
+#define fv_bridge_door_steps CS_B(0xCC)
+#define fv_crew CS_W(0xD9)
+#define fv_crew_anim CS_W(0xDB)
+#define fv_cure_steps CS_B(0x1D29)
+#define fv_cure_x CS_B(0x1D2A)
+#define fv_cure_y CS_B(0x1D2B)
+#define fv_door2_steps CS_B(0xCD)
+#define fv_going_door CS_B(0xCE)
+#define fv_nozzle_anim CS_W(0xDF)
+#define fv_nozzle_item CS_W(0xDD)
+#define fv_safety_door_steps CS_B(0xCB)
+#define fv_talk_buf CS_W(0x2C3F)
+#define fv_unused1 CS_W(0xD5)
+#define fv_unused2 CS_W(0xD7)
+#define fv_victim CS_W(0xCF)
+#define fv_warned CS_B(0xCA)
+#define rv_called_ship ROOM_B(0x47)
+#define rv_called_ship_cured ROOM_B(0x48)
+#define rv_dish_in_chamber ROOM_B(0x30)
+#define rv_distilled ROOM_B(0x4B)
+#define rv_freezer_open ROOM_B(0x2F)
+#define rv_have_research ROOM_B(0x2A)
+#define rv_made_cure ROOM_B(0x4F)
+#define rv_made_sample ROOM_B(0x2E)
+#define rv_n2o_released ROOM_B(0x2C)
+#define rv_nozzle ROOM_B(0x31)
+#define rv_rlg_released ROOM_B(0x2D)
+#define rv_romulans_out ROOM_B(0x2B)
+#define rv_score ROOM_W(0x52)
+#define rv_spock_cured ROOM_B(0x46)
+#define rv_virus ROOM_B(0x45)
+#define rv_virus_struck ROOM_B(0x41)
+
+/* functions */
+static void love1_StartRoom(void);
+static void love1_E_0386(void);
+static void love1_WalkToSafetyDoor(void);
+static void love1_ReachSafetyDoor(void);
+static void love1_E_03E8(void);
+static void love1_ThroughSafetyDoor(void);
+static void love1_E_0413(void);
+static void love1_WalkToBridgeDoor(void);
+static void love1_ReachBridgeDoor(void);
+static void love1_E_046F(void);
+static void love1_ThroughBridgeDoor(void);
+static void love1_E_049A(void);
+static void love1_WalkToDoor2(void);
+static void love1_ReachDoor2(void);
+static void love1_E_04F6(void);
+static void love1_ThroughDoor2(void);
+static void love1_LookAtAccelerator(void);
+static void love1_LookAtKirk(void);
+static void love1_LookAtSpock(void);
+static void love1_LookAtMcCoy(void);
+static void love1_LookAtRedshirt(void);
+static void love1_LookAtScene(void);
+static void love1_E_05C7(void);
+static void love1_LookAtNozzle(void);
+static void love1_LookAtLadder(void);
+static void love1_E_0683(void);
+static void love1_LookAtDoor(void);
+static void love1_LookAtSafetyDoor(void);
+static void love1_LookAtDistillator(void);
+static void love1_E_07DD(void);
+static void love1_LookAtChamber(void);
+static void love1_LookAtReplicator(void);
+static void love1_E_0940(void);
+static void love1_LookAtFreezer(void);
+static void love1_LookAtDishes(void);
+static void love1_TalkToKirk(void);
+static void love1_TalkToSpock(void);
+static void love1_TalkToMcCoy(void);
+static void love1_TalkToRedshirt(void);
+static void love1_McCoyScansDishes(void);
+static void love1_McCoyScans(void);
+static void love1_E_0E0D(void);
+static void love1_SpockScansChamber(void);
+static void love1_E_0E46(void);
+static void love1_SpockScansAccelerator(void);
+static void love1_SpockScansFreezer(void);
+static void love1_SpockScans(void);
+static void love1_SpockScansDishes(void);
+static void love1_SpockScansDistillator(void);
+static void love1_E_0FCA(void);
+static void love1_GetFromFreezer(void);
+static void love1_KirkAtFreezer(void);
+static void love1_TookDishes(void);
+static void love1_E_106C(void);
+static void love1_GetFromChamber2(void);
+static void love1_GetFromChamber(void);
+static void love1_KirkAtChamber(void);
+static void love1_TookFromChamber(void);
+static void love1_E_1190(void);
+static void love1_GetBottle(void);
+static void love1_KirkAtNozzle(void);
+static void love1_TookBottle(void);
+static void love1_N2OOnNozzle(void);
+static void love1_H2OOnNozzle(void);
+static void love1_NH3OnNozzle(void);
+static void love1_RLGOnNozzle(void);
+static void love1_part_130F(void);
+static void love1_KirkAtNozzle2(void);
+static void love1_BottleFitted(void);
+static void love1_UseNozzle(void);
+static void love1_SpockUsesReplicator(void);
+static void love1_FerrisUsesReplicator(void);
+static void love1_E_1484(void);
+static void love1_McCoyUsesChamber(void);
+static void love1_McCoyUsesReplicator(void);
+static void love1_McCoyAtReplicator(void);
+static void love1_Replicated(void);
+static void love1_part_1565(void);
+static void love1_ChamberOpens(void);
+static void love1_CureSampleMade(void);
+static void love1_UseChamber(void);
+static void love1_E_1619(void);
+static void love1_DishesInReplicator(void);
+static void love1_KirkAtReplicator(void);
+static void love1_ChamberOpen(void);
+static void love1_DishesIn(void);
+static void love1_DistillInsulation(void);
+static void love1_KirkAtDistillator(void);
+static void love1_Distilled(void);
+static void love1_E_17C7(void);
+static void love1_KirkOpensFreezer(void);
+static void love1_E_17F6(void);
+static void love1_FerrisOpensFreezer(void);
+static void love1_E_1824(void);
+static void love1_SpockOpensFreezer(void);
+static void love1_E_1852(void);
+static void love1_McCoyOpensFreezer(void);
+static void love1_part_1878(uint16_t s0);
+static void love1_AtFreezer(void);
+static void love1_FreezerToggled(void);
+static void love1_UseFreezer(void);
+static void love1_KirkAtFreezer2(void);
+static void love1_FreezerColder(void);
+static void love1_UseReplicator(void);
+static void love1_KirkAtReplicator2(void);
+static void love1_NotAMicrowave(void);
+static void love1_UseDistillator(void);
+static void love1_KirkAtDistillator2(void);
+static void love1_NotACanOpener(void);
+static void love1_KirkClimbsDown(void);
+static void love1_SpockClimbsDown(void);
+static void love1_McCoyClimbsDown(void);
+static void love1_FerrisClimbsDown(void);
+static void love1_part_1B06(void);
+static void love1_AtLadder(void);
+static void love1_ShotOnLadder(void);
+static void love1_NearLadder(void);
+static void love1_CrewLaugh(void);
+static void love1_SpockLaughs(void);
+static void love1_MedkitOnSpock(void);
+static void love1_SampleOnSpock(uint16_t ax);
+static void love1_CureSpock(uint16_t ax);
+static void love1_part_211C(uint16_t ax);
+static void love1_AtSpock(void);
+static void love1_SpockCured(void);
+static void love1_VirusProgresses(void);
+static void love1_McCoyScansSpock(void);
+static void love1_E_266E(void);
+static void love1_McCoyScansMcCoy(void);
+static void love1_McCoyScansCrew(void);
+static void love1_ReleaseRLG(void);
+static void love1_ReleaseN2O(void);
+static void love1_ReleaseNH3(void);
+static void love1_CallEnterprise(void);
+static void love1_Talk(uint16_t ax);
+static void love1_Say(uint16_t ax, uint16_t bx);
+
+/* The room starts: the freezer, the chamber, the bottle on the nozzle,
+ * the gases, the virus timer.
+ * [MSG_TICK 01 00 00] */
+static void love1_StartRoom(void)
+{
+    uint16_t ax = 0;
+    uint16_t s0;
+    uint16_t s1;
+    uint16_t s2;
+    uint16_t s3;
+    svc_Sfx(N_LOV1LOOP);
+    if (rv_freezer_open == 1) {
+        svc_Anim0(0xB, N_s3r2d4o, 0x67, 0x8D, 0);
+    }
+    s0 = 0;
+    s1 = 0x75;
+    s2 = 0xB4;
+    s3 = N_s3r2d5c;
+    if (rv_dish_in_chamber != 0) {
+        s3 = N_s3r2d5o;
+    }
+    svc_Anim0(0xC, s3, s2, s1, s0);
+    if (rv_dish_in_chamber == 1) {
+        svc_Anim0(0xE, N_dishes, 0xB4, 0x71, 0);
+    }
+    if (rv_nozzle != 0) {
+        if (rv_nozzle == 1) {
+            fv_nozzle_anim = N_btle1;
+            fv_nozzle_item = 0x65;
+        } else if (rv_nozzle == 2) {
+            fv_nozzle_anim = N_btle2;
+            fv_nozzle_item = 0x66;
+        } else if (rv_nozzle == 3) {
+            fv_nozzle_anim = N_btle3;
+            fv_nozzle_item = 0x67;
+        } else {
+            if (rv_nozzle != 4)
+                goto L0315;
+            fv_nozzle_anim = N_btle4;
+            fv_nozzle_item = 0x49;
+        }
+        svc_Anim0(0xF, fv_nozzle_anim, 0xA3, 0x72, 0);
+    }
+    if (rv_n2o_released == 1) {
+        ax = (uint16_t)svc_Random(0xC8, 0x190);
+        room.timers[0] = ax;
+    }
+L0315:;
+    if (rv_rlg_released == 1) {
+        ax = (uint16_t)svc_Random(0xC8, 0x190);
+        room.timers[1] = ax;
+    }
+    room.timers[2] = 0xC8;
+    svc_Anim0(0xA, N_s3r2d3a, 0xDB, 0x7E, 0);
+    svc_Anim0(8, N_s3r2d1a, 0, 0, 0);
+    svc_Anim0(9, N_s3r2d2a, 0, 0, 0);
+    fv_cure_x = 0x90;
+    fv_cure_y = 0xA7;
+    return;
+}
+
+/* The doors: walk (msgs 15-17), the door opens at its step (anim msgs
+ * 2-4), and when both are done, through: the safety door to room 3, the
+ * bridge (room 0), and room 2.
+ * [MSG_WALK 0A 00 00] */
+static void love1_E_0386(void)
+{
+    { love1_WalkToSafetyDoor(); return; }
+}
+
+/* [MSG_WALK 26 00 00] */
+static void love1_WalkToSafetyDoor(void)
+{
+    room.busy = 1;
+    fv_going_door = 1;
+    svc_Walk(0, 0xD9, 0x81, 0xF);
+    room.fall[0] = 0;
+    return;
+}
+
+/* [MSG_REGION 01 00 00] */
+static void love1_ReachSafetyDoor(void)
+{
+    if (fv_going_door == 1) {
+        svc_Anim0(0xA, N_s3r2d3, 0xDB, 0x7E, 2);
+        svc_BridgeSfx(5);
+    }
+    return;
+}
+
+/* [MSG_WALK_DONE 0F 00 00] */
+static void love1_E_03E8(void)
+{
+    { love1_ThroughSafetyDoor(); return; }
+}
+
+/* [MSG_ANIM_DONE 02 00 00] */
+static void love1_ThroughSafetyDoor(void)
+{
+    fv_safety_door_steps++;
+    if (fv_safety_door_steps != 2) {
+        return;
+    }
+    svc_GotoRoom(3, 1);
+    return;
+}
+
+/* [MSG_WALK 08 00 00] */
+static void love1_E_0413(void)
+{
+    { love1_WalkToBridgeDoor(); return; }
+}
+
+/* [MSG_WALK 27 00 00] */
+static void love1_WalkToBridgeDoor(void)
+{
+    room.busy = 1;
+    fv_going_door = 1;
+    svc_Walk(0, 0x42, 0x97, 0x10);
+    return;
+}
+
+/* [MSG_REGION 02 00 00] */
+static void love1_ReachBridgeDoor(void)
+{
+    if (fv_going_door == 1) {
+        svc_Anim0(8, N_s3r2d1, 0, 0, 3);
+        svc_BridgeSfx(5);
+    }
+    return;
+}
+
+/* [MSG_WALK_DONE 10 00 00] */
+static void love1_E_046F(void)
+{
+    { love1_ThroughBridgeDoor(); return; }
+}
+
+/* [MSG_ANIM_DONE 03 00 00] */
+static void love1_ThroughBridgeDoor(void)
+{
+    fv_bridge_door_steps++;
+    if (fv_bridge_door_steps != 2) {
+        return;
+    }
+    svc_GotoRoom(0, 2);
+    return;
+}
+
+/* [MSG_WALK 09 00 00] */
+static void love1_E_049A(void)
+{
+    { love1_WalkToDoor2(); return; }
+}
+
+/* [MSG_WALK 28 00 00] */
+static void love1_WalkToDoor2(void)
+{
+    room.busy = 1;
+    fv_going_door = 1;
+    svc_Walk(0, 0x79, 0x85, 0x11);
+    return;
+}
+
+/* [MSG_REGION 03 00 00] */
+static void love1_ReachDoor2(void)
+{
+    if (fv_going_door == 1) {
+        svc_Anim0(9, N_s3r2d2, 0, 0, 4);
+        svc_BridgeSfx(5);
+    }
+    return;
+}
+
+/* [MSG_WALK_DONE 11 00 00] */
+static void love1_E_04F6(void)
+{
+    { love1_ThroughDoor2(); return; }
+}
+
+/* [MSG_ANIM_DONE 04 00 00] */
+static void love1_ThroughDoor2(void)
+{
+    fv_door2_steps++;
+    if (fv_door2_steps != 2) {
+        return;
+    }
+    svc_GotoRoom(2, 0);
+    return;
+}
+
+/* Looking and talking.
+ * [MSG_LOOK 25 00 00] */
+static void love1_LookAtAccelerator(void)
+{
+    love1_Say(0, T_LOV1N000);
+    return;
+}
+
+/* [MSG_LOOK 00 00 00] */
+static void love1_LookAtKirk(void)
+{
+    love1_Say(0, T_LOV1N003);
+    return;
+}
+
+/* [MSG_LOOK 01 00 00] */
+static void love1_LookAtSpock(void)
+{
+    love1_Say(0, T_LOV1N004);
+    return;
+}
+
+/* [MSG_LOOK 02 00 00] */
+static void love1_LookAtMcCoy(void)
+{
+    love1_Say(0, T_LOV1N001);
+    return;
+}
+
+/* [MSG_LOOK 03 00 00] */
+static void love1_LookAtRedshirt(void)
+{
+    love1_Say(0, T_LOV1N002);
+    return;
+}
+
+/* [MSG_LOOK FF 00 00] */
+static void love1_LookAtScene(void)
+{
+    love1_Say(0, T_LOV1N019);
+    return;
+}
+
+/* [MSG_LOOK 0F 00 00] */
+static void love1_E_05C7(void)
+{
+    { love1_LookAtNozzle(); return; }
+}
+
+/* [MSG_LOOK 24 00 00] */
+static void love1_LookAtNozzle(void)
+{
+    love1_Say(0, T_LOV1N022);
+    return;
+}
+
+/* [MSG_LOOK 20 00 00] */
+static void love1_LookAtLadder(void)
+{
+    love1_Say(0, T_LOV1N021);
+    return;
+}
+
+/* [MSG_LOOK 09 00 00] */
+static void love1_E_0683(void)
+{
+    { love1_LookAtDoor(); return; }
+}
+
+/* [MSG_LOOK 08 00 00] */
+static void love1_LookAtDoor(void)
+{
+    love1_Say(0, T_LOV1N020);
+    return;
+}
+
+/* [MSG_LOOK 0A 00 00] */
+static void love1_LookAtSafetyDoor(void)
+{
+    love1_Say(0, T_LOV1N017);
+    return;
+}
+
+/* [MSG_LOOK 21 00 00] */
+static void love1_LookAtDistillator(void)
+{
+    love1_Say(0, T_LOV1N016);
+    return;
+}
+
+/* [MSG_LOOK 0E 00 00] */
+static void love1_E_07DD(void)
+{
+    { love1_LookAtChamber(); return; }
+}
+
+/* [MSG_LOOK 0C 00 00] */
+static void love1_LookAtChamber(void)
+{
+    if (rv_made_sample != 1) {
+        love1_Say(0, T_LOV1N014);
+        return;
+    }
+    love1_Say(0, T_LOV1N013);
+    return;
+}
+
+/* [MSG_LOOK 23 00 00] */
+static void love1_LookAtReplicator(void)
+{
+    love1_Say(0, T_LOV1N015);
+    return;
+}
+
+/* [MSG_LOOK 0B 00 00] */
+static void love1_E_0940(void)
+{
+    { love1_LookAtFreezer(); return; }
+}
+
+/* [MSG_LOOK 22 00 00] */
+static void love1_LookAtFreezer(void)
+{
+    if (rv_freezer_open == 1) {
+        love1_Say(0, T_LOV1N023);
+        return;
+    }
+    love1_Say(0, T_LOV1N018);
+    return;
+}
+
+/* [MSG_LOOK 4E 00 00] */
+static void love1_LookAtDishes(void)
+{
+    love1_Say(0, T_LOV1N012);
+    return;
+}
+
+/* [MSG_TALK 00 00 00] */
+static void love1_TalkToKirk(void)
+{
+    love1_Say(N_Capt_Kirk, T_LOV1_001);
+    return;
+}
+
+/* [MSG_TALK 01 00 00] */
+static void love1_TalkToSpock(void)
+{
+    love1_Say(N_Mr_Spock, T_LOV1_005);
+    return;
+}
+
+/* [MSG_TALK 02 00 00] */
+static void love1_TalkToMcCoy(void)
+{
+    love1_Say(N_Dr_McCoy, T_LOV1_011);
+    return;
+}
+
+/* [MSG_TALK 03 00 00] */
+static void love1_TalkToRedshirt(void)
+{
+    love1_Say(N_Lt_Ferris, T_LOV1_027);
+    return;
+}
+
+/* Tricorders.
+ * [MSG_USE 45 4E 00] */
+static void love1_McCoyScansDishes(void)
+{
+    svc_Anim(2, N_mscanw, -1, -1, 0);
+    svc_BridgeSfx(4);
+    love1_Say(N_Dr_McCoy, T_LOV1_017);
+    return;
+}
+
+/* [MSG_USE 45 FF 00] */
+static void love1_McCoyScans(void)
+{
+    svc_Anim(2, N_mscans, -1, -1, 0);
+    svc_BridgeSfx(4);
+    if (rv_have_research != 1) {
+        love1_Say(N_Dr_McCoy, T_LOV1_010);
+        return;
+    }
+    love1_Say(N_Dr_McCoy, T_LOV1_009);
+    return;
+}
+
+/* [MSG_USE 44 23 00] */
+static void love1_E_0E0D(void)
+{
+    { love1_SpockScansChamber(); return; }
+}
+
+/* [MSG_USE 44 0C 00] */
+static void love1_SpockScansChamber(void)
+{
+    svc_Anim(1, N_sscann, -1, -1, 0);
+    svc_BridgeSfx(4);
+    love1_Say(N_Mr_Spock, T_LOV1_022);
+    return;
+}
+
+/* [MSG_USE 01 25 00] */
+static void love1_E_0E46(void)
+{
+    { love1_SpockScansAccelerator(); return; }
+}
+
+/* [MSG_USE 44 25 00] */
+static void love1_SpockScansAccelerator(void)
+{
+    svc_Anim(1, N_sscane, -1, -1, 0);
+    svc_BridgeSfx(4);
+    love1_Say(N_Mr_Spock, T_LOV1_006);
+    return;
+}
+
+/* [MSG_USE 44 22 00] */
+static void love1_SpockScansFreezer(void)
+{
+    svc_Anim(1, N_sscanw, -1, -1, 0);
+    svc_BridgeSfx(4);
+    love1_Say(N_Mr_Spock, T_LOV1_023);
+    return;
+}
+
+/* [MSG_USE 44 FF 00] */
+static void love1_SpockScans(void)
+{
+    svc_Anim(1, N_sscans, -1, -1, 0);
+    svc_BridgeSfx(4);
+    love1_Say(N_Mr_Spock, T_LOV1_003);
+    return;
+}
+
+/* [MSG_USE 44 4E 00] */
+static void love1_SpockScansDishes(void)
+{
+    svc_Anim(1, N_sscanw, -1, -1, 0);
+    svc_BridgeSfx(4);
+    love1_Say(N_Mr_Spock, T_LOV1_004);
+    return;
+}
+
+/* [MSG_USE 44 21 00] */
+static void love1_SpockScansDistillator(void)
+{
+    svc_Anim(1, N_sscans, -1, -1, 0);
+    svc_BridgeSfx(4);
+    love1_Say(N_Mr_Spock, T_LOV1_007);
+    return;
+}
+
+/* The freezer, once open: Kirk takes a dish of virus culture (msgs 14, 9).
+ * [MSG_GET 0B 00 00] */
+static void love1_E_0FCA(void)
+{
+    { love1_GetFromFreezer(); return; }
+}
+
+/* [MSG_GET 22 00 00] */
+static void love1_GetFromFreezer(void)
+{
+    svc_Walk(0, 0x71, 0x8E, 0xE);
+    return;
+}
+
+/* [MSG_WALK_DONE 0E 00 00] */
+static void love1_KirkAtFreezer(void)
+{
+    if (rv_freezer_open != 1) {
+        love1_Say(0, T_LOV1N010);
+        return;
+    }
+    svc_Anim(0, N_kusehw, -1, -1, 9);
+    return;
+}
+
+/* [MSG_ANIM_DONE 09 00 00] */
+static void love1_TookDishes(void)
+{
+    svc_GiveItem(IT_DISHES);
+    love1_Say(S_2C3E, T_LOV1N006);
+    return;
+}
+
+/* The replicator's chamber: the cure sample, else the dish.
+ * [MSG_GET 0E 00 00] */
+static void love1_E_106C(void)
+{
+    { love1_GetFromChamber2(); return; }
+}
+
+/* [MSG_GET 0C 00 00] */
+static void love1_GetFromChamber2(void)
+{
+    { love1_GetFromChamber(); return; }
+}
+
+/* [MSG_GET 23 00 00] */
+static void love1_GetFromChamber(void)
+{
+    if (rv_dish_in_chamber == 0) {
+    } else {
+        svc_Walk(0, 0xB5, 0x8C, 8);
+        return;
+    }
+    love1_Say(0, T_LOV1N009);
+    return;
+}
+
+/* [MSG_WALK_DONE 08 00 00] */
+static void love1_KirkAtChamber(void)
+{
+    svc_Anim(0, N_kusemn, -1, -1, 0xA);
+    return;
+}
+
+/* [MSG_ANIM_DONE 0A 00 00] */
+static void love1_TookFromChamber(void)
+{
+    if (rv_made_sample == 1) {
+        svc_GiveItem(IT_SAMPLE);
+        love1_Say(0, T_LOV1N035);
+    } else {
+        svc_GiveItem(IT_DISHES);
+        love1_Say(S_2C3E, T_LOV1N006);
+    }
+    svc_StopAnim(0xE);
+    svc_Anim(0xC, N_s3r2d6, 0xB4, 0x75, 0);
+    svc_BridgeSfx(5);
+    rv_dish_in_chamber = 0;
+    return;
+}
+
+/* The nozzle: take the bottle back (msgs 2, 11), or fit a bottle of
+ * N2O, water, ammonia or Romulan laughing gas (msgs 3, 12).
+ * [MSG_GET 0F 00 00] */
+static void love1_E_1190(void)
+{
+    { love1_GetBottle(); return; }
+}
+
+/* [MSG_GET 24 00 00] */
+static void love1_GetBottle(void)
+{
+    svc_Walk(0, 0xA6, 0x90, 2);
+    return;
+}
+
+/* [MSG_WALK_DONE 02 00 00] */
+static void love1_KirkAtNozzle(void)
+{
+    if (rv_nozzle == 0) {
+        love1_Say(0, T_LOV1N011);
+        return;
+    }
+    svc_Anim(0, N_kusemn, -1, -1, 0xB);
+    return;
+}
+
+/* [MSG_ANIM_DONE 0B 00 00] */
+static void love1_TookBottle(void)
+{
+    uint16_t s0;
+    if (rv_nozzle == 1) {
+        s0 = 0x65;
+    } else {
+        if (rv_nozzle == 2) {
+            s0 = 0x66;
+        } else {
+            if (rv_nozzle == 3) {
+                s0 = 0x67;
+            } else {
+                if (rv_nozzle == 4) {
+                    s0 = 0x49;
+                } else {
+                    love1_Say(N_wes, S_1238);
+                    return;
+                }
+            }
+        }
+    }
+    svc_GiveItem(s0);
+    rv_nozzle = 0;
+    svc_StopAnim(0xF);
+    love1_Say(0, T_LOV1N007);
+    fv_nozzle_item = 0;
+    return;
+}
+
+/* [MSG_USE 65 24 00] */
+static void love1_N2OOnNozzle(void)
+{
+    if (rv_nozzle != 0) {
+        return;
+    }
+    fv_nozzle_item = 0x65;
+    fv_nozzle_anim = N_btle1;
+    rv_nozzle = 1;
+    { love1_part_130F(); return; }
+}
+
+/* [MSG_USE 67 24 00] */
+static void love1_H2OOnNozzle(void)
+{
+    if (rv_nozzle != 0) {
+        return;
+    }
+    fv_nozzle_item = 0x67;
+    fv_nozzle_anim = N_btle3;
+    rv_nozzle = 3;
+    { love1_part_130F(); return; }
+}
+
+/* [MSG_USE 66 24 00] */
+static void love1_NH3OnNozzle(void)
+{
+    if (rv_nozzle != 0) {
+        return;
+    }
+    fv_nozzle_item = 0x66;
+    fv_nozzle_anim = N_btle2;
+    rv_nozzle = 2;
+    { love1_part_130F(); return; }
+}
+
+/* [MSG_USE 49 24 00] */
+static void love1_RLGOnNozzle(void)
+{
+    if (rv_nozzle != 0) {
+        return;
+    }
+    fv_nozzle_item = 0x49;
+    fv_nozzle_anim = N_btle4;
+    rv_nozzle = 4;
+    { love1_part_130F(); return; }
+}
+
+static void love1_part_130F(void)
+{
+    svc_Walk(0, 0xA6, 0x90, 3);
+    return;
+}
+
+/* [MSG_WALK_DONE 03 00 00] */
+static void love1_KirkAtNozzle2(void)
+{
+    svc_Anim(0, N_kusemn, -1, -1, 0xC);
+    return;
+}
+
+/* [MSG_ANIM_DONE 0C 00 00] */
+static void love1_BottleFitted(void)
+{
+    svc_Anim0(0xF, fv_nozzle_anim, 0xA3, 0x72, 0);
+    svc_TakeItem(fv_nozzle_item);
+    return;
+}
+
+/* [MSG_USE FF 24 00] */
+static void love1_UseNozzle(void)
+{
+    love1_Say(N_Dr_McCoy, T_LOV1_012);
+    return;
+}
+
+/* Running the replicator: only McCoy (msgs 4, 13), with a bottle on the
+ * nozzle and a dish in the chamber. Only ammonia gives the cure sample
+ * (msgs 7, 8): made_sample.
+ * [MSG_USE 01 23 00] */
+static void love1_SpockUsesReplicator(void)
+{
+    love1_Say(N_Mr_Spock, T_LOV1_002);
+    return;
+}
+
+/* [MSG_USE 03 23 00] */
+static void love1_FerrisUsesReplicator(void)
+{
+    love1_Say(N_Lt_Ferris, T_LOV1_026);
+    return;
+}
+
+/* [MSG_USE 02 0F 00] */
+static void love1_E_1484(void)
+{
+    { love1_McCoyUsesChamber(); return; }
+}
+
+/* [MSG_USE 02 0E 00] */
+static void love1_McCoyUsesChamber(void)
+{
+    { love1_McCoyUsesReplicator(); return; }
+}
+
+/* [MSG_USE 02 23 00] */
+static void love1_McCoyUsesReplicator(void)
+{
+    svc_Walk(2, 0xB1, 0x8C, 4);
+    return;
+}
+
+/* [MSG_WALK_DONE 04 00 00] */
+static void love1_McCoyAtReplicator(void)
+{
+    if (rv_nozzle == 0) {
+        love1_Say(N_Dr_McCoy, T_LOV1_021);
+        { love1_part_1565(); return; }
+    }
+    if (rv_dish_in_chamber == 0) {
+        love1_Say(N_Dr_McCoy, T_LOV1_015);
+        { love1_part_1565(); return; }
+    }
+    svc_Anim(2, N_musehn, -1, -1, 0xD);
+    return;
+}
+
+/* [MSG_ANIM_DONE 0D 00 00] */
+static void love1_Replicated(void)
+{
+    if (fv_nozzle_item != 0x66) {
+        love1_Say(N_Dr_McCoy, T_LOV1_019);
+        { love1_part_1565(); return; }
+    }
+    svc_StopAnim(0xE);
+    svc_Anim(0xC, N_s3r2d6, 0xB4, 0x75, 7);
+    svc_BridgeSfx(5);
+    { love1_part_1565(); return; }
+}
+
+static void love1_part_1565(void)
+{
+    svc_Walk(2, 0xBF, 0x98, 0);
+    return;
+}
+
+/* [MSG_ANIM_DONE 07 00 00] */
+static void love1_ChamberOpens(void)
+{
+    svc_Anim(0xC, N_s3r2d5, 0xB4, 0x75, 8);
+    svc_BridgeSfx(5);
+    return;
+}
+
+/* [MSG_ANIM_DONE 08 00 00] */
+static void love1_CureSampleMade(void)
+{
+    svc_Anim0(0xE, N_dishes, 0xB4, 0x71, 0);
+    love1_Say(N_Dr_McCoy, T_LOV1_018);
+    rv_made_sample = 1;
+    return;
+}
+
+/* [MSG_USE FF 0C 00] */
+static void love1_UseChamber(void)
+{
+    love1_Say(N_Dr_McCoy, T_LOV1_013);
+    return;
+}
+
+/* The dish into the chamber (msgs 5, 1, 14).
+ * [MSG_USE 4E 0C 00] */
+static void love1_E_1619(void)
+{
+    { love1_DishesInReplicator(); return; }
+}
+
+/* [MSG_USE 4E 23 00] */
+static void love1_DishesInReplicator(void)
+{
+    svc_Walk(0, 0xB3, 0x8C, 5);
+    return;
+}
+
+/* [MSG_WALK_DONE 05 00 00] */
+static void love1_KirkAtReplicator(void)
+{
+    if (rv_dish_in_chamber != 0) {
+        love1_Say(0, T_LOV1_014);
+        return;
+    }
+    svc_Anim0(0xC, N_s3r2d5, 0xB4, 0x75, 1);
+    svc_BridgeSfx(5);
+    return;
+}
+
+/* [MSG_ANIM_DONE 01 00 00] */
+static void love1_ChamberOpen(void)
+{
+    svc_Anim(0, N_kusemn, -1, -1, 0xE);
+    return;
+}
+
+/* [MSG_ANIM_DONE 0E 00 00] */
+static void love1_DishesIn(void)
+{
+    svc_Anim0(0xE, N_dishes, 0xB4, 0x71, 0);
+    svc_TakeItem(IT_DISHES);
+    rv_dish_in_chamber = 1;
+    return;
+}
+
+/* The distillator turns insulation into polyberylcarbonate (+1, once).
+ * [MSG_USE 4B 21 00] */
+static void love1_DistillInsulation(void)
+{
+    svc_Walk(0, 0xBE, 0xC1, 6);
+    return;
+}
+
+/* [MSG_WALK_DONE 06 00 00] */
+static void love1_KirkAtDistillator(void)
+{
+    svc_Anim(0, N_kusemn, -1, -1, 0xF);
+    svc_Sfx(N_LD1PROCE);
+    return;
+}
+
+/* [MSG_ANIM_DONE 0F 00 00] */
+static void love1_Distilled(void)
+{
+    love1_Say(0, T_LOV1N034);
+    if (rv_distilled != 1) {
+        rv_distilled = 1;
+        rv_score += 1;
+    }
+    svc_GiveItem(IT_PBC);
+    svc_TakeItem(IT_INSULAT);
+    return;
+}
+
+/* Opening or closing the freezer (msgs 7, 16).
+ * [MSG_USE 00 22 00] */
+static void love1_E_17C7(void)
+{
+    { love1_KirkOpensFreezer(); return; }
+}
+
+/* [MSG_USE 00 0B 00] */
+static void love1_KirkOpensFreezer(void)
+{
+    uint16_t s0;
+    fv_back_y = 0xA0;
+    fv_back_x = 0x96;
+    fv_crew = 0;
+    fv_crew_anim = N_kusehw;
+    s0 = 7;
+    { love1_part_1878(s0); return; }
+}
+
+/* [MSG_USE 03 22 00] */
+static void love1_E_17F6(void)
+{
+    { love1_FerrisOpensFreezer(); return; }
+}
+
+/* [MSG_USE 03 0B 00] */
+static void love1_FerrisOpensFreezer(void)
+{
+    uint16_t s0;
+    fv_back_y = 0x89;
+    fv_back_x = 0x95;
+    fv_crew = 3;
+    fv_crew_anim = N_rusehw;
+    s0 = 7;
+    { love1_part_1878(s0); return; }
+}
+
+/* [MSG_USE 01 22 00] */
+static void love1_E_1824(void)
+{
+    { love1_SpockOpensFreezer(); return; }
+}
+
+/* [MSG_USE 01 0B 00] */
+static void love1_SpockOpensFreezer(void)
+{
+    uint16_t s0;
+    fv_back_y = 0xA9;
+    fv_back_x = 0x61;
+    fv_crew = 1;
+    fv_crew_anim = N_susehw;
+    s0 = 7;
+    { love1_part_1878(s0); return; }
+}
+
+/* [MSG_USE 02 22 00] */
+static void love1_E_1852(void)
+{
+    { love1_McCoyOpensFreezer(); return; }
+}
+
+/* [MSG_USE 02 0B 00] */
+static void love1_McCoyOpensFreezer(void)
+{
+    uint16_t s0;
+    fv_back_y = 0x98;
+    fv_back_x = 0xBF;
+    fv_crew = 2;
+    fv_crew_anim = N_musehw;
+    s0 = 7;
+    { love1_part_1878(s0); return; }
+}
+
+static void love1_part_1878(uint16_t s0)
+{
+    svc_Walk(fv_crew, 0x71, 0x8E, s0);
+    room.busy = 1;
+    return;
+}
+
+/* [MSG_WALK_DONE 07 00 00] */
+static void love1_AtFreezer(void)
+{
+    svc_Anim(fv_crew, fv_crew_anim, -1, -1, 0x10);
+    return;
+}
+
+/* [MSG_ANIM_DONE 10 00 00] */
+static void love1_FreezerToggled(void)
+{
+    uint16_t s0;
+    uint16_t s1;
+    uint16_t s2;
+    uint16_t s3;
+    s0 = 0;
+    s1 = 0x8D;
+    s2 = 0x67;
+    s3 = N_s3r2d4;
+    if (rv_freezer_open == 1) {
+        s3 = N_s3r2d4a;
+    }
+    svc_Anim0(0xB, s3, s2, s1, s0);
+    svc_BridgeSfx(5);
+    rv_freezer_open ^= 1;
+    svc_Walk(fv_crew, fv_back_x, fv_back_y, 0);
+    room.busy = 0;
+    return;
+}
+
+/* Other things on the equipment.
+ * [MSG_USE FF 22 00] */
+static void love1_UseFreezer(void)
+{
+    svc_Walk(0, 0x6F, 0x8E, 0xB);
+    return;
+}
+
+/* [MSG_WALK_DONE 0B 00 00] */
+static void love1_KirkAtFreezer2(void)
+{
+    svc_Anim(0, N_kusemw, -1, -1, 0x11);
+    return;
+}
+
+/* [MSG_ANIM_DONE 11 00 00] */
+static void love1_FreezerColder(void)
+{
+    love1_Say(0, T_LOV1N008);
+    return;
+}
+
+/* [MSG_USE FF 23 00] */
+static void love1_UseReplicator(void)
+{
+    svc_Walk(0, 0xB5, 0x8C, 0xC);
+    return;
+}
+
+/* [MSG_WALK_DONE 0C 00 00] */
+static void love1_KirkAtReplicator2(void)
+{
+    svc_Anim(0, N_kusemn, -1, -1, 0x12);
+    return;
+}
+
+/* [MSG_ANIM_DONE 12 00 00] */
+static void love1_NotAMicrowave(void)
+{
+    love1_Say(N_Dr_McCoy, T_LOV1_016);
+    return;
+}
+
+/* [MSG_USE FF 21 00] */
+static void love1_UseDistillator(void)
+{
+    svc_Walk(0, 0xC2, 0xB2, 0xD);
+    return;
+}
+
+/* [MSG_WALK_DONE 0D 00 00] */
+static void love1_KirkAtDistillator2(void)
+{
+    svc_Anim(0, N_kuseme, -1, -1, 0x13);
+    return;
+}
+
+/* [MSG_ANIM_DONE 13 00 00] */
+static void love1_NotACanOpener(void)
+{
+    love1_Say(N_Dr_McCoy, T_LOV1_008);
+    return;
+}
+
+/* The ladder to the deck below (room 4): unless the Romulans there are
+ * out, a Romulan shoots whoever goes first (msg 6); Kirk's death ends the
+ * game.
+ * [MSG_USE 00 20 00] */
+static void love1_KirkClimbsDown(void)
+{
+    fv_crew = 0;
+    room.fall[0] = 0;
+    { love1_part_1B06(); return; }
+}
+
+/* [MSG_USE 01 20 00] */
+static void love1_SpockClimbsDown(void)
+{
+    fv_crew = 1;
+    room.fall[1] = 0;
+    { love1_part_1B06(); return; }
+}
+
+/* [MSG_USE 02 20 00] */
+static void love1_McCoyClimbsDown(void)
+{
+    fv_crew = 2;
+    room.fall[2] = 0;
+    { love1_part_1B06(); return; }
+}
+
+/* [MSG_USE 03 20 00] */
+static void love1_FerrisClimbsDown(void)
+{
+    fv_crew = 3;
+    room.fall[3] = 0;
+    { love1_part_1B06(); return; }
+}
+
+static void love1_part_1B06(void)
+{
+    svc_Walk(fv_crew, 0x102, 0x89, 1);
+    room.busy = 1;
+    return;
+}
+
+/* [MSG_WALK_DONE 01 00 00] */
+static void love1_AtLadder(void)
+{
+    uint16_t s0;
+    uint16_t s1;
+    uint16_t s2;
+    uint16_t s3;
+    uint16_t s4;
+    if (rv_romulans_out != 1) {
+        if (rv_virus_struck != 1) {
+            svc_Anim0(0xD, N_s3r2s2, 0xF3, 0x89, 0);
+            svc_BridgeSfx(6);
+            goto L1B69;
+        }
+    }
+    svc_GotoRoom(4, 3);
+    return;
+L1B69:;
+    s0 = 6;
+    s1 = 0x89;
+    s2 = 0x102;
+    if (fv_crew == 0) {
+        fv_victim = N_Capt_Kirk;
+        s3 = N_kkillw;
+        s4 = fv_crew;
+    } else {
+        if (fv_crew == 1) {
+            fv_victim = N_Mr_Spock;
+            s3 = N_skillw;
+            s4 = fv_crew;
+        } else {
+            if (fv_crew == 2) {
+                fv_victim = N_Dr_McCoy;
+                s3 = N_mkillw;
+                s4 = fv_crew;
+            } else {
+                if (fv_crew == 3) {
+                    s3 = N_rkillw;
+                    s4 = fv_crew;
+                } else {
+                    love1_Say(0, N_Animation_Error);
+                    return;
+                }
+            }
+        }
+    }
+    svc_Anim0(s4, s3, s2, s1, s0);
+    return;
+}
+
+/* [MSG_ANIM_DONE 06 00 00] */
+static void love1_ShotOnLadder(void)
+{
+    uint16_t ax = 0;
+    if (fv_crew == 3) {
+        room.busy = 0;
+        love1_Say(N_Lt_Ferris, T_LOV1_024);
+        room.redshirt_dead = 1;
+        room.busy = 0;
+        return;
+    }
+    ax = fv_victim;
+    love1_Say(ax, T_LOV1_025);
+    svc_GameOver();
+    room.busy = 0;
+    return;
+}
+
+/* Region 0, near the ladder: Ferris warns of the Romulans, once.
+ * [MSG_REGION 00 00 00] */
+static void love1_NearLadder(void)
+{
+    if (rv_romulans_out == 1) {
+    } else if (rv_virus_struck == 1) {
+    } else {
+        svc_Anim0(0xD, N_s3r2s1, 0xF3, 0x89, 0);
+        svc_BridgeSfx(6);
+        fv_warned = 1;
+        if (room.redshirt_dead != 1) {
+            love1_Say(N_Lt_Ferris, T_LOV1_028);
+            goto L1D1A;
+        }
+    }
+L1D1A:;
+    return;
+}
+
+/* The gases, common to all of the mission's rooms. Timer 0 (after
+ * laughing gas): a random crew member giggles, and again in 200-400 ticks.
+ * [MSG_TIMER 00 00 00] */
+static void love1_CrewLaugh(void)
+{
+    uint16_t ax = 0, bx = 0;
+    ax = (uint16_t)svc_Random(0, 2);
+    fv_unused2 = ax;
+    if (fv_unused2 == 0) {
+        fv_unused1 = N_Dr_McCoy;
+    } else {
+        if (fv_unused2 == 1) {
+            fv_unused1 = N_Lt_Ferris;
+            if (room.redshirt_dead == 1) {
+                fv_unused1 = N_Dr_McCoy;
+                goto L1E3D;
+            }
+        } else {
+            love1_Say(0, N_get_name_error);
+            return;
+        }
+    }
+    fv_unused1 = N_Dr_McCoy;
+    ax = (uint16_t)svc_Random(0, 0xA);
+    fv_unused2 = ax;
+    if (fv_unused2 == 0) {
+        bx = T_LOV0_011;
+        goto L1EE4;
+    }
+    if (fv_unused2 == 1) {
+        bx = T_LOV0_020;
+        goto L1EE4;
+    }
+    if (fv_unused2 == 2) {
+        bx = T_LOV0_016;
+        goto L1EE4;
+    }
+    if (fv_unused2 == 3) {
+        bx = T_LOV0_012;
+        goto L1EE4;
+    }
+    if (fv_unused2 == 4) {
+        bx = T_LOV0_014;
+        goto L1EE4;
+    }
+    if (fv_unused2 == 5) {
+        bx = T_LOV0_022;
+        goto L1EE4;
+    }
+    if (fv_unused2 == 6) {
+        bx = T_LOV0_015;
+        goto L1EE4;
+    }
+    if (fv_unused2 == 7) {
+        bx = T_LOV0_021;
+        goto L1EE4;
+    }
+    if (fv_unused2 == 8) {
+        bx = T_LOV0_013;
+        goto L1EE4;
+    }
+    if (fv_unused2 == 9) {
+        bx = T_LOV0_019;
+        goto L1EE4;
+    }
+    bx = T_LOV0_017;
+    goto L1EE4;
+L1E3D:;
+    if (room.redshirt_dead == 1) {
+        return;
+    }
+    fv_unused1 = N_Lt_Ferris;
+    ax = (uint16_t)svc_Random(0, 0xA);
+    fv_unused2 = ax;
+    if (fv_unused2 == 0) {
+        bx = T_LOV0_039;
+    } else if (fv_unused2 == 1) {
+        bx = T_LOV0_048;
+    } else if (fv_unused2 == 2) {
+        bx = T_LOV0_045;
+    } else if (fv_unused2 == 3) {
+        bx = T_LOV0_040;
+    } else if (fv_unused2 == 4) {
+        bx = T_LOV0_042;
+    } else if (fv_unused2 == 5) {
+        bx = T_LOV0_050;
+    } else if (fv_unused2 == 6) {
+        bx = T_LOV0_043;
+    } else if (fv_unused2 == 7) {
+        bx = T_LOV0_049;
+    } else if (fv_unused2 == 8) {
+        bx = T_LOV0_041;
+    } else if (fv_unused2 == 9) {
+        bx = T_LOV0_047;
+    } else {
+        bx = T_LOV0_046;
+        goto L1EE4;
+    }
+L1EE4:;
+    ax = fv_unused1;
+    love1_Say(ax, bx);
+    if (rv_rlg_released == 1) {
+        return;
+    }
+    ax = (uint16_t)svc_Random(0, 3);
+    fv_unused2 = ax;
+    ax = N_Mr_Spock;
+    if (fv_unused2 == 0) {
+        bx = T_LOV0_029;
+    } else if (fv_unused2 == 1) {
+        bx = T_LOV0_033;
+    } else if (fv_unused2 == 2) {
+        bx = T_LOV0_026;
+    } else {
+        bx = T_LOV0_124;
+        goto L1F33;
+    }
+L1F33:;
+    love1_Say(ax, bx);
+    ax = (uint16_t)svc_Random(0xC8, 0x190);
+    room.timers[0] = ax;
+    return;
+}
+
+/* Timer 1 (after Romulan laughing gas): Spock laughs.
+ * [MSG_TIMER 01 00 00] */
+static void love1_SpockLaughs(void)
+{
+    uint16_t ax = 0, bx = 0;
+    ax = (uint16_t)svc_Random(0, 7);
+    fv_unused2 = ax;
+    ax = N_Mr_Spock;
+    if (fv_unused2 == 0) {
+        bx = T_LOV0_025;
+    } else if (fv_unused2 == 1) {
+        bx = T_LOV0_101;
+    } else if (fv_unused2 == 2) {
+        bx = T_LOV0_102;
+    } else if (fv_unused2 == 3) {
+        bx = T_LOV0_103;
+    } else if (fv_unused2 == 4) {
+        bx = T_LOV0_104;
+    } else if (fv_unused2 == 5) {
+        bx = T_LOV0_105;
+    } else if (fv_unused2 == 6) {
+        bx = T_LOV0_106;
+    } else {
+        bx = T_LOV0_107;
+        goto L1FC4;
+    }
+L1FC4:;
+    love1_Say(ax, bx);
+    ax = (uint16_t)svc_Random(0xC8, 0x190);
+    room.timers[1] = ax;
+    return;
+}
+
+/* Curing Spock, common to all of the mission's rooms: with the cure,
+ * Spock and McCoy walk to the cure spot (msg 99), and McCoy injects him.
+ * [MSG_USE 7F 01 00] */
+static void love1_MedkitOnSpock(void)
+{
+    if (rv_spock_cured != 1) {
+        love1_Say(N_Dr_McCoy, T_LOV5_019);
+        return;
+    }
+    love1_Say(N_Dr_McCoy, T_LOV5_015);
+    return;
+}
+
+/* [MSG_USE 4C 01 00] */
+static void love1_SampleOnSpock(uint16_t ax)
+{
+    if (rv_spock_cured == 1) {
+        { love1_part_211C(ax); return; }
+    }
+    love1_Say(N_Dr_McCoy, T_LOVA_F55);
+    return;
+}
+
+/* [MSG_USE 4D 01 00] */
+static void love1_CureSpock(uint16_t ax)
+{
+    if (rv_spock_cured != 1)
+        { love1_part_211C(ax); return; }
+    love1_Say(N_Dr_McCoy, T_LOV5_015_2);
+    return;
+}
+
+static void love1_part_211C(uint16_t ax)
+{
+    uint16_t t0;
+    SETHI(ax, 0);
+    SETLO(ax, fv_cure_y);
+    SETHI(ax, 0);
+    SETLO(ax, fv_cure_x);
+    ax = (uint16_t)svc_Walk(1, ax, ax, 0x63);
+    SETHI(ax, 0);
+    SETLO(ax, fv_cure_y);
+    ax = ax + 0xA;
+    t0 = ax;
+    SETHI(ax, 0);
+    SETLO(ax, fv_cure_x);
+    svc_Walk(2, ax, ax, 0x63);
+    return;
+}
+
+/* [MSG_WALK_DONE 63 00 00] */
+static void love1_AtSpock(void)
+{
+    fv_cure_steps++;
+    if (fv_cure_steps != 2) {
+        return;
+    }
+    svc_Anim(2, N_musemn, -1, -1, 0x63);
+    return;
+}
+
+/* [MSG_ANIM_DONE 63 00 00] */
+static void love1_SpockCured(void)
+{
+    love1_Say(N_Dr_McCoy, T_LOV5_030);
+    love1_Say(N_Mr_Spock, T_LOV5_038);
+    love1_Say(N_Dr_McCoy, T_LOV5_027);
+    love1_Say(N_Mr_Spock, S_2228);
+    rv_spock_cured = 1;
+    return;
+}
+
+/* Timer 2, every 200 ticks until Spock is cured: the virus advances,
+ * with a line at 0Fh, 1Eh, 2Dh; at 3Ch Spock collapses, at 64h he dies.
+ * [MSG_TIMER 02 00 00] */
+static void love1_VirusProgresses(void)
+{
+    if (rv_spock_cured == 1) {
+        return;
+    }
+    rv_virus++;
+    if ((int8_t)rv_virus >= (int8_t)0x64) {
+    } else {
+        if (rv_virus == 0xF) {
+            love1_Say(N_Mr_Spock, T_spokcoff);
+            rv_virus++;
+        } else {
+            if (rv_virus == 0x1E) {
+                love1_Say(N_Dr_McCoy, T_LOVA_F08);
+                rv_virus++;
+            } else {
+                if (rv_virus == 0x2D) {
+                    love1_Say(N_Mr_Spock, T_spokcoff_2);
+                    rv_virus++;
+                } else {
+                    if (rv_virus == 0x3C) {
+                        love1_Say(N_Mr_Spock, T_LOVA_F54);
+                        rv_virus_struck = 1;
+                        rv_virus++;
+                        goto L23A1;
+                    }
+                }
+            }
+        }
+L23A1:;
+        room.timers[2] = 0xC8;
+        return;
+    }
+    svc_Anim(1, N_sgetdn, -1, -1, 0);
+    svc_Music(2, STALE_ARG);
+    love1_Say(0, T_GENER004);
+    svc_GameOver();
+    return;
+}
+
+/* McCoy's tricorder on Spock follows the virus; on the others, normal.
+ * [MSG_USE 45 01 00] */
+static void love1_McCoyScansSpock(void)
+{
+    svc_BridgeSfx(4);
+    if (rv_spock_cured == 1) {
+        love1_Say(N_Dr_McCoy, T_LOVA_F01);
+        return;
+    }
+    if (rv_have_research != 1) {
+        love1_Say(N_Dr_McCoy, T_LOVA_F02);
+        return;
+    }
+    if ((int8_t)rv_virus < (int8_t)0xA) {
+        love1_Say(N_Dr_McCoy, T_LOVA_F04);
+        return;
+    }
+    if ((int8_t)rv_virus < (int8_t)0x1E) {
+        love1_Say(N_Dr_McCoy, T_LOVA_F03);
+        return;
+    }
+    if ((int8_t)rv_virus < (int8_t)0x32) {
+        love1_Say(N_Dr_McCoy, T_LOVA_F08_2);
+        return;
+    }
+    if (rv_virus == 0x46) {
+        love1_Say(N_Dr_McCoy, T_TUG2_010);
+        return;
+    }
+    if ((int8_t)rv_virus < (int8_t)0x64) {
+        love1_Say(N_Dr_McCoy, T_LOVA_F10);
+        return;
+    }
+    love1_Say(N_Dr_McCoy, T_LOVA_100);
+    return;
+}
+
+/* [MSG_USE 45 00 00] */
+static void love1_E_266E(void)
+{
+    { love1_McCoyScansMcCoy(); return; }
+}
+
+/* [MSG_USE 45 02 00] */
+static void love1_McCoyScansMcCoy(void)
+{
+    { love1_McCoyScansCrew(); return; }
+}
+
+/* [MSG_USE 45 03 00] */
+static void love1_McCoyScansCrew(void)
+{
+    svc_BridgeSfx(4);
+    love1_Say(N_Dr_McCoy, T_LOVA_F07);
+    return;
+}
+
+/* Opening a gas canister: Romulan laughing gas sets Spock laughing,
+ * nitrous oxide the crew, ammonia nothing.
+ * [MSG_USE 49 FF 00] */
+static void love1_ReleaseRLG(void)
+{
+    love1_Say(S_2C3E, T_LOV2N005);
+    rv_rlg_released = 1;
+    svc_TakeItem(IT_RLG);
+    return;
+}
+
+/* [MSG_USE 65 FF 00] */
+static void love1_ReleaseN2O(void)
+{
+    love1_Say(S_2C3E, T_LOV2N005_2);
+    love1_Say(N_Mr_Spock, T_MUD2_040);
+    rv_n2o_released = 1;
+    svc_TakeItem(IT_N2O);
+    svc_Music(3, STALE_ARG);
+    return;
+}
+
+/* [MSG_USE 66 FF 00] */
+static void love1_ReleaseNH3(void)
+{
+    love1_Say(S_2C3E, T_LOV2N005_3);
+    if (room.redshirt_dead != 1) {
+    }
+    svc_TakeItem(IT_NH3);
+    return;
+}
+
+/* The communicator: four cases (first call, later calls, the same after
+ * the cure), all with the same three lines borrowed from other missions'
+ * speech files.
+ * [MSG_USE 47 FF 00] */
+static void love1_CallEnterprise(void)
+{
+    if (rv_made_cure == 1) {
+    } else {
+        if (rv_called_ship == 1) {
+        } else {
+            love1_Say(N_Capt_Kirk, T_MUD4_018);
+            love1_Say(N_Lt_Uhura, T_BRIDU146);
+            love1_Say(N_Capt_Kirk, T_VENA_F41);
+            rv_called_ship = 1;
+            return;
+        }
+        love1_Say(N_Capt_Kirk, T_MUD4_018_2);
+        love1_Say(N_Lt_Uhura, T_BRIDU146_2);
+        love1_Say(N_Capt_Kirk, T_VENA_F41_2);
+        return;
+    }
+    if (rv_called_ship_cured == 1) {
+    } else {
+        love1_Say(N_Capt_Kirk, T_MUD4_018_3);
+        love1_Say(N_Lt_Uhura, T_BRIDU146_3);
+        love1_Say(N_Capt_Kirk, T_VENA_F41_3);
+        rv_called_ship_cured = 1;
+        return;
+    }
+    love1_Say(N_Capt_Kirk, T_MUD4_018_4);
+    love1_Say(N_Lt_Uhura, T_BRIDU146_4);
+    love1_Say(N_Capt_Kirk, T_VENA_F41_4);
+    return;
+}
+
+/* Talk: conversation AX (speaker, choices, 0); returns the choice. */
+static void love1_Talk(uint16_t ax)
+{
+    svc_Talk(ax);
+    return;
+}
+
+/* Say: one line, BX, said by AX (0: narration). */
+static void love1_Say(uint16_t ax, uint16_t bx)
+{
+    fv_talk_buf = ax;
+    CS_W(0x2C41) = bx;
+    love1_Talk(talk_buf);
+    return;
+}
+
+/* the scripts, by the offset of their code in the room file */
+const RoomScript love1_scripts[] = {
+    { 0x0217, love1_StartRoom },    /* MSG_TICK 01 00 00 */
+    { 0x0386, love1_E_0386 },    /* MSG_WALK 0A 00 00 */
+    { 0x038E, love1_WalkToSafetyDoor },    /* MSG_WALK 26 00 00 */
+    { 0x03B7, love1_ReachSafetyDoor },    /* MSG_REGION 01 00 00 */
+    { 0x03E8, love1_E_03E8 },    /* MSG_WALK_DONE 0F 00 00 */
+    { 0x03F0, love1_ThroughSafetyDoor },    /* MSG_ANIM_DONE 02 00 00 */
+    { 0x0413, love1_E_0413 },    /* MSG_WALK 08 00 00 */
+    { 0x041B, love1_WalkToBridgeDoor },    /* MSG_WALK 27 00 00 */
+    { 0x043F, love1_ReachBridgeDoor },    /* MSG_REGION 02 00 00 */
+    { 0x046F, love1_E_046F },    /* MSG_WALK_DONE 10 00 00 */
+    { 0x0477, love1_ThroughBridgeDoor },    /* MSG_ANIM_DONE 03 00 00 */
+    { 0x049A, love1_E_049A },    /* MSG_WALK 09 00 00 */
+    { 0x04A2, love1_WalkToDoor2 },    /* MSG_WALK 28 00 00 */
+    { 0x04C6, love1_ReachDoor2 },    /* MSG_REGION 03 00 00 */
+    { 0x04F6, love1_E_04F6 },    /* MSG_WALK_DONE 11 00 00 */
+    { 0x04FE, love1_ThroughDoor2 },    /* MSG_ANIM_DONE 04 00 00 */
+    { 0x0521, love1_LookAtAccelerator },    /* MSG_LOOK 25 00 00 */
+    { 0x0530, love1_LookAtKirk },    /* MSG_LOOK 00 00 00 */
+    { 0x053F, love1_LookAtSpock },    /* MSG_LOOK 01 00 00 */
+    { 0x054E, love1_LookAtMcCoy },    /* MSG_LOOK 02 00 00 */
+    { 0x055D, love1_LookAtRedshirt },    /* MSG_LOOK 03 00 00 */
+    { 0x056C, love1_LookAtScene },    /* MSG_LOOK FF 00 00 */
+    { 0x05C7, love1_E_05C7 },    /* MSG_LOOK 0F 00 00 */
+    { 0x05CF, love1_LookAtNozzle },    /* MSG_LOOK 24 00 00 */
+    { 0x061D, love1_LookAtLadder },    /* MSG_LOOK 20 00 00 */
+    { 0x0683, love1_E_0683 },    /* MSG_LOOK 09 00 00 */
+    { 0x068B, love1_LookAtDoor },    /* MSG_LOOK 08 00 00 */
+    { 0x06EB, love1_LookAtSafetyDoor },    /* MSG_LOOK 0A 00 00 */
+    { 0x076F, love1_LookAtDistillator },    /* MSG_LOOK 21 00 00 */
+    { 0x07DD, love1_E_07DD },    /* MSG_LOOK 0E 00 00 */
+    { 0x07E5, love1_LookAtChamber },    /* MSG_LOOK 0C 00 00 */
+    { 0x08B4, love1_LookAtReplicator },    /* MSG_LOOK 23 00 00 */
+    { 0x0940, love1_E_0940 },    /* MSG_LOOK 0B 00 00 */
+    { 0x0948, love1_LookAtFreezer },    /* MSG_LOOK 22 00 00 */
+    { 0x09E8, love1_LookAtDishes },    /* MSG_LOOK 4E 00 00 */
+    { 0x0A61, love1_TalkToKirk },    /* MSG_TALK 00 00 00 */
+    { 0x0AF1, love1_TalkToSpock },    /* MSG_TALK 01 00 00 */
+    { 0x0B71, love1_TalkToMcCoy },    /* MSG_TALK 02 00 00 */
+    { 0x0BF6, love1_TalkToRedshirt },    /* MSG_TALK 03 00 00 */
+    { 0x0C82, love1_McCoyScansDishes },    /* MSG_USE 45 4E 00 */
+    { 0x0D0B, love1_McCoyScans },    /* MSG_USE 45 FF 00 */
+    { 0x0E0D, love1_E_0E0D },    /* MSG_USE 44 23 00 */
+    { 0x0E15, love1_SpockScansChamber },    /* MSG_USE 44 0C 00 */
+    { 0x0E46, love1_E_0E46 },    /* MSG_USE 01 25 00 */
+    { 0x0E4E, love1_SpockScansAccelerator },    /* MSG_USE 44 25 00 */
+    { 0x0E7F, love1_SpockScansFreezer },    /* MSG_USE 44 22 00 */
+    { 0x0EB0, love1_SpockScans },    /* MSG_USE 44 FF 00 */
+    { 0x0F11, love1_SpockScansDishes },    /* MSG_USE 44 4E 00 */
+    { 0x0F99, love1_SpockScansDistillator },    /* MSG_USE 44 21 00 */
+    { 0x0FCA, love1_E_0FCA },    /* MSG_GET 0B 00 00 */
+    { 0x0FD2, love1_GetFromFreezer },    /* MSG_GET 22 00 00 */
+    { 0x0FEC, love1_KirkAtFreezer },    /* MSG_WALK_DONE 0E 00 00 */
+    { 0x1050, love1_TookDishes },    /* MSG_ANIM_DONE 09 00 00 */
+    { 0x106C, love1_E_106C },    /* MSG_GET 0E 00 00 */
+    { 0x1074, love1_GetFromChamber2 },    /* MSG_GET 0C 00 00 */
+    { 0x107C, love1_GetFromChamber },    /* MSG_GET 23 00 00 */
+    { 0x10A0, love1_KirkAtChamber },    /* MSG_WALK_DONE 08 00 00 */
+    { 0x10BC, love1_TookFromChamber },    /* MSG_ANIM_DONE 0A 00 00 */
+    { 0x1190, love1_E_1190 },    /* MSG_GET 0F 00 00 */
+    { 0x1198, love1_GetBottle },    /* MSG_GET 24 00 00 */
+    { 0x11B3, love1_KirkAtNozzle },    /* MSG_WALK_DONE 02 00 00 */
+    { 0x1205, love1_TookBottle },    /* MSG_ANIM_DONE 0B 00 00 */
+    { 0x1293, love1_N2OOnNozzle },    /* MSG_USE 65 24 00 */
+    { 0x12B4, love1_H2OOnNozzle },    /* MSG_USE 67 24 00 */
+    { 0x12D5, love1_NH3OnNozzle },    /* MSG_USE 66 24 00 */
+    { 0x12F6, love1_RLGOnNozzle },    /* MSG_USE 49 24 00 */
+    { 0x132A, love1_KirkAtNozzle2 },    /* MSG_WALK_DONE 03 00 00 */
+    { 0x1346, love1_BottleFitted },    /* MSG_ANIM_DONE 0C 00 00 */
+    { 0x1374, love1_UseNozzle },    /* MSG_USE FF 24 00 */
+    { 0x13BF, love1_SpockUsesReplicator },    /* MSG_USE 01 23 00 */
+    { 0x142D, love1_FerrisUsesReplicator },    /* MSG_USE 03 23 00 */
+    { 0x1484, love1_E_1484 },    /* MSG_USE 02 0F 00 */
+    { 0x148C, love1_McCoyUsesChamber },    /* MSG_USE 02 0E 00 */
+    { 0x1494, love1_McCoyUsesReplicator },    /* MSG_USE 02 23 00 */
+    { 0x14AF, love1_McCoyAtReplicator },    /* MSG_WALK_DONE 04 00 00 */
+    { 0x1524, love1_Replicated },    /* MSG_ANIM_DONE 0D 00 00 */
+    { 0x1580, love1_ChamberOpens },    /* MSG_ANIM_DONE 07 00 00 */
+    { 0x15A9, love1_CureSampleMade },    /* MSG_ANIM_DONE 08 00 00 */
+    { 0x15D3, love1_UseChamber },    /* MSG_USE FF 0C 00 */
+    { 0x1619, love1_E_1619 },    /* MSG_USE 4E 0C 00 */
+    { 0x1621, love1_DishesInReplicator },    /* MSG_USE 4E 23 00 */
+    { 0x163C, love1_KirkAtReplicator },    /* MSG_WALK_DONE 05 00 00 */
+    { 0x16B1, love1_ChamberOpen },    /* MSG_ANIM_DONE 01 00 00 */
+    { 0x16CD, love1_DishesIn },    /* MSG_ANIM_DONE 0E 00 00 */
+    { 0x16FA, love1_DistillInsulation },    /* MSG_USE 4B 21 00 */
+    { 0x1715, love1_KirkAtDistillator },    /* MSG_WALK_DONE 06 00 00 */
+    { 0x174B, love1_Distilled },    /* MSG_ANIM_DONE 0F 00 00 */
+    { 0x17C7, love1_E_17C7 },    /* MSG_USE 00 22 00 */
+    { 0x17CF, love1_KirkOpensFreezer },    /* MSG_USE 00 0B 00 */
+    { 0x17F6, love1_E_17F6 },    /* MSG_USE 03 22 00 */
+    { 0x17FE, love1_FerrisOpensFreezer },    /* MSG_USE 03 0B 00 */
+    { 0x1824, love1_E_1824 },    /* MSG_USE 01 22 00 */
+    { 0x182C, love1_SpockOpensFreezer },    /* MSG_USE 01 0B 00 */
+    { 0x1852, love1_E_1852 },    /* MSG_USE 02 22 00 */
+    { 0x185A, love1_McCoyOpensFreezer },    /* MSG_USE 02 0B 00 */
+    { 0x1897, love1_AtFreezer },    /* MSG_WALK_DONE 07 00 00 */
+    { 0x18B8, love1_FreezerToggled },    /* MSG_ANIM_DONE 10 00 00 */
+    { 0x190E, love1_UseFreezer },    /* MSG_USE FF 22 00 */
+    { 0x1928, love1_KirkAtFreezer2 },    /* MSG_WALK_DONE 0B 00 00 */
+    { 0x1944, love1_FreezerColder },    /* MSG_ANIM_DONE 11 00 00 */
+    { 0x1998, love1_UseReplicator },    /* MSG_USE FF 23 00 */
+    { 0x19B3, love1_KirkAtReplicator2 },    /* MSG_WALK_DONE 0C 00 00 */
+    { 0x19CF, love1_NotAMicrowave },    /* MSG_ANIM_DONE 12 00 00 */
+    { 0x1A34, love1_UseDistillator },    /* MSG_USE FF 21 00 */
+    { 0x1A4F, love1_KirkAtDistillator2 },    /* MSG_WALK_DONE 0D 00 00 */
+    { 0x1A6B, love1_NotACanOpener },    /* MSG_ANIM_DONE 13 00 00 */
+    { 0x1AC2, love1_KirkClimbsDown },    /* MSG_USE 00 20 00 */
+    { 0x1AD5, love1_SpockClimbsDown },    /* MSG_USE 01 20 00 */
+    { 0x1AE8, love1_McCoyClimbsDown },    /* MSG_USE 02 20 00 */
+    { 0x1AFB, love1_FerrisClimbsDown },    /* MSG_USE 03 20 00 */
+    { 0x1B28, love1_AtLadder },    /* MSG_WALK_DONE 01 00 00 */
+    { 0x1BFB, love1_ShotOnLadder },    /* MSG_ANIM_DONE 06 00 00 */
+    { 0x1C6D, love1_NearLadder },    /* MSG_REGION 00 00 00 */
+    { 0x1D32, love1_CrewLaugh },    /* MSG_TIMER 00 00 00 */
+    { 0x1F4F, love1_SpockLaughs },    /* MSG_TIMER 01 00 00 */
+    { 0x1FE1, love1_MedkitOnSpock },    /* MSG_USE 7F 01 00 */
+    /* 206F: a helper, not a script */
+    /* 20E2: a helper, not a script */
+    { 0x215E, love1_AtSpock },    /* MSG_WALK_DONE 63 00 00 */
+    { 0x2188, love1_SpockCured },    /* MSG_ANIM_DONE 63 00 00 */
+    { 0x2247, love1_VirusProgresses },    /* MSG_TIMER 02 00 00 */
+    { 0x23FD, love1_McCoyScansSpock },    /* MSG_USE 45 01 00 */
+    { 0x266E, love1_E_266E },    /* MSG_USE 45 00 00 */
+    { 0x2676, love1_McCoyScansMcCoy },    /* MSG_USE 45 02 00 */
+    { 0x267E, love1_McCoyScansCrew },    /* MSG_USE 45 03 00 */
+    { 0x26C5, love1_ReleaseRLG },    /* MSG_USE 49 FF 00 */
+    { 0x2715, love1_ReleaseN2O },    /* MSG_USE 65 FF 00 */
+    { 0x27A7, love1_ReleaseNH3 },    /* MSG_USE 66 FF 00 */
+    { 0x280D, love1_CallEnterprise },    /* MSG_USE 47 FF 00 */
+    { 0, 0 }
+};

@@ -1,0 +1,794 @@
+/* FEATHER5.RDF: the room's scripts, translated from the machine code in the room file
+ * (src/rdf/feather5.asm) by tools/rdf2c.py.  They run on the loaded file (CS_B/CS_W) and the
+ * room state (`room`), and call the game through the svc_ macros of rooms.h.
+ *
+ * FEATHER5.RDF - "The Feathered Serpent", a muddy river crossed by a log,
+ * with a lit cave beyond. A carnivorous squid lurks under the log. A
+ * piece of the thorny plant, cut with Tlaoxac's knife (room 3) and thrown
+ * in the water, repels it; sending Stragey across first feeds him to it.
+ *
+ * Actors: 8 the creature, 10 (0Ah) the thrown plant.
+ * Objects: 8 the creature, 0Ah the lights, 20h the log, 21h the plant,
+ * 22h the log, 23h the river, 24h/25h insects, 26h the cave.
+ * Exits: 2 room 4, 3 room 6. Region 0: the log.
+ *
+ * Labels: H_ script headers, L branch targets, C_ conversations,
+ * T_/N_/S_ strings; talk_buf: the conversation buffer of Say.
+ *
+ * Quirks of the original:
+ * - KnifeOnKirk gives Kirk McCoy's line ("Jim! Are you out of your mind?").
+ * - The script chain runs on into code at 07DF: the engine reads its bytes
+ * as key 50 6A 03 2E and next 1EFF (beyond rdf_scripts_end, so the search
+ * stops).
+ * - Code at 0343 runs on into the script header at 0346.
+ */
+
+#include "rooms.h"
+
+/* where the file keeps its strings, conversations and tables */
+enum {
+    N_s5r5kf = 0x00CA,
+    N_s5r5kt = 0x00D1,
+    N_s5r5pt = 0x00D8,
+    N_s5r5os = 0x00DF,
+    N_s5r5oh = 0x00E6,
+    N_s5r5ol = 0x00ED,
+    N_sscann = 0x00F4,
+    N_sscanw = 0x00FB,
+    N_mscanw = 0x0102,
+    N_feath5b = 0x0109,
+    N_FEA5LOOP = 0x0119,
+    N_TENTICL2 = 0x020B,
+    T_FEA5_010 = 0x078C,
+    N_Capt_Kirk = 0x0951,
+    N_Dr_McCoy = 0x095C,
+    N_Mr_Spock = 0x0966,
+    N_Lt_Stragey = 0x0970,
+    S_097C = 0x097C,
+    T_FEA5N015 = 0x097D,
+    T_FEA5N008 = 0x09B3,
+    T_FEA5N005 = 0x09FF,
+    T_FEA5_005 = 0x0A3B,
+    T_FEA5_002 = 0x0A8D,
+    T_FEA5_015 = 0x0AF7,
+    T_FEA5_034 = 0x0B1D,
+    T_FEA5N010 = 0x0B49,
+    T_FEA5_032 = 0x0B6D,
+    T_FEA5_020 = 0x0BA2,
+    T_FEA5_040 = 0x0BFF,
+    T_FEA5N011 = 0x0C21,
+    T_FEA5_018 = 0x0C66,
+    T_DEM0_020 = 0x0CC4,
+    T_FEA5_029 = 0x0CF2,
+    T_FEA5_008 = 0x0D33,
+    T_FEA5_039 = 0x0D82,
+    T_FEA5_006 = 0x0E16,
+    T_FEA5_025 = 0x0E76,
+    T_FEA5_027 = 0x0F88,
+    T_FEA5_019 = 0x0FDC,
+    T_FEA5_038 = 0x1031,
+    T_FEA5N003 = 0x105C,
+    T_FEA5_003 = 0x1080,
+    T_FEA5_016 = 0x10F8,
+    T_FEA5_037 = 0x1151,
+    T_FEA5N007 = 0x11DA,
+    T_FEA5N009 = 0x120D,
+    T_FEA5N012 = 0x1279,
+    T_FEA5N014 = 0x1325,
+    T_FEA5N000 = 0x136C,
+    T_FEA5N013 = 0x13EF,
+    T_FEA5N001 = 0x142B,
+    T_FEA5N006 = 0x1474,
+    T_FEA5N002 = 0x14CE,
+    T_FEA5N004 = 0x1514,
+    T_FEA5_022 = 0x155C,
+    T_FEA5_007 = 0x158E,
+    T_FEA5_036 = 0x15B4,
+    T_FEA5_004 = 0x167A,
+    T_FEA5_009 = 0x16F6,
+    T_FEA5_035 = 0x1769,
+    T_FEA5_014 = 0x17D3,
+    T_FEA5_011 = 0x181C,
+    T_FEA5_013 = 0x1857,
+    T_FEA5_026 = 0x18A2,
+    T_FEA5_030 = 0x18D0,
+    T_FEA5_031 = 0x1949,
+    T_FEA5_024 = 0x19A9,
+    T_FEA5_023 = 0x1A36,
+    T_FEA5_033 = 0x1ABF,
+    T_FEA5_028 = 0x1B27,
+    talk_buf = 0x1B52,
+};
+
+/* the room's variables: in the room state, and in the file itself */
+#define fv_talk_buf CS_W(0x1B52)
+#define rv_creature_gone ROOM_B(0x34)
+#define rv_have_fern ROOM_B(0x30)
+#define rv_score ROOM_W(0x36)
+
+/* functions */
+static void feather5_StartRoom(void);
+static void feather5_AtTheLog(void);
+static void feather5_SpockOnPlant(void);
+static void feather5_McCoyOnPlant(void);
+static void feather5_StrageyOnPlant(void);
+static void feather5_StrageyCrosses(void);
+static void feather5_StrageyOnLog(void);
+static void feather5_StrageyEaten(void);
+static void feather5_SpockCrosses(void);
+static void feather5_McCoyCrosses(void);
+static void feather5_SnakeOnKirk(void);
+static void feather5_SnakeOnSpock(void);
+static void feather5_SnakeOnMcCoy(void);
+static void feather5_SnakeOnStragey(void);
+static void feather5_SnakeInRiver(void);
+static void feather5_KnifeOnKirk(void);
+static void feather5_KnifeOnSpock(void);
+static void feather5_KnifeOnMcCoy(void);
+static void feather5_KnifeOnStragey(void);
+static void feather5_KnifeInRiver(void);
+static void feather5_KnifeOnCreature(void);
+static void feather5_GetPlant(void);
+static void feather5_CutPlant(void);
+static void feather5_KirkAtPlant(void);
+static void feather5_GotFern(void);
+static void feather5_E_03DE(void);
+static void feather5_FernInRiver(void);
+static void feather5_KirkThrowsFern(void);
+static void feather5_FernThrown(void);
+static void feather5_CreatureLeaves(void);
+static void feather5_SpockOnPlantSap(void);
+static void feather5_RockAtSpock(void);
+static void feather5_RockAtMcCoy(void);
+static void feather5_RockAtStragey(void);
+static void feather5_SpockOnLight(void);
+static void feather5_McCoyOnLight(void);
+static void feather5_StrageyOnLight(void);
+static void feather5_part_04E3(void);
+static void feather5_SpockOnCreature(void);
+static void feather5_McCoyOnCreature(void);
+static void feather5_StrageyOnCreature(void);
+static void feather5_StunAnything(void);
+static void feather5_KillAnything(void);
+static void feather5_LookAtScene(void);
+static void feather5_LookAtLog(void);
+static void feather5_LookAtRiver(void);
+static void feather5_LookAtPlant(void);
+static void feather5_LookAtInsects1(void);
+static void feather5_LookAtInsects2(void);
+static void feather5_LookAtCave(void);
+static void feather5_LookAtCreature(void);
+static void feather5_LookAtSpock(void);
+static void feather5_LookAtKirk(void);
+static void feather5_LookAtMcCoy(void);
+static void feather5_LookAtRedshirt(void);
+static void feather5_TalkToMcCoy(void);
+static void feather5_TalkToSpock(void);
+static void feather5_TalkToRedshirt(void);
+static void feather5_McCoyScansRiver(void);
+static void feather5_McCoyScansCreature(void);
+static void feather5_SpockScansCreature(void);
+static void feather5_SpockScans(void);
+static void feather5_SpockScansRiver(void);
+static void feather5_SpockScansPlant(void);
+static void feather5_UseMedkit(void);
+static void feather5_Talk(uint16_t ax);
+static void feather5_Say(uint16_t ax, uint16_t bx);
+
+/* The room starts: the creature by the log, which can't be crossed.
+ * [MSG_TICK 01 00 00] */
+static void feather5_StartRoom(void)
+{
+    svc_Sfx(N_FEA5LOOP);
+    svc_Music(0x1D, STALE_ARG);
+    if (rv_creature_gone == 0) {
+        svc_Anim0(8, N_s5r5os, 0x4E, 0xA4, 0);
+        return;
+    }
+    svc_LoadMap(N_feath5b);
+    return;
+}
+
+/* Region 0, the log: Spock and Stragey warn while the creature is there.
+ * [MSG_REGION 00 00 00] */
+static void feather5_AtTheLog(void)
+{
+    if (rv_creature_gone == 0) {
+        feather5_Say(N_Mr_Spock, T_FEA5_005);
+        if (room.redshirt_dead != 1) {
+            feather5_Say(N_Lt_Stragey, T_FEA5_033);
+        }
+    }
+    return;
+}
+
+/* The crew on the plant: it needs cutting.
+ * [MSG_USE 01 21 00] */
+static void feather5_SpockOnPlant(void)
+{
+    feather5_Say(N_Mr_Spock, T_FEA5_004);
+    return;
+}
+
+/* [MSG_USE 02 21 00] */
+static void feather5_McCoyOnPlant(void)
+{
+    feather5_Say(N_Dr_McCoy, T_FEA5_009);
+    return;
+}
+
+/* [MSG_USE 03 21 00] */
+static void feather5_StrageyOnPlant(void)
+{
+    feather5_Say(N_Lt_Stragey, T_FEA5_035);
+    return;
+}
+
+/* Stragey tries the log first (msg 8): the creature takes him (anim
+ * msg 9), and is gone.
+ * [MSG_USE 03 20 00] */
+static void feather5_StrageyCrosses(void)
+{
+    if (rv_creature_gone == 0) {
+        feather5_Say(N_Lt_Stragey, T_FEA5_034);
+        room.busy = 1;
+        svc_LoadMap(N_feath5b);
+        svc_Walk(3, 0x8F, 0x64, 8);
+    }
+    return;
+}
+
+/* [MSG_WALK_DONE 08 00 00] */
+static void feather5_StrageyOnLog(void)
+{
+    svc_Music(2, STALE_ARG);
+    svc_Sfx(N_TENTICL2);
+    svc_Anim0(8, N_s5r5oh, 0x4E, 0xA4, 0);
+    svc_Anim0(3, N_s5r5ol, 0x8F, 0x64, 9);
+    rv_creature_gone = 1;
+    room.redshirt_dead = 1;
+    return;
+}
+
+/* [MSG_ANIM_DONE 09 00 00] */
+static void feather5_StrageyEaten(void)
+{
+    svc_StopAnim(3);
+    room.busy = 0;
+    return;
+}
+
+/* [MSG_USE 01 20 00] */
+static void feather5_SpockCrosses(void)
+{
+    if (rv_creature_gone == 0) {
+        feather5_Say(N_Mr_Spock, T_FEA5_002);
+    }
+    return;
+}
+
+/* [MSG_USE 02 20 00] */
+static void feather5_McCoyCrosses(void)
+{
+    if (rv_creature_gone == 0) {
+        feather5_Say(N_Dr_McCoy, T_FEA5_015);
+    }
+    return;
+}
+
+/* The snake and the knife on people and things.
+ * [MSG_USE 76 00 00] */
+static void feather5_SnakeOnKirk(void)
+{
+    feather5_Say(N_Capt_Kirk, T_FEA5N010);
+    return;
+}
+
+/* [MSG_USE 76 01 00] */
+static void feather5_SnakeOnSpock(void)
+{
+    feather5_Say(N_Mr_Spock, T_FEA5_032);
+    return;
+}
+
+/* [MSG_USE 76 02 00] */
+static void feather5_SnakeOnMcCoy(void)
+{
+    feather5_Say(N_Dr_McCoy, T_FEA5_020);
+    return;
+}
+
+/* [MSG_USE 76 03 00] */
+static void feather5_SnakeOnStragey(void)
+{
+    feather5_Say(N_Lt_Stragey, T_FEA5_040);
+    return;
+}
+
+/* [MSG_USE 76 23 00] */
+static void feather5_SnakeInRiver(void)
+{
+    feather5_Say(S_097C, T_FEA5N011);
+    svc_TakeItem(IT_SNAKE);
+    return;
+}
+
+/* [MSG_USE 79 00 00] */
+static void feather5_KnifeOnKirk(void)
+{
+    feather5_Say(N_Capt_Kirk, T_DEM0_020);
+    return;
+}
+
+/* [MSG_USE 79 01 00] */
+static void feather5_KnifeOnSpock(void)
+{
+    feather5_Say(N_Mr_Spock, T_FEA5_029);
+    return;
+}
+
+/* [MSG_USE 79 02 00] */
+static void feather5_KnifeOnMcCoy(void)
+{
+    feather5_Say(N_Dr_McCoy, T_FEA5_008);
+    return;
+}
+
+/* [MSG_USE 79 03 00] */
+static void feather5_KnifeOnStragey(void)
+{
+    feather5_Say(N_Lt_Stragey, T_FEA5_039);
+    return;
+}
+
+/* [MSG_USE 79 23 00] */
+static void feather5_KnifeInRiver(void)
+{
+    feather5_Say(N_Dr_McCoy, T_FEA5_018);
+    { feather5_KnifeOnCreature(); return; }
+}
+
+/* [MSG_USE 79 08 00] */
+static void feather5_KnifeOnCreature(void)
+{
+    feather5_Say(N_Mr_Spock, T_FEA5_006);
+    return;
+}
+
+/* The plant: cut with the knife (msgs 1); a piece thrown in the river
+ * (+2, msgs 2, 3) drives the creature away.
+ * [MSG_GET 21 00 00] */
+static void feather5_GetPlant(void)
+{
+    feather5_Say(S_097C, T_FEA5N008);
+    return;
+}
+
+/* [MSG_USE 79 21 00] */
+static void feather5_CutPlant(void)
+{
+    if (rv_have_fern == 1) {
+        feather5_Say(S_097C, T_FEA5N015);
+        return;
+    }
+    svc_Walk(0, 0x106, 0x8A, 1);
+    room.busy = 1;
+    return;
+}
+
+/* [MSG_WALK_DONE 01 00 00] */
+static void feather5_KirkAtPlant(void)
+{
+    svc_Anim(0, N_s5r5kf, -1, -1, 1);
+    return;
+}
+
+/* [MSG_ANIM_DONE 01 00 00] */
+static void feather5_GotFern(void)
+{
+    room.busy = 0;
+    svc_StopAnim(0);
+    svc_GiveItem(IT_FERN);
+    rv_have_fern = 1;
+    return;
+}
+
+/* [MSG_USE 77 08 00] */
+static void feather5_E_03DE(void)
+{
+    { feather5_FernInRiver(); return; }
+}
+
+/* [MSG_USE 77 23 00] */
+static void feather5_FernInRiver(void)
+{
+    rv_score += 2;
+    svc_Walk(0, 0x106, 0x8A, 2);
+    room.busy = 1;
+    return;
+}
+
+/* [MSG_WALK_DONE 02 00 00] */
+static void feather5_KirkThrowsFern(void)
+{
+    svc_Anim(0, N_s5r5kt, -1, -1, 2);
+    svc_Anim(0xA, N_s5r5pt, 0xE6, 0x52, 3);
+    return;
+}
+
+/* [MSG_ANIM_DONE 02 00 00] */
+static void feather5_FernThrown(void)
+{
+    room.busy = 0;
+    svc_StopAnim(0);
+    svc_TakeItem(IT_FERN);
+    rv_have_fern = 0;
+    return;
+}
+
+/* [MSG_ANIM_DONE 03 00 00] */
+static void feather5_CreatureLeaves(void)
+{
+    if (rv_creature_gone == 0) {
+        rv_creature_gone = 1;
+        room.timers[1] = 0x14;
+        svc_StopAnim(8);
+        svc_LoadMap(N_feath5b);
+    }
+    return;
+}
+
+/* [MSG_TIMER 01 00 00] */
+static void feather5_SpockOnPlantSap(void)
+{
+    feather5_Say(N_Mr_Spock, T_FEA5_025);
+    return;
+}
+
+/* Rocks, and the crew on the lights and the creature.
+ * [MSG_USE 43 01 00] */
+static void feather5_RockAtSpock(void)
+{
+    feather5_Say(N_Mr_Spock, T_FEA5_027);
+    return;
+}
+
+/* [MSG_USE 43 02 00] */
+static void feather5_RockAtMcCoy(void)
+{
+    feather5_Say(N_Dr_McCoy, T_FEA5_019);
+    return;
+}
+
+/* [MSG_USE 43 03 00] */
+static void feather5_RockAtStragey(void)
+{
+    feather5_Say(N_Lt_Stragey, T_FEA5_038);
+    return;
+}
+
+/* [MSG_USE 01 0A 00] */
+static void feather5_SpockOnLight(void)
+{
+    { feather5_part_04E3(); return; }
+}
+
+/* [MSG_USE 02 0A 00] */
+static void feather5_McCoyOnLight(void)
+{
+    { feather5_part_04E3(); return; }
+}
+
+/* [MSG_USE 03 0A 00] */
+static void feather5_StrageyOnLight(void)
+{
+    { feather5_part_04E3(); return; }
+}
+
+static void feather5_part_04E3(void)
+{
+    feather5_Say(S_097C, T_FEA5N003);
+    return;
+}
+
+/* [MSG_USE 01 08 00] */
+static void feather5_SpockOnCreature(void)
+{
+    feather5_Say(N_Mr_Spock, T_FEA5_003);
+    return;
+}
+
+/* [MSG_USE 02 08 00] */
+static void feather5_McCoyOnCreature(void)
+{
+    feather5_Say(N_Dr_McCoy, T_FEA5_016);
+    return;
+}
+
+/* [MSG_USE 03 08 00] */
+static void feather5_StrageyOnCreature(void)
+{
+    feather5_Say(N_Lt_Stragey, T_FEA5_037);
+    return;
+}
+
+/* [MSG_USE 40 FF 00] */
+static void feather5_StunAnything(void)
+{
+    feather5_Say(N_Mr_Spock, T_FEA5_028);
+    return;
+}
+
+/* [MSG_USE 41 FF 00] */
+static void feather5_KillAnything(void)
+{
+    feather5_Say(N_Mr_Spock, T_FEA5_028);
+    return;
+}
+
+/* Looking and talking.
+ * [MSG_LOOK FF 00 00] */
+static void feather5_LookAtScene(void)
+{
+    feather5_Say(0, T_FEA5N012);
+    return;
+}
+
+/* [MSG_LOOK 22 00 00] */
+static void feather5_LookAtLog(void)
+{
+    feather5_Say(0, T_FEA5N007);
+    return;
+}
+
+/* [MSG_LOOK 23 00 00] */
+static void feather5_LookAtRiver(void)
+{
+    feather5_Say(0, T_FEA5N009);
+    return;
+}
+
+/* [MSG_LOOK 21 00 00] */
+static void feather5_LookAtPlant(void)
+{
+    feather5_Say(0, T_FEA5N014);
+    return;
+}
+
+/* [MSG_LOOK 24 00 00] */
+static void feather5_LookAtInsects1(void)
+{
+    feather5_Say(0, T_FEA5N005);
+    return;
+}
+
+/* [MSG_LOOK 25 00 00] */
+static void feather5_LookAtInsects2(void)
+{
+    feather5_Say(0, T_FEA5N005);
+    return;
+}
+
+/* [MSG_LOOK 26 00 00] */
+static void feather5_LookAtCave(void)
+{
+    feather5_Say(0, T_FEA5N013);
+    return;
+}
+
+/* [MSG_LOOK 08 00 00] */
+static void feather5_LookAtCreature(void)
+{
+    feather5_Say(0, T_FEA5N000);
+    return;
+}
+
+/* [MSG_LOOK 01 00 00] */
+static void feather5_LookAtSpock(void)
+{
+    feather5_Say(0, T_FEA5N006);
+    return;
+}
+
+/* [MSG_LOOK 00 00 00] */
+static void feather5_LookAtKirk(void)
+{
+    if (rv_creature_gone == 0) {
+        feather5_Say(0, T_FEA5N001);
+    }
+    return;
+}
+
+/* [MSG_LOOK 02 00 00] */
+static void feather5_LookAtMcCoy(void)
+{
+    if (rv_creature_gone == 0) {
+        feather5_Say(0, T_FEA5N002);
+    }
+    return;
+}
+
+/* [MSG_LOOK 03 00 00] */
+static void feather5_LookAtRedshirt(void)
+{
+    if (rv_creature_gone == 0) {
+        feather5_Say(0, T_FEA5N004);
+    }
+    return;
+}
+
+/* [MSG_TALK 02 00 00] */
+static void feather5_TalkToMcCoy(void)
+{
+    feather5_Say(N_Dr_McCoy, T_FEA5_007);
+    return;
+}
+
+/* [MSG_TALK 01 00 00] */
+static void feather5_TalkToSpock(void)
+{
+    feather5_Say(N_Mr_Spock, T_FEA5_022);
+    return;
+}
+
+/* [MSG_TALK 03 00 00] */
+static void feather5_TalkToRedshirt(void)
+{
+    feather5_Say(N_Lt_Stragey, T_FEA5_036);
+    return;
+}
+
+/* Tricorders.
+ * [MSG_USE 45 23 00] */
+static void feather5_McCoyScansRiver(void)
+{
+    svc_Anim(2, N_mscanw, -1, -1, 0);
+    svc_BridgeSfx(4);
+    if (rv_creature_gone == 0) {
+        feather5_Say(N_Dr_McCoy, T_FEA5_014);
+        return;
+    }
+    feather5_Say(N_Dr_McCoy, T_FEA5_011);
+    return;
+}
+
+/* [MSG_USE 45 08 00] */
+static void feather5_McCoyScansCreature(void)
+{
+    svc_Anim(2, N_mscanw, -1, -1, 0);
+    svc_BridgeSfx(4);
+    feather5_Say(N_Dr_McCoy, T_FEA5_013);
+    return;
+}
+
+/* [MSG_USE 44 08 00] */
+static void feather5_SpockScansCreature(void)
+{
+    svc_Anim(1, N_sscanw, -1, -1, 0);
+    svc_BridgeSfx(4);
+    feather5_Say(N_Mr_Spock, T_FEA5_024);
+    return;
+}
+
+/* [MSG_USE 44 FF 00] */
+static void feather5_SpockScans(void)
+{
+    svc_Anim(1, N_sscanw, -1, -1, 0);
+    svc_BridgeSfx(4);
+    feather5_Say(N_Mr_Spock, T_FEA5_026);
+    return;
+}
+
+/* [MSG_USE 44 23 00] */
+static void feather5_SpockScansRiver(void)
+{
+    svc_Anim(1, N_sscanw, -1, -1, 0);
+    svc_BridgeSfx(4);
+    if (rv_creature_gone == 0) {
+        feather5_Say(N_Mr_Spock, T_FEA5_030);
+        return;
+    }
+    feather5_Say(N_Mr_Spock, T_FEA5_031);
+    return;
+}
+
+/* [MSG_USE 44 21 00] */
+static void feather5_SpockScansPlant(void)
+{
+    svc_Anim(1, N_sscann, -1, -1, 0);
+    svc_BridgeSfx(4);
+    feather5_Say(N_Mr_Spock, T_FEA5_023);
+    return;
+}
+
+/* [MSG_USE 7F FF 00] */
+static void feather5_UseMedkit(void)
+{
+    feather5_Say(N_Dr_McCoy, T_FEA5_010);
+    return;
+}
+
+/* Talk: conversation AX (speaker, choices, 0); returns the choice. */
+static void feather5_Talk(uint16_t ax)
+{
+    svc_Talk(ax);
+    return;
+}
+
+/* Say: one line, BX, said by AX (0: narration). */
+static void feather5_Say(uint16_t ax, uint16_t bx)
+{
+    fv_talk_buf = ax;
+    CS_W(0x1B54) = bx;
+    feather5_Talk(talk_buf);
+    return;
+}
+
+/* the scripts, by the offset of their code in the room file */
+const RoomScript feather5_scripts[] = {
+    { 0x0117, feather5_StartRoom },    /* MSG_TICK 01 00 00 */
+    { 0x016E, feather5_AtTheLog },    /* MSG_REGION 00 00 00 */
+    { 0x0193, feather5_SpockOnPlant },    /* MSG_USE 01 21 00 */
+    { 0x01A3, feather5_McCoyOnPlant },    /* MSG_USE 02 21 00 */
+    { 0x01B3, feather5_StrageyOnPlant },    /* MSG_USE 03 21 00 */
+    { 0x01C3, feather5_StrageyCrosses },    /* MSG_USE 03 20 00 */
+    { 0x01FD, feather5_StrageyOnLog },    /* MSG_WALK_DONE 08 00 00 */
+    { 0x025E, feather5_StrageyEaten },    /* MSG_ANIM_DONE 09 00 00 */
+    { 0x0275, feather5_SpockCrosses },    /* MSG_USE 01 20 00 */
+    { 0x028B, feather5_McCoyCrosses },    /* MSG_USE 02 20 00 */
+    { 0x02A1, feather5_SnakeOnKirk },    /* MSG_USE 76 00 00 */
+    { 0x02B1, feather5_SnakeOnSpock },    /* MSG_USE 76 01 00 */
+    { 0x02C1, feather5_SnakeOnMcCoy },    /* MSG_USE 76 02 00 */
+    { 0x02D1, feather5_SnakeOnStragey },    /* MSG_USE 76 03 00 */
+    { 0x02E1, feather5_SnakeInRiver },    /* MSG_USE 76 23 00 */
+    { 0x02FD, feather5_KnifeOnKirk },    /* MSG_USE 79 00 00 */
+    { 0x030D, feather5_KnifeOnSpock },    /* MSG_USE 79 01 00 */
+    { 0x031D, feather5_KnifeOnMcCoy },    /* MSG_USE 79 02 00 */
+    { 0x032D, feather5_KnifeOnStragey },    /* MSG_USE 79 03 00 */
+    { 0x033D, feather5_KnifeInRiver },    /* MSG_USE 79 23 00 */
+    { 0x034C, feather5_KnifeOnCreature },    /* MSG_USE 79 08 00 */
+    { 0x035C, feather5_GetPlant },    /* MSG_GET 21 00 00 */
+    { 0x036C, feather5_CutPlant },    /* MSG_USE 79 21 00 */
+    { 0x039B, feather5_KirkAtPlant },    /* MSG_WALK_DONE 01 00 00 */
+    { 0x03B7, feather5_GotFern },    /* MSG_ANIM_DONE 01 00 00 */
+    { 0x03DE, feather5_E_03DE },    /* MSG_USE 77 08 00 */
+    { 0x03E6, feather5_FernInRiver },    /* MSG_USE 77 23 00 */
+    { 0x0409, feather5_KirkThrowsFern },    /* MSG_WALK_DONE 02 00 00 */
+    { 0x043B, feather5_FernThrown },    /* MSG_ANIM_DONE 02 00 00 */
+    { 0x0462, feather5_CreatureLeaves },    /* MSG_ANIM_DONE 03 00 00 */
+    { 0x0491, feather5_SpockOnPlantSap },    /* MSG_TIMER 01 00 00 */
+    { 0x04A1, feather5_RockAtSpock },    /* MSG_USE 43 01 00 */
+    { 0x04B1, feather5_RockAtMcCoy },    /* MSG_USE 43 02 00 */
+    { 0x04C1, feather5_RockAtStragey },    /* MSG_USE 43 03 00 */
+    { 0x04D1, feather5_SpockOnLight },    /* MSG_USE 01 0A 00 */
+    { 0x04D9, feather5_McCoyOnLight },    /* MSG_USE 02 0A 00 */
+    { 0x04E1, feather5_StrageyOnLight },    /* MSG_USE 03 0A 00 */
+    { 0x04F3, feather5_SpockOnCreature },    /* MSG_USE 01 08 00 */
+    { 0x0503, feather5_McCoyOnCreature },    /* MSG_USE 02 08 00 */
+    { 0x0513, feather5_StrageyOnCreature },    /* MSG_USE 03 08 00 */
+    { 0x0523, feather5_StunAnything },    /* MSG_USE 40 FF 00 */
+    { 0x0533, feather5_KillAnything },    /* MSG_USE 41 FF 00 */
+    { 0x0543, feather5_LookAtScene },    /* MSG_LOOK FF 00 00 */
+    { 0x0552, feather5_LookAtLog },    /* MSG_LOOK 22 00 00 */
+    { 0x0561, feather5_LookAtRiver },    /* MSG_LOOK 23 00 00 */
+    { 0x0570, feather5_LookAtPlant },    /* MSG_LOOK 21 00 00 */
+    { 0x057F, feather5_LookAtInsects1 },    /* MSG_LOOK 24 00 00 */
+    { 0x058E, feather5_LookAtInsects2 },    /* MSG_LOOK 25 00 00 */
+    { 0x059D, feather5_LookAtCave },    /* MSG_LOOK 26 00 00 */
+    { 0x05AC, feather5_LookAtCreature },    /* MSG_LOOK 08 00 00 */
+    { 0x05BB, feather5_LookAtSpock },    /* MSG_LOOK 01 00 00 */
+    { 0x05CA, feather5_LookAtKirk },    /* MSG_LOOK 00 00 00 */
+    { 0x05E0, feather5_LookAtMcCoy },    /* MSG_LOOK 02 00 00 */
+    { 0x05F6, feather5_LookAtRedshirt },    /* MSG_LOOK 03 00 00 */
+    { 0x060C, feather5_TalkToMcCoy },    /* MSG_TALK 02 00 00 */
+    { 0x061C, feather5_TalkToSpock },    /* MSG_TALK 01 00 00 */
+    { 0x062C, feather5_TalkToRedshirt },    /* MSG_TALK 03 00 00 */
+    { 0x063C, feather5_McCoyScansRiver },    /* MSG_USE 45 23 00 */
+    { 0x067D, feather5_McCoyScansCreature },    /* MSG_USE 45 08 00 */
+    { 0x06AE, feather5_SpockScansCreature },    /* MSG_USE 44 08 00 */
+    { 0x06DF, feather5_SpockScans },    /* MSG_USE 44 FF 00 */
+    { 0x0710, feather5_SpockScansRiver },    /* MSG_USE 44 23 00 */
+    { 0x0751, feather5_SpockScansPlant },    /* MSG_USE 44 21 00 */
+    { 0x0782, feather5_UseMedkit },    /* MSG_USE 7F FF 00 */
+    { 0, 0 }
+};

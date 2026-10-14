@@ -1,0 +1,853 @@
+/* VENG3.RDF: the room's scripts, translated from the machine code in the room file
+ * (src/rdf/veng3.asm) by tools/rdf2c.py.  They run on the loaded file (CS_B/CS_W) and the
+ * room state (`room`), and call the game through the svc_ macros of rooms.h.
+ *
+ * VENG3.RDF - "Vengeance", a corridor of the Republic between the two
+ * turbolifts and sickbay (room 4). Debris from the ceiling blocks
+ * turbolift 2: wedge in the beam from the bridge, then phaser it clear. A
+ * power cable lies here.
+ *
+ * Actors: 8 the turbolift 2 door, 9 the sickbay door, 0Ah (10) the debris,
+ * 0Bh (11) the cable, 0Ch (12) a body, 0Dh (13) the beam. Objects: those,
+ * 20h/21h the doors. Exits 0/1: the turbolifts.
+ *
+ * Labels: H_ script headers, L branch targets, C_ conversations,
+ * T_/N_/S_ strings; talk_buf: the conversation buffer of Say.
+ *
+ * Quirks of the original:
+ * - The script chain runs on into code at 1A6B: the engine reads its bytes
+ * as key 50 B8 03 00 and next 2E50 (beyond rdf_scripts_end, so the search
+ * stops).
+ * - The jump at 0CB7 goes to the script header at 0CF4.
+ */
+
+#include "rooms.h"
+
+/* where the file keeps its strings, conversations and tables */
+enum {
+    N_VEN3LOOP = 0x00E0,
+    N_s7r3bm = 0x0100,
+    N_veng3 = 0x011F,
+    N_s7r3d2 = 0x013A,
+    N_veng3b = 0x0159,
+    N_s7r3c1 = 0x016F,
+    N_s7r3ca = 0x0195,
+    N_s7r3dc = 0x01B5,
+    T_VEN0_010 = 0x01F0,
+    T_VEN3N006 = 0x02C2,
+    N_s7r3db = 0x030A,
+    N_s7r3da = 0x0392,
+    T_VEN3N007 = 0x03FC,
+    T_VEN3N009 = 0x0460,
+    T_VEN3N007_2 = 0x04F8,
+    T_VEN3N012 = 0x0552,
+    T_VEN3_013 = 0x05A3,
+    T_VEN3_006 = 0x0635,
+    T_VEN3N011 = 0x0696,
+    T_VEN3N013 = 0x06DB,
+    T_VEN3N005 = 0x0732,
+    T_VEN3N001 = 0x07A2,
+    T_VEN3N002 = 0x07F8,
+    T_VEN3N004 = 0x086D,
+    T_VEN3N000 = 0x08D7,
+    T_VEN3N003 = 0x092B,
+    T_VEN3_002 = 0x09B2,
+    N_kfiren = 0x0A2A,
+    N_s7r3ph = 0x0A4F,
+    N_MUR1E4 = 0x0A8F,
+    N_s7r3df = 0x0AA7,
+    N_s7r3d2_2 = 0x0ADD,
+    T_VEN3_014 = 0x0B0A,
+    N_veng3_2 = 0x0BA6,
+    T_VEN3_015 = 0x0BC4,
+    T_VEN3_008 = 0x0C3E,
+    T_VEN3_011 = 0x0CB9,
+    T_VEN3_017 = 0x0D0E,
+    T_VEN3_016 = 0x0D9A,
+    T_VEN3_004 = 0x0DF1,
+    N_kusemn = 0x0E50,
+    N_MUR3E1S = 0x0E6E,
+    N_s7r3bm_2 = 0x0E8E,
+    N_sscann = 0x0ECC,
+    T_VEN3_009 = 0x0F0D,
+    T_VEN3_007 = 0x0F99,
+    T_VEN3_010 = 0x0FE7,
+    T_VEN3_001 = 0x1062,
+    T_VEN3_012 = 0x1152,
+    T_VEN3_003 = 0x118D,
+    T_VEN3_018 = 0x11E6,
+    T_VEN3_005 = 0x1230,
+    T_VEN3N010 = 0x1271,
+    N_kusehn = 0x12E4,
+    N_MUR4E6 = 0x1302,
+    T_VEN3N014 = 0x133E,
+    T_VEN2_098 = 0x13C6,
+    T_VENA_F40 = 0x1425,
+    T_VENA_F32 = 0x14AC,
+    T_VENA_F34 = 0x15BA,
+    T_VEN4N010 = 0x1654,
+    T_VEN6N007 = 0x1695,
+    T_MUD4_018 = 0x16EA,
+    T_BRIDU146 = 0x172F,
+    T_MUD4_018_2 = 0x176F,
+    T_VEN2U093 = 0x17B3,
+    T_VEN2_028 = 0x181E,
+    T_VEN2_066 = 0x186C,
+    T_DEM3_019 = 0x1913,
+    T_VEN4_016 = 0x1946,
+    T_G_014 = 0x198E,
+    T_G_014_2 = 0x19C7,
+    T_VEN0_016 = 0x1A00,
+    T_VEN0_016_2 = 0x1A3B,
+    N_Capt_Kirk = 0x1AED,
+    N_Dr_McCoy = 0x1AF8,
+    N_Mr_Spock = 0x1B02,
+    N_Ensign_Kije = 0x1B0C,
+    N_Lt_Uhura = 0x1B18,
+    N_Elasi_Captain = 0x1B26,
+    talk_buf = 0x1B34,
+};
+
+/* the room's variables: in the room state, and in the file itself */
+#define fv_mccoy_line CS_W(0x18D6)
+#define fv_talk_buf CS_W(0x1B34)
+#define rv_attack_timer ROOM_W(0x51)
+#define rv_beam_placed ROOM_B(0x53)
+#define rv_board_timer ROOM_W(0x49)
+#define rv_cable_taken ROOM_B(0x5F)
+#define rv_complied ROOM_B(0x45)
+#define rv_comply_timer ROOM_W(0x4D)
+#define rv_debris_cleared ROOM_B(0x54)
+#define rv_elasi_here ROOM_B(0x43)
+#define rv_enterprise_away ROOM_B(0x36)
+#define rv_hypo_oiled ROOM_B(0x3A)
+#define rv_power_on ROOM_B(0x34)
+#define rv_power_to ROOM_B(0x3C)
+#define rv_rescued ROOM_B(0x42)
+#define rv_saw_marata ROOM_B(0x56)
+#define rv_spock_on_lift ROOM_B(0x55)
+#define rv_stall_timer ROOM_W(0x4B)
+#define rv_torpedo_timer ROOM_W(0x4F)
+
+/* functions */
+static void veng3_StartRoom(void);
+static void veng3_NeedPower(void);
+static void veng3_ToTurbolift2(void);
+static void veng3_ToTurbolift1(void);
+static void veng3_E_028C(void);
+static void veng3_WalkToTurbolift(void);
+static void veng3_AtTurbolift(void);
+static void veng3_IntoTurbolift(void);
+static void veng3_E_0361(void);
+static void veng3_WalkToSickbay(void);
+static void veng3_AtSickbay(void);
+static void veng3_IntoSickbay(void);
+static void veng3_E_03E9(void);
+static void veng3_LookAtBeam(void);
+static void veng3_LookAtDebris(void);
+static void veng3_LookAtTurbolift(void);
+static void veng3_E_0683(void);
+static void veng3_LookAtSickbay(void);
+static void veng3_E_06C8(void);
+static void veng3_LookAtCable(void);
+static void veng3_LookAtBody(void);
+static void veng3_LookAtKirk(void);
+static void veng3_LookAtMcCoy(void);
+static void veng3_LookAtSpock(void);
+static void veng3_LookAtRedshirt(void);
+static void veng3_LookAtCorridor(void);
+static void veng3_StunDebris(void);
+static void veng3_PhaserDebris(void);
+static void veng3_KirkAtDebris(void);
+static void veng3_Fired(void);
+static void veng3_DebrisHit(void);
+static void veng3_DebrisFell(void);
+static void veng3_SpockOnDebris(void);
+static void veng3_KijeOnDebris(void);
+static void veng3_McCoyOnDebris(void);
+static void veng3_BeamOnDebris(void);
+static void veng3_KirkAtCeiling(void);
+static void veng3_BeamPlaced(void);
+static void veng3_SpockScansDebris(void);
+static void veng3_part_0F8E(void);
+static void veng3_SawOnDebris(void);
+static void veng3_TalkToKirk(void);
+static void veng3_TalkToSpock(void);
+static void veng3_TalkToMcCoy(void);
+static void veng3_TalkToRedshirt(void);
+static void veng3_GetDebris(void);
+static void veng3_GetCable(void);
+static void veng3_KirkAtCable(void);
+static void veng3_TookCable(void);
+static void veng3_ElasiDeadlines(void);
+static void veng3_E_15A6(void);
+static void veng3_KillAnything(void);
+static void veng3_LookAtHypo(void);
+static void veng3_CallEnterprise(void);
+static void veng3_E_18DE(void);
+static void veng3_MTricorderOnBody(void);
+static void veng3_McCoyOnBody(void);
+static void veng3_Talk(uint16_t ax);
+static void veng3_Say(uint16_t ax, uint16_t bx);
+
+/* The room starts: the beam, the debris (and its walk map), the cable.
+ * [MSG_TICK 01 00 00] */
+static void veng3_StartRoom(void)
+{
+    svc_Sfx(N_VEN3LOOP);
+    if (rv_beam_placed == 1) {
+        svc_Anim(0xD, N_s7r3bm, 0x8C, 0x61, 0);
+    }
+    svc_LoadMap(N_veng3);
+    if (rv_debris_cleared != 1) {
+        svc_Anim(0xA, N_s7r3d2, 0xA5, 0x68, 0);
+        svc_LoadMap(N_veng3b);
+    }
+    svc_Anim(0xC, N_s7r3c1, 0xC5, 0x99, 0);
+    if (rv_cable_taken != 1) {
+        svc_Anim(0xB, N_s7r3ca, 0xB7, 0x84, 0);
+    }
+    svc_Anim(9, N_s7r3dc, 0x5B, 0x80, 0);
+    return;
+}
+
+/* Tick 15, back from sickbay with no power yet: Kirk turns to restoring
+ * it.
+ * [MSG_TICK 0F 00 00] */
+static void veng3_NeedPower(void)
+{
+    if (rv_saw_marata == 1) {
+        if (rv_power_on != 1) {
+            veng3_Say(N_Capt_Kirk, T_VEN0_010);
+            rv_saw_marata = 0;
+        }
+    }
+    return;
+}
+
+/* Exits 0 and 1: the turbolifts.
+ * [MSG_EXIT 00 00 00] */
+static void veng3_ToTurbolift2(void)
+{
+    svc_BridgeSfx(5);
+    svc_Turbolift(3, 1);
+    return;
+}
+
+/* [MSG_EXIT 01 00 00] */
+static void veng3_ToTurbolift1(void)
+{
+    svc_BridgeSfx(5);
+    svc_Turbolift(3, 0);
+    return;
+}
+
+/* Walking to turbolift 2, once cleared (msg 2, anim msg 1), and to sickbay
+ * (msg 9, anim msg 0Ah).
+ * [MSG_WALK 0A 00 00] */
+static void veng3_E_028C(void)
+{
+    { veng3_WalkToTurbolift(); return; }
+}
+
+/* [MSG_WALK 20 00 00] */
+static void veng3_WalkToTurbolift(void)
+{
+    if (rv_debris_cleared == 1) {
+        svc_Walk(0, 0xA6, 0x6E, 2);
+        return;
+    }
+    veng3_Say(0, T_VEN3N006);
+    return;
+}
+
+/* [MSG_WALK_DONE 02 00 00] */
+static void veng3_AtTurbolift(void)
+{
+    room.busy = 1;
+    svc_Anim(8, N_s7r3db, 0xA6, 0x60, 1);
+    svc_BridgeSfx(5);
+    return;
+}
+
+/* [MSG_ANIM_DONE 01 00 00] */
+static void veng3_IntoTurbolift(void)
+{
+    svc_Walk(0, 0xA6, 0x61, 0);
+    return;
+}
+
+/* [MSG_WALK 09 00 00] */
+static void veng3_E_0361(void)
+{
+    { veng3_WalkToSickbay(); return; }
+}
+
+/* [MSG_WALK 21 00 00] */
+static void veng3_WalkToSickbay(void)
+{
+    svc_Walk(0, 0x68, 0x83, 9);
+    return;
+}
+
+/* [MSG_WALK_DONE 09 00 00] */
+static void veng3_AtSickbay(void)
+{
+    room.busy = 1;
+    svc_Anim(9, N_s7r3da, 0x5B, 0x80, 0xA);
+    svc_BridgeSfx(5);
+    return;
+}
+
+/* [MSG_ANIM_DONE 0A 00 00] */
+static void veng3_IntoSickbay(void)
+{
+    svc_Walk(0, 0x5E, 0x83, 0);
+    return;
+}
+
+/* Looking.
+ * [MSG_USE 44 0D 00] */
+static void veng3_E_03E9(void)
+{
+    { veng3_LookAtBeam(); return; }
+}
+
+/* [MSG_LOOK 0D 00 00] */
+static void veng3_LookAtBeam(void)
+{
+    veng3_Say(0, T_VEN3N007);
+    return;
+}
+
+/* [MSG_LOOK 0A 00 00] */
+static void veng3_LookAtDebris(void)
+{
+    if (rv_debris_cleared == 1) {
+    } else {
+        veng3_Say(0, T_VEN3N009);
+        return;
+    }
+    veng3_Say(0, T_VEN3N007_2);
+    return;
+}
+
+/* [MSG_LOOK 20 00 00] */
+static void veng3_LookAtTurbolift(void)
+{
+    veng3_Say(0, T_VEN3N012);
+    if (rv_spock_on_lift == 1) {
+    } else {
+        rv_spock_on_lift = 1;
+        if (rv_debris_cleared == 1) {
+        } else {
+            veng3_Say(N_Mr_Spock, T_VEN3_013);
+            veng3_Say(N_Dr_McCoy, T_VEN3_006);
+            goto L067C;
+        }
+    }
+L067C:;
+    return;
+}
+
+/* [MSG_LOOK 09 00 00] */
+static void veng3_E_0683(void)
+{
+    { veng3_LookAtSickbay(); return; }
+}
+
+/* [MSG_LOOK 21 00 00] */
+static void veng3_LookAtSickbay(void)
+{
+    veng3_Say(0, T_VEN3N011);
+    return;
+}
+
+/* [MSG_USE 44 0B 00] */
+static void veng3_E_06C8(void)
+{
+    { veng3_LookAtCable(); return; }
+}
+
+/* [MSG_LOOK 0B 00 00] */
+static void veng3_LookAtCable(void)
+{
+    veng3_Say(0, T_VEN3N013);
+    return;
+}
+
+/* [MSG_LOOK 0C 00 00] */
+static void veng3_LookAtBody(void)
+{
+    veng3_Say(0, T_VEN3N005);
+    return;
+}
+
+/* [MSG_LOOK 00 00 00] */
+static void veng3_LookAtKirk(void)
+{
+    veng3_Say(0, T_VEN3N001);
+    return;
+}
+
+/* [MSG_LOOK 02 00 00] */
+static void veng3_LookAtMcCoy(void)
+{
+    veng3_Say(0, T_VEN3N002);
+    return;
+}
+
+/* [MSG_LOOK 01 00 00] */
+static void veng3_LookAtSpock(void)
+{
+    veng3_Say(0, T_VEN3N004);
+    return;
+}
+
+/* [MSG_LOOK 03 00 00] */
+static void veng3_LookAtRedshirt(void)
+{
+    veng3_Say(0, T_VEN3N000);
+    return;
+}
+
+/* [MSG_LOOK FF 00 00] */
+static void veng3_LookAtCorridor(void)
+{
+    veng3_Say(0, T_VEN3N003);
+    return;
+}
+
+/* Phasers on the debris (msgs 4, 5, anims 3, 6): without the beam to hold
+ * the ceiling it falls back; with it, the way is clear.
+ * [MSG_USE 40 0A 00] */
+static void veng3_StunDebris(void)
+{
+    veng3_Say(N_Mr_Spock, T_VEN3_002);
+    return;
+}
+
+/* [MSG_USE 41 0A 00] */
+static void veng3_PhaserDebris(void)
+{
+    if (rv_debris_cleared != 1) {
+        room.busy = 1;
+        svc_Walk(0, 0x96, 0xA8, 4);
+    }
+    return;
+}
+
+/* [MSG_WALK_DONE 04 00 00] */
+static void veng3_KirkAtDebris(void)
+{
+    svc_Anim(0, N_kfiren, -1, -1, 5);
+    return;
+}
+
+/* [MSG_ANIM_DONE 05 00 00] */
+static void veng3_Fired(void)
+{
+    svc_Anim(0xA, N_s7r3ph, 0x9C, 0x83, 3);
+    svc_BridgeSfx(6);
+    return;
+}
+
+/* [MSG_ANIM_DONE 03 00 00] */
+static void veng3_DebrisHit(void)
+{
+    if (rv_beam_placed == 1) {
+    } else {
+        svc_Sfx(N_MUR1E4);
+        svc_Anim(0xA, N_s7r3df, 0xA6, 0x60, 6);
+        svc_StopAnim(0);
+        return;
+    }
+    room.busy = 0;
+    svc_LoadMap(N_veng3_2);
+    veng3_Say(N_Mr_Spock, T_VEN3_015);
+    rv_debris_cleared = 1;
+    return;
+}
+
+/* [MSG_ANIM_DONE 06 00 00] */
+static void veng3_DebrisFell(void)
+{
+    svc_Anim(0xA, N_s7r3d2_2, 0xA5, 0x68, 0);
+    room.busy = 0;
+    veng3_Say(N_Mr_Spock, T_VEN3_014);
+    return;
+}
+
+/* The crew and the debris.
+ * [MSG_USE 01 0A 00] */
+static void veng3_SpockOnDebris(void)
+{
+    if (rv_beam_placed != 1) {
+        veng3_Say(N_Mr_Spock, T_VEN3_008);
+        return;
+    }
+    veng3_Say(N_Mr_Spock, T_VEN3_011);
+    { veng3_KijeOnDebris(); return; }
+}
+
+/* [MSG_USE 03 0A 00] */
+static void veng3_KijeOnDebris(void)
+{
+    if (rv_beam_placed == 1) {
+    } else {
+        veng3_Say(N_Ensign_Kije, T_VEN3_017);
+        return;
+    }
+    if (rv_beam_placed == 1) {
+        { veng3_part_0F8E(); return; }
+    }
+    veng3_Say(N_Ensign_Kije, T_VEN3_016);
+    return;
+}
+
+/* [MSG_USE 02 0A 00] */
+static void veng3_McCoyOnDebris(void)
+{
+    veng3_Say(N_Dr_McCoy, T_VEN3_004);
+    return;
+}
+
+/* Wedging the beam under the ceiling (msgs 7, 8).
+ * [MSG_USE 80 0A 00] */
+static void veng3_BeamOnDebris(void)
+{
+    room.busy = 1;
+    svc_Walk(0, 0x94, 0x6D, 7);
+    return;
+}
+
+/* [MSG_WALK_DONE 07 00 00] */
+static void veng3_KirkAtCeiling(void)
+{
+    svc_Anim(0, N_kusemn, -1, -1, 8);
+    svc_Sfx(N_MUR3E1S);
+    return;
+}
+
+/* [MSG_ANIM_DONE 08 00 00] */
+static void veng3_BeamPlaced(void)
+{
+    svc_Anim(0xD, N_s7r3bm_2, 0x8C, 0x61, 0);
+    room.busy = 0;
+    rv_beam_placed = 1;
+    svc_TakeItem(IT_BEAM);
+    return;
+}
+
+/* Spock's tricorder and the saw.
+ * [MSG_USE 44 0A 00] */
+static void veng3_SpockScansDebris(void)
+{
+    svc_Anim(1, N_sscann, -1, -1, 0);
+    svc_BridgeSfx(4);
+    if (rv_beam_placed == 1) {
+        { veng3_part_0F8E(); return; }
+    }
+    veng3_Say(N_Mr_Spock, T_VEN3_009);
+    return;
+}
+
+static void veng3_part_0F8E(void)
+{
+    veng3_Say(N_Mr_Spock, T_VEN3_007);
+    return;
+}
+
+/* [MSG_USE 86 0A 00] */
+static void veng3_SawOnDebris(void)
+{
+    veng3_Say(N_Mr_Spock, T_VEN3_010);
+    return;
+}
+
+/* [MSG_TALK 00 00 00] */
+static void veng3_TalkToKirk(void)
+{
+    veng3_Say(N_Capt_Kirk, T_VEN3_001);
+    return;
+}
+
+/* [MSG_TALK 01 00 00] */
+static void veng3_TalkToSpock(void)
+{
+    veng3_Say(N_Mr_Spock, T_VEN3_012);
+    return;
+}
+
+/* [MSG_TALK 02 00 00] */
+static void veng3_TalkToMcCoy(void)
+{
+    veng3_Say(N_Dr_McCoy, T_VEN3_003);
+    return;
+}
+
+/* [MSG_TALK 03 00 00] */
+static void veng3_TalkToRedshirt(void)
+{
+    veng3_Say(N_Ensign_Kije, T_VEN3_018);
+    veng3_Say(N_Dr_McCoy, T_VEN3_005);
+    return;
+}
+
+/* [MSG_GET 0A 00 00] */
+static void veng3_GetDebris(void)
+{
+    veng3_Say(0, T_VEN3N010);
+    return;
+}
+
+/* Taking the cable (msgs 0Bh, 0Ch).
+ * [MSG_GET 0B 00 00] */
+static void veng3_GetCable(void)
+{
+    room.busy = 1;
+    svc_Walk(0, 0xB7, 0x85, 0xB);
+    return;
+}
+
+/* [MSG_WALK_DONE 0B 00 00] */
+static void veng3_KirkAtCable(void)
+{
+    svc_Anim(0, N_kusehn, -1, -1, 0xC);
+    svc_Sfx(N_MUR4E6);
+    return;
+}
+
+/* [MSG_ANIM_DONE 0C 00 00] */
+static void veng3_TookCable(void)
+{
+    room.busy = 0;
+    svc_StopAnim(0xB);
+    veng3_Say(0, T_VEN3N014);
+    svc_GiveItem(IT_CABLE2);
+    rv_cable_taken = 1;
+    return;
+}
+
+/* Every tick, common to the mission's rooms: the Elasi deadlines set on
+ * the bridge (room 2). Until the Enterprise returns: boarding unless the
+ * shields are up, the thirty minutes, the wait after Kirk complies (then
+ * a warning and the torpedoes), the chance after they lower their
+ * shields. When one runs out, the game is over.
+ * [MSG_TICK FF FF FF] */
+static void veng3_ElasiDeadlines(void)
+{
+    if (rv_board_timer != 0) {
+        rv_board_timer--;
+        if (rv_board_timer == 0) {
+            if (rv_power_to != 2) {
+                goto L1496;
+            }
+        }
+    }
+    if (rv_stall_timer != 0) {
+        rv_stall_timer--;
+        if (rv_stall_timer == 0) {
+            if (rv_complied != 1) {
+                goto L1496;
+            }
+        }
+    }
+    if (rv_comply_timer != 0) {
+        rv_comply_timer--;
+        if (rv_comply_timer == 0) {
+            if (rv_rescued != 1) {
+                veng3_Say(N_Elasi_Captain, T_VEN2_098);
+                rv_torpedo_timer = 0xA8C;
+            }
+        }
+    }
+    if (rv_torpedo_timer != 0) {
+        rv_torpedo_timer--;
+        if (rv_torpedo_timer == 0) {
+            if (rv_rescued != 1) {
+                veng3_Say(0, T_VENA_F40);
+                svc_GameOver();
+            }
+        }
+    }
+    if (rv_attack_timer != 0) {
+        rv_attack_timer--;
+        if (rv_attack_timer == 0) {
+            if (rv_rescued != 1) {
+                goto L1496;
+            }
+        }
+    }
+    return;
+L1496:;
+    veng3_Say(0, T_VENA_F32);
+    svc_GameOver();
+    return;
+}
+
+/* [MSG_USE 40 FF 00] */
+static void veng3_E_15A6(void)
+{
+    { veng3_KillAnything(); return; }
+}
+
+/* [MSG_USE 41 FF 00] */
+static void veng3_KillAnything(void)
+{
+    veng3_Say(N_Mr_Spock, T_VENA_F34);
+    return;
+}
+
+/* The hypo, empty or full of oil.
+ * [MSG_LOOK 82 00 00] */
+static void veng3_LookAtHypo(void)
+{
+    if (rv_hypo_oiled != 1) {
+        veng3_Say(0, T_VEN4N010);
+        return;
+    }
+    veng3_Say(0, T_VEN6N007);
+    return;
+}
+
+/* The communicator: before the Enterprise leaves, Uhura; while the Elasi
+ * jam it, Spock; otherwise Uhura, tracking the distress call.
+ * [MSG_USE 47 00 00] */
+static void veng3_CallEnterprise(void)
+{
+    if (rv_enterprise_away != 1) {
+        veng3_Say(N_Capt_Kirk, T_MUD4_018);
+        veng3_Say(N_Lt_Uhura, T_BRIDU146);
+        return;
+    }
+    if (rv_elasi_here == 1) {
+    } else {
+        veng3_Say(N_Capt_Kirk, T_MUD4_018_2);
+        veng3_Say(N_Lt_Uhura, T_VEN2U093);
+        veng3_Say(N_Capt_Kirk, T_VEN2_028);
+        return;
+    }
+    veng3_Say(N_Mr_Spock, T_VEN2_066);
+    return;
+}
+
+/* McCoy and the body.
+ * [MSG_USE 7F 0C 00] */
+static void veng3_E_18DE(void)
+{
+    { veng3_MTricorderOnBody(); return; }
+}
+
+/* [MSG_USE 45 0C 00] */
+static void veng3_MTricorderOnBody(void)
+{
+    { veng3_McCoyOnBody(); return; }
+}
+
+/* [MSG_USE 02 0C 00] */
+static void veng3_McCoyOnBody(void)
+{
+    uint16_t ax = 0;
+    ax = (uint16_t)svc_Random(0, 5);
+    fv_mccoy_line = ax;
+    if (fv_mccoy_line == 0) {
+        veng3_Say(N_Dr_McCoy, T_DEM3_019);
+        return;
+    }
+    if (fv_mccoy_line == 1) {
+        veng3_Say(N_Dr_McCoy, T_VEN4_016);
+        return;
+    }
+    if (fv_mccoy_line == 2) {
+        veng3_Say(N_Dr_McCoy, T_G_014);
+        return;
+    }
+    if (fv_mccoy_line == 3) {
+        veng3_Say(N_Dr_McCoy, T_G_014_2);
+        return;
+    }
+    if (fv_mccoy_line == 4) {
+        veng3_Say(N_Dr_McCoy, T_VEN0_016);
+        return;
+    }
+    veng3_Say(N_Dr_McCoy, T_VEN0_016_2);
+    return;
+}
+
+/* Talk: conversation AX (speaker, choices, 0); returns the choice. */
+static void veng3_Talk(uint16_t ax)
+{
+    svc_Talk(ax);
+    return;
+}
+
+/* Say: one line, BX, said by AX (0: narration). */
+static void veng3_Say(uint16_t ax, uint16_t bx)
+{
+    fv_talk_buf = ax;
+    CS_W(0x1B36) = bx;
+    veng3_Talk(talk_buf);
+    return;
+}
+
+/* the scripts, by the offset of their code in the room file */
+const RoomScript veng3_scripts[] = {
+    { 0x00DE, veng3_StartRoom },    /* MSG_TICK 01 00 00 */
+    { 0x01D9, veng3_NeedPower },    /* MSG_TICK 0F 00 00 */
+    { 0x0242, veng3_ToTurbolift2 },    /* MSG_EXIT 00 00 00 */
+    { 0x0267, veng3_ToTurbolift1 },    /* MSG_EXIT 01 00 00 */
+    { 0x028C, veng3_E_028C },    /* MSG_WALK 0A 00 00 */
+    { 0x0294, veng3_WalkToTurbolift },    /* MSG_WALK 20 00 00 */
+    { 0x0304, veng3_AtTurbolift },    /* MSG_WALK_DONE 02 00 00 */
+    { 0x033E, veng3_IntoTurbolift },    /* MSG_ANIM_DONE 01 00 00 */
+    { 0x0361, veng3_E_0361 },    /* MSG_WALK 09 00 00 */
+    { 0x0369, veng3_WalkToSickbay },    /* MSG_WALK 21 00 00 */
+    { 0x038C, veng3_AtSickbay },    /* MSG_WALK_DONE 09 00 00 */
+    { 0x03C6, veng3_IntoSickbay },    /* MSG_ANIM_DONE 0A 00 00 */
+    { 0x03E9, veng3_E_03E9 },    /* MSG_USE 44 0D 00 */
+    { 0x03F1, veng3_LookAtBeam },    /* MSG_LOOK 0D 00 00 */
+    { 0x044B, veng3_LookAtDebris },    /* MSG_LOOK 0A 00 00 */
+    { 0x0547, veng3_LookAtTurbolift },    /* MSG_LOOK 20 00 00 */
+    { 0x0683, veng3_E_0683 },    /* MSG_LOOK 09 00 00 */
+    { 0x068B, veng3_LookAtSickbay },    /* MSG_LOOK 21 00 00 */
+    { 0x06C8, veng3_E_06C8 },    /* MSG_USE 44 0B 00 */
+    { 0x06D0, veng3_LookAtCable },    /* MSG_LOOK 0B 00 00 */
+    { 0x0727, veng3_LookAtBody },    /* MSG_LOOK 0C 00 00 */
+    { 0x0797, veng3_LookAtKirk },    /* MSG_LOOK 00 00 00 */
+    { 0x07ED, veng3_LookAtMcCoy },    /* MSG_LOOK 02 00 00 */
+    { 0x0862, veng3_LookAtSpock },    /* MSG_LOOK 01 00 00 */
+    { 0x08CC, veng3_LookAtRedshirt },    /* MSG_LOOK 03 00 00 */
+    { 0x0920, veng3_LookAtCorridor },    /* MSG_LOOK FF 00 00 */
+    { 0x09A7, veng3_StunDebris },    /* MSG_USE 40 0A 00 */
+    { 0x09FB, veng3_PhaserDebris },    /* MSG_USE 41 0A 00 */
+    { 0x0A28, veng3_KirkAtDebris },    /* MSG_WALK_DONE 04 00 00 */
+    { 0x0A4D, veng3_Fired },    /* MSG_ANIM_DONE 05 00 00 */
+    { 0x0A84, veng3_DebrisHit },    /* MSG_ANIM_DONE 03 00 00 */
+    { 0x0ADB, veng3_DebrisFell },    /* MSG_ANIM_DONE 06 00 00 */
+    { 0x0C2D, veng3_SpockOnDebris },    /* MSG_USE 01 0A 00 */
+    { 0x0CFA, veng3_KijeOnDebris },    /* MSG_USE 03 0A 00 */
+    { 0x0DE6, veng3_McCoyOnDebris },    /* MSG_USE 02 0A 00 */
+    { 0x0E27, veng3_BeamOnDebris },    /* MSG_USE 80 0A 00 */
+    { 0x0E4E, veng3_KirkAtCeiling },    /* MSG_WALK_DONE 07 00 00 */
+    { 0x0E8C, veng3_BeamPlaced },    /* MSG_ANIM_DONE 08 00 00 */
+    { 0x0ECA, veng3_SpockScansDebris },    /* MSG_USE 44 0A 00 */
+    { 0x0FDC, veng3_SawOnDebris },    /* MSG_USE 86 0A 00 */
+    { 0x1056, veng3_TalkToKirk },    /* MSG_TALK 00 00 00 */
+    { 0x1147, veng3_TalkToSpock },    /* MSG_TALK 01 00 00 */
+    { 0x1182, veng3_TalkToMcCoy },    /* MSG_TALK 02 00 00 */
+    { 0x11DB, veng3_TalkToRedshirt },    /* MSG_TALK 03 00 00 */
+    { 0x1266, veng3_GetDebris },    /* MSG_GET 0A 00 00 */
+    { 0x12BB, veng3_GetCable },    /* MSG_GET 0B 00 00 */
+    { 0x12E2, veng3_KirkAtCable },    /* MSG_WALK_DONE 0B 00 00 */
+    { 0x131F, veng3_TookCable },    /* MSG_ANIM_DONE 0C 00 00 */
+    { 0x1382, veng3_ElasiDeadlines },    /* MSG_TICK FF FF FF */
+    { 0x15A6, veng3_E_15A6 },    /* MSG_USE 40 FF 00 */
+    { 0x15AE, veng3_KillAnything },    /* MSG_USE 41 FF 00 */
+    { 0x1643, veng3_LookAtHypo },    /* MSG_LOOK 82 00 00 */
+    { 0x16D9, veng3_CallEnterprise },    /* MSG_USE 47 00 00 */
+    { 0x18DE, veng3_E_18DE },    /* MSG_USE 7F 0C 00 */
+    { 0x18E6, veng3_MTricorderOnBody },    /* MSG_USE 45 0C 00 */
+    { 0x18EE, veng3_McCoyOnBody },    /* MSG_USE 02 0C 00 */
+    { 0, 0 }
+};

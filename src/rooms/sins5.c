@@ -1,0 +1,982 @@
+/* SINS5.RDF: the room's scripts, translated from the machine code in the room file
+ * (src/rdf/sins5.asm) by tools/rdf2c.py.  They run on the loaded file (CS_B/CS_W) and the
+ * room state (`room`), and call the game through the svc_ macros of rooms.h.
+ *
+ * SINS5.RDF - "Sins of Omission", the operations centre of the Scythe
+ * base: two twin computers, Alpha and Omega, drive the missile launch
+ * computer. The virus-ridden Alpha unit has the wrong launch time; linked
+ * with the connector (room 3), the Omega unit's time wins and the
+ * missiles fall short of Proxtrey. The end of the mission.
+ *
+ * Actors: 8-10 (0Ah) phaser hits, 11 (0Bh) the connector cable.
+ * Objects: 20h the Alpha unit, 21h the Omega unit, 22h the launch
+ * computer, 23h the radiation door, 24h lights, 25h-28h missiles.
+ * Exit 1: room 4.
+ *
+ * Labels: H_ script headers, L branch targets, C_ conversations,
+ * T_/N_/S_ strings; talk_buf: the conversation buffer of Say.
+ *
+ * Quirks of the original:
+ * - The point-once flags (mccoy_scan_point ... omega_use_point) are never
+ * set, so those points come every time.
+ * - The conversation at 00DA is built at run time.
+ */
+
+#include "rooms.h"
+
+/* where the file keeps its strings, conversations and tables */
+enum {
+    N_sscans = 0x00CC,
+    N_mscans = 0x00D3,
+    talk_buf = 0x00DA,
+    N_Capt_Kirk = 0x0123,
+    N_Dr_McCoy = 0x012E,
+    N_Mr_Spock = 0x0138,
+    N_Ensign_Mosher = 0x0142,
+    N_Mr_Scott = 0x015A,
+    N_Computer = 0x0164,
+    N_SIN5LOOP = 0x0271,
+    N_s5cabl = 0x02A1,
+    N_sscans_2 = 0x02EC,
+    T_SIN5_013 = 0x0323,
+    T_SIN5_030 = 0x03AE,
+    T_SIN5_029 = 0x045F,
+    T_SIN5_028 = 0x0507,
+    T_SIN5_003 = 0x05BE,
+    T_SIN5_004 = 0x061A,
+    T_SIN5_001 = 0x0676,
+    T_SIN5_015 = 0x06D7,
+    T_SIN5_042 = 0x075F,
+    T_SIN5_027 = 0x07E3,
+    N_susemn = 0x0888,
+    T_SIN5_039 = 0x08BA,
+    N_susemn_2 = 0x0983,
+    T_SIN5_041 = 0x09C3,
+    T_SIN5_025 = 0x0A4E,
+    T_SIN5_040 = 0x0AE1,
+    T_SIN5_008 = 0x0BFD,
+    T_SIN5_S19 = 0x0C4D,
+    T_SIN5_005 = 0x0CB6,
+    T_SIN5_026 = 0x0D0D,
+    T_SIN5_044 = 0x0DDF,
+    T_SIN5_036 = 0x0E59,
+    T_SIN5_020 = 0x0F03,
+    T_SIN5_006 = 0x0F62,
+    T_SIN5_037 = 0x0FC2,
+    T_SIN5_021 = 0x1049,
+    T_SIN5_032 = 0x10AD,
+    T_SIN5_007 = 0x111E,
+    N_suselw = 0x11AF,
+    N_kusele = 0x11CD,
+    N_s5cabl_2 = 0x1200,
+    T_SIN5N004 = 0x1227,
+    T_SIN5_043 = 0x1296,
+    N_kdraww = 0x12F7,
+    N_s5phal = 0x131C,
+    N_kfiren = 0x13A1,
+    N_s5phac = 0x13C6,
+    N_kdrawe = 0x144C,
+    N_s5phar = 0x1471,
+    T_SIN5N012 = 0x14E8,
+    T_SIN5N013 = 0x15CB,
+    T_SIN5N005 = 0x1781,
+    T_SIN5N000 = 0x17F1,
+    T_SIN5N006 = 0x187C,
+    T_SIN5N001 = 0x18E5,
+    T_SIN5N002 = 0x193E,
+    T_SIN5N007 = 0x197C,
+    T_SIN5N010 = 0x19D1,
+    T_SIN5N008 = 0x1A35,
+    T_SIN5N009 = 0x1AB7,
+    T_SIN5N003 = 0x1B34,
+    T_SIN5N011 = 0x1BB4,
+    T_SIN5_017 = 0x1C21,
+    T_SIN5_016 = 0x1C8E,
+    T_SIN5_002 = 0x1D19,
+    T_SIN5_038 = 0x1D69,
+    T_SIN5_023 = 0x1DC5,
+    T_SIN5_033 = 0x1E2A,
+    T_SIN5_019 = 0x1E8A,
+    T_SIN5_018 = 0x1EF4,
+    T_SIN5_010 = 0x1F30,
+    T_SIN5_046 = 0x1FAC,
+    T_SIN5_034 = 0x2024,
+    T_SIN5_011 = 0x20EB,
+    T_SIN5_012 = 0x2188,
+    T_SIN5_024 = 0x2232,
+    T_SIN5_014 = 0x22FE,
+    rdf_scripts_end = 0x2365,
+    T_SIN5_045 = 0x2459,
+};
+
+/* the room's variables: in the room state, and in the file itself */
+#define fv_at_computers CS_B(0xCA)
+#define fv_gathered CS_B(0xCB)
+#define fv_talk_buf CS_W(0xDA)
+#define rv_alpha_scan_point ROOM_B(0x4B)
+#define rv_alpha_use_point ROOM_B(0x4D)
+#define rv_computers_seen ROOM_B(0x3A)
+#define rv_connected ROOM_B(0x3B)
+#define rv_connected2 ROOM_B(0x3C)
+#define rv_mccoy_scan_point ROOM_B(0x4A)
+#define rv_music_started ROOM_B(0x51)
+#define rv_omega_scan_point ROOM_B(0x4C)
+#define rv_omega_use_point ROOM_B(0x4E)
+#define rv_out_of_sync ROOM_B(0x4F)
+#define rv_score ROOM_W(0x52)
+#define rv_seen_brain ROOM_B(0x47)
+
+/* functions */
+static void sins5_Talk(uint16_t ax);
+static void sins5_Say(uint16_t ax, uint16_t bx);
+static void sins5_StartRoom(void);
+static void sins5_SpockScans(void);
+static void sins5_SpockScansAlpha(void);
+static void sins5_SpockScansOmega(void);
+static void sins5_SpockScansLauncher(void);
+static void sins5_KirkOnAlpha(void);
+static void sins5_KirkOnOmega(void);
+static void sins5_KirkOnLauncher(void);
+static void sins5_E_06BC(void);
+static void sins5_McCoyOnOmega(void);
+static void sins5_McCoyOnComputers(void);
+static void sins5_E_0744(void);
+static void sins5_MosherOnOmega(void);
+static void sins5_MosherOnComputers(void);
+static void sins5_SpockOnLauncher(void);
+static void sins5_SpockOnAlpha(void);
+static void sins5_SpockAtAlpha(void);
+static void sins5_AlphaReports(void);
+static void sins5_SpockOnOmega(void);
+static void sins5_SpockAtOmega(void);
+static void sins5_OmegaReports(void);
+static void sins5_CrewGathered(void);
+static void sins5_BrainOfScythe(void);
+static void sins5_part_0DBD(void);
+static void sins5_E_1154(void);
+static void sins5_ConnectorOnAlpha(void);
+static void sins5_AtComputers(void);
+static void sins5_ConnectorFitted(void);
+static void sins5_E_127B(void);
+static void sins5_StunLauncher(void);
+static void sins5_StunComputer(void);
+static void sins5_KillOmega(void);
+static void sins5_KirkAtOmega(void);
+static void sins5_OmegaHit(void);
+static void sins5_Timer0Done(void);
+static void sins5_KillLauncher(void);
+static void sins5_KirkAtLauncher(void);
+static void sins5_LauncherHit(void);
+static void sins5_Timer1Done(void);
+static void sins5_KillAlpha(void);
+static void sins5_KirkAtAlpha(void);
+static void sins5_AlphaHit(void);
+static void sins5_Timer2Done(void);
+static void sins5_DefencesTriggered(void);
+static void sins5_Timer3Sound(void);
+static void sins5_LookAtScene(void);
+static void sins5_LookAtKirk(void);
+static void sins5_LookAtSpock(void);
+static void sins5_LookAtMcCoy(void);
+static void sins5_LookAtRedshirt(void);
+static void sins5_LookAtLights(void);
+static void sins5_LookAtOmega(void);
+static void sins5_LookAtLauncher(void);
+static void sins5_LookAtAlpha(void);
+static void sins5_E_1B11(void);
+static void sins5_E_1B19(void);
+static void sins5_E_1B21(void);
+static void sins5_LookAtMissiles(void);
+static void sins5_LookAtHazardDoor(void);
+static void sins5_E_1BFE(void);
+static void sins5_MedkitOnSpock(void);
+static void sins5_MedkitOnMcCoy(void);
+static void sins5_MedkitOnRedshirt(void);
+static void sins5_McCoyScans(void);
+static void sins5_TalkToKirk(void);
+static void sins5_TalkToSpock(void);
+static void sins5_TalkToMcCoy(void);
+static void sins5_TalkToRedshirt(void);
+static void sins5_E_2144(void);
+static void sins5_E_214C(void);
+static void sins5_E_2154(void);
+static void sins5_SpockScansMissiles(void);
+static void sins5_SpockScansHazardDoor(void);
+static void sins5_E_22BA(void);
+static void sins5_E_22C2(void);
+static void sins5_E_22CA(void);
+static void sins5_McCoyScansRedshirt(void);
+
+/* Talk: conversation AX (speaker, choices, 0); returns the choice. */
+static void sins5_Talk(uint16_t ax)
+{
+    svc_Talk(ax);
+    return;
+}
+
+/* Say: one line, BX, said by AX (0: narration). */
+static void sins5_Say(uint16_t ax, uint16_t bx)
+{
+    fv_talk_buf = ax;
+    CS_W(0xDC) = bx;
+    CS_W(0xDE) = 0;
+    sins5_Talk(talk_buf);
+    return;
+}
+
+/* The room starts: the connector if fitted. Until Spock's survey (tick 20)
+ * the party can't move.
+ * [MSG_TICK 01 00 00] */
+static void sins5_StartRoom(void)
+{
+    svc_Sfx(N_SIN5LOOP);
+    if (rv_seen_brain == 0) {
+        room.busy = 2;
+    }
+    if (rv_connected == 1) {
+        if (rv_connected2 == 1) {
+            svc_Anim(0xB, N_s5cabl, 0, 0, 0);
+        }
+    }
+    if (rv_music_started != 1) {
+        svc_Music(0, -1);
+        rv_music_started = 1;
+    }
+    svc_Music(0x1B, -3);
+    return;
+}
+
+/* Tricorders on the computers (+1 each, every time: the once-flags are
+ * never set).
+ * [MSG_USE 44 FF 00] */
+static void sins5_SpockScans(void)
+{
+    svc_Anim(1, N_sscans_2, -1, -1, 0);
+    svc_BridgeSfx(4);
+    sins5_Say(N_Mr_Spock, T_SIN5_013);
+    return;
+}
+
+/* [MSG_USE 44 20 00] */
+static void sins5_SpockScansAlpha(void)
+{
+    if (rv_alpha_scan_point != 1) {
+        rv_score += 1;
+    }
+    svc_Anim(1, N_sscans, -1, -1, 0);
+    svc_BridgeSfx(4);
+    sins5_Say(N_Mr_Spock, T_SIN5_030);
+    rv_computers_seen |= 2;
+    { sins5_part_0DBD(); return; }
+}
+
+/* [MSG_USE 44 21 00] */
+static void sins5_SpockScansOmega(void)
+{
+    if (rv_omega_scan_point != 1) {
+        rv_score += 1;
+    }
+    svc_Anim(1, N_sscans, -1, -1, 0);
+    svc_BridgeSfx(4);
+    sins5_Say(N_Mr_Spock, T_SIN5_029);
+    rv_computers_seen |= 1;
+    { sins5_part_0DBD(); return; }
+}
+
+/* [MSG_USE 44 22 00] */
+static void sins5_SpockScansLauncher(void)
+{
+    svc_Anim(1, N_sscans, -1, -1, 0);
+    svc_BridgeSfx(4);
+    sins5_Say(N_Mr_Spock, T_SIN5_028);
+    return;
+}
+
+/* The crew on the computers: only Spock can use them.
+ * [MSG_USE 00 20 00] */
+static void sins5_KirkOnAlpha(void)
+{
+    sins5_Say(N_Capt_Kirk, T_SIN5_003);
+    { sins5_SpockOnAlpha(); return; }
+}
+
+/* [MSG_USE 00 21 00] */
+static void sins5_KirkOnOmega(void)
+{
+    sins5_Say(N_Capt_Kirk, T_SIN5_004);
+    { sins5_SpockOnOmega(); return; }
+}
+
+/* [MSG_USE 00 22 00] */
+static void sins5_KirkOnLauncher(void)
+{
+    sins5_Say(N_Capt_Kirk, T_SIN5_001);
+    return;
+}
+
+/* [MSG_USE 02 20 00] */
+static void sins5_E_06BC(void)
+{
+    { sins5_McCoyOnOmega(); return; }
+}
+
+/* [MSG_USE 02 21 00] */
+static void sins5_McCoyOnOmega(void)
+{
+    { sins5_McCoyOnComputers(); return; }
+}
+
+/* [MSG_USE 02 22 00] */
+static void sins5_McCoyOnComputers(void)
+{
+    sins5_Say(N_Dr_McCoy, T_SIN5_015);
+    return;
+}
+
+/* [MSG_USE 03 20 00] */
+static void sins5_E_0744(void)
+{
+    { sins5_MosherOnOmega(); return; }
+}
+
+/* [MSG_USE 03 21 00] */
+static void sins5_MosherOnOmega(void)
+{
+    { sins5_MosherOnComputers(); return; }
+}
+
+/* [MSG_USE 03 22 00] */
+static void sins5_MosherOnComputers(void)
+{
+    sins5_Say(N_Ensign_Mosher, T_SIN5_042);
+    return;
+}
+
+/* [MSG_USE 01 22 00] */
+static void sins5_SpockOnLauncher(void)
+{
+    sins5_Say(N_Mr_Spock, T_SIN5_027);
+    return;
+}
+
+/* Spock at the Alpha unit (msgs 11, 13) and the Omega unit (msgs 10, 12):
+ * their launch times. With the connector fitted, the Omega unit's timing
+ * takes over: the missiles will fall short of Proxtrey. Everyone gathers
+ * (msg 16), Scott beams them home: +19, BeamUp(score, 28, 0).
+ * [MSG_USE 01 20 00] */
+static void sins5_SpockOnAlpha(void)
+{
+    if (rv_alpha_use_point != 1) {
+        rv_score += 1;
+    }
+    room.fall[1] = 1;
+    room.busy = 1;
+    svc_Walk(1, 0xE1, 0xB3, 0xB);
+    return;
+}
+
+/* [MSG_WALK_DONE 0B 00 00] */
+static void sins5_SpockAtAlpha(void)
+{
+    svc_Anim(1, N_susemn, -1, -1, 0xD);
+    return;
+}
+
+/* [MSG_ANIM_DONE 0D 00 00] */
+static void sins5_AlphaReports(void)
+{
+    room.busy = 0;
+    sins5_Say(N_Computer, T_SIN5_039);
+    rv_computers_seen |= 8;
+    { sins5_part_0DBD(); return; }
+}
+
+/* [MSG_USE 01 21 00] */
+static void sins5_SpockOnOmega(void)
+{
+    if (rv_omega_use_point != 1) {
+        rv_score += 1;
+    }
+    room.busy = 1;
+    room.fall[1] = 1;
+    svc_Walk(1, 0x40, 0xB3, 0xA);
+    return;
+}
+
+/* [MSG_WALK_DONE 0A 00 00] */
+static void sins5_SpockAtOmega(void)
+{
+    svc_Anim(1, N_susemn_2, -1, -1, 0xC);
+    return;
+}
+
+/* [MSG_ANIM_DONE 0C 00 00] */
+static void sins5_OmegaReports(void)
+{
+    if (rv_connected != 1) {
+    } else {
+        if (rv_connected2 != 1) {
+        } else {
+            sins5_Say(N_Computer, T_SIN5_041);
+            sins5_Say(N_Mr_Spock, T_SIN5_025);
+            goto L0B6D;
+        }
+    }
+    room.busy = 0;
+    sins5_Say(N_Computer, T_SIN5_040);
+    rv_computers_seen |= 4;
+    { sins5_part_0DBD(); return; }
+L0B6D:;
+    svc_Walk(0, 0x8C, 0xB5, 0x10);
+    svc_Walk(1, 0x82, 0xAB, 0x10);
+    svc_Walk(2, 0x96, 0xAB, 0x10);
+    svc_Walk(3, 0x91, 0xA1, 0x10);
+    return;
+}
+
+/* [MSG_WALK_DONE 10 00 00] */
+static void sins5_CrewGathered(void)
+{
+    fv_gathered++;
+    if (fv_gathered != 4) {
+        return;
+    }
+    sins5_Say(N_Capt_Kirk, T_SIN5_008);
+    sins5_Say(N_Mr_Scott, T_SIN5_S19);
+    sins5_Say(N_Capt_Kirk, T_SIN5_005);
+    rv_score += 0x13;
+    svc_BeamUp(rv_score, 0x1C, 0);
+    room.busy = 0;
+    return;
+}
+
+/* Tick 20: Spock explains the two isolated computers; once both have been
+ * scanned and used, Mosher notices they disagree.
+ * [MSG_TICK 14 00 00] */
+static void sins5_BrainOfScythe(void)
+{
+    if (rv_seen_brain != 0) {
+    } else {
+        room.busy = 0;
+        sins5_Say(N_Mr_Spock, T_SIN5_026);
+        rv_seen_brain = 1;
+    }
+    return;
+}
+
+static void sins5_part_0DBD(void)
+{
+    if (rv_computers_seen != 0xF) {
+        return;
+    }
+    if (rv_out_of_sync == 1) {
+        return;
+    }
+    rv_out_of_sync = 1;
+    sins5_Say(N_Ensign_Mosher, T_SIN5_044);
+    sins5_Say(N_Mr_Spock, T_SIN5_036);
+    sins5_Say(N_Dr_McCoy, T_SIN5_020);
+    sins5_Say(N_Mr_Spock, rdf_scripts_end);
+    sins5_Say(N_Capt_Kirk, T_SIN5_006);
+    sins5_Say(N_Mr_Spock, T_SIN5_037);
+    sins5_Say(N_Dr_McCoy, T_SIN5_021);
+    sins5_Say(N_Mr_Spock, T_SIN5_032);
+    sins5_Say(N_Capt_Kirk, T_SIN5_007);
+    return;
+}
+
+/* The connector between the computers (msgs 14, 15): connected.
+ * [MSG_USE 73 21 00] */
+static void sins5_E_1154(void)
+{
+    { sins5_ConnectorOnAlpha(); return; }
+}
+
+/* [MSG_USE 73 20 00] */
+static void sins5_ConnectorOnAlpha(void)
+{
+    svc_Walk(1, 0x60, 0xAB, 0xE);
+    svc_Walk(0, 0xBC, 0xAB, 0xE);
+    room.busy = 1;
+    return;
+}
+
+/* [MSG_WALK_DONE 0E 00 00] */
+static void sins5_AtComputers(void)
+{
+    fv_at_computers++;
+    if (fv_at_computers != 2) {
+        return;
+    }
+    svc_Anim(1, N_suselw, -1, -1, 0xF);
+    svc_Anim(0, N_kusele, -1, -1, 0);
+    return;
+}
+
+/* [MSG_ANIM_DONE 0F 00 00] */
+static void sins5_ConnectorFitted(void)
+{
+    if (rv_connected == 0) {
+        rv_connected = 1;
+        rv_connected2 = 1;
+        svc_Anim(0xB, N_s5cabl_2, 0, 0, 0);
+        sins5_Say(0, T_SIN5N004);
+        svc_TakeItem(IT_CONECT);
+        svc_Music(0x1E, -1);
+    }
+    room.busy = 0;
+    return;
+}
+
+/* Phasers on the computers (msgs 2-7, timers 0-2): the consoles explode
+ * and the defences kill the party (anim msg 1): game over.
+ * [MSG_USE 40 21 00] */
+static void sins5_E_127B(void)
+{
+    { sins5_StunLauncher(); return; }
+}
+
+/* [MSG_USE 40 22 00] */
+static void sins5_StunLauncher(void)
+{
+    { sins5_StunComputer(); return; }
+}
+
+/* [MSG_USE 40 20 00] */
+static void sins5_StunComputer(void)
+{
+    sins5_Say(N_Ensign_Mosher, T_SIN5_043);
+    return;
+}
+
+/* [MSG_USE 41 21 00] */
+static void sins5_KillOmega(void)
+{
+    room.busy = 1;
+    svc_Walk(0, 0x84, 0xBC, 2);
+    return;
+}
+
+/* [MSG_WALK_DONE 02 00 00] */
+static void sins5_KirkAtOmega(void)
+{
+    svc_Anim(0, N_kdraww, -1, -1, 3);
+    return;
+}
+
+/* [MSG_ANIM_DONE 03 00 00] */
+static void sins5_OmegaHit(void)
+{
+    svc_Anim(8, N_s5phal, 0, 0xAF, 1);
+    svc_BridgeSfx(6);
+    room.timers[3] = 0xA;
+    room.timers[0] = 0x18;
+    return;
+}
+
+/* [MSG_TIMER 00 00 00] */
+static void sins5_Timer0Done(void)
+{
+    room.fall[0] = 3;
+    svc_StopAnim(0);
+    room.busy = 0;
+    return;
+}
+
+/* [MSG_USE 41 22 00] */
+static void sins5_KillLauncher(void)
+{
+    room.busy = 1;
+    svc_Walk(0, 0x8B, 0xBC, 6);
+    return;
+}
+
+/* [MSG_WALK_DONE 06 00 00] */
+static void sins5_KirkAtLauncher(void)
+{
+    svc_Anim(0, N_kfiren, -1, -1, 7);
+    return;
+}
+
+/* [MSG_ANIM_DONE 07 00 00] */
+static void sins5_LauncherHit(void)
+{
+    svc_Anim(0xA, N_s5phac, 0, 0x8C, 1);
+    svc_BridgeSfx(6);
+    room.timers[3] = 0xA;
+    room.timers[1] = 0x18;
+    return;
+}
+
+/* [MSG_TIMER 01 00 00] */
+static void sins5_Timer1Done(void)
+{
+    room.fall[0] = 0;
+    svc_StopAnim(0);
+    room.busy = 0;
+    return;
+}
+
+/* [MSG_USE 41 20 00] */
+static void sins5_KillAlpha(void)
+{
+    room.busy = 1;
+    svc_Walk(0, 0x9E, 0xBC, 4);
+    return;
+}
+
+/* [MSG_WALK_DONE 04 00 00] */
+static void sins5_KirkAtAlpha(void)
+{
+    svc_Anim(0, N_kdrawe, -1, -1, 5);
+    return;
+}
+
+/* [MSG_ANIM_DONE 05 00 00] */
+static void sins5_AlphaHit(void)
+{
+    svc_Anim(9, N_s5phar, 0, 0xAF, 1);
+    svc_BridgeSfx(6);
+    room.timers[3] = 0xA;
+    room.timers[2] = 0x18;
+    return;
+}
+
+/* [MSG_TIMER 02 00 00] */
+static void sins5_Timer2Done(void)
+{
+    room.fall[0] = 2;
+    svc_StopAnim(0);
+    room.busy = 0;
+    return;
+}
+
+/* [MSG_ANIM_DONE 01 00 00] */
+static void sins5_DefencesTriggered(void)
+{
+    svc_Music(2, -1);
+    sins5_Say(0, T_SIN5N012);
+    sins5_Say(0, T_SIN5N013);
+    svc_GameOver();
+    return;
+}
+
+/* [MSG_TIMER 03 00 00] */
+static void sins5_Timer3Sound(void)
+{
+    svc_BridgeSfx(0x14);
+    return;
+}
+
+/* Looking and talking.
+ * [MSG_LOOK FF 00 00] */
+static void sins5_LookAtScene(void)
+{
+    sins5_Say(0, T_SIN5N005);
+    return;
+}
+
+/* [MSG_LOOK 00 00 00] */
+static void sins5_LookAtKirk(void)
+{
+    sins5_Say(0, T_SIN5N000);
+    return;
+}
+
+/* [MSG_LOOK 01 00 00] */
+static void sins5_LookAtSpock(void)
+{
+    sins5_Say(0, T_SIN5N006);
+    return;
+}
+
+/* [MSG_LOOK 02 00 00] */
+static void sins5_LookAtMcCoy(void)
+{
+    sins5_Say(0, T_SIN5N001);
+    return;
+}
+
+/* [MSG_LOOK 03 00 00] */
+static void sins5_LookAtRedshirt(void)
+{
+    sins5_Say(0, T_SIN5N002);
+    return;
+}
+
+/* [MSG_LOOK 24 00 00] */
+static void sins5_LookAtLights(void)
+{
+    sins5_Say(0, T_SIN5N007);
+    return;
+}
+
+/* [MSG_LOOK 21 00 00] */
+static void sins5_LookAtOmega(void)
+{
+    sins5_Say(0, T_SIN5N010);
+    return;
+}
+
+/* [MSG_LOOK 22 00 00] */
+static void sins5_LookAtLauncher(void)
+{
+    sins5_Say(0, T_SIN5N008);
+    return;
+}
+
+/* [MSG_LOOK 20 00 00] */
+static void sins5_LookAtAlpha(void)
+{
+    sins5_Say(0, T_SIN5N009);
+    return;
+}
+
+/* [MSG_LOOK 25 00 00] */
+static void sins5_E_1B11(void)
+{
+    { sins5_LookAtMissiles(); return; }
+}
+
+/* [MSG_LOOK 26 00 00] */
+static void sins5_E_1B19(void)
+{
+    { sins5_LookAtMissiles(); return; }
+}
+
+/* [MSG_LOOK 27 00 00] */
+static void sins5_E_1B21(void)
+{
+    { sins5_LookAtMissiles(); return; }
+}
+
+/* [MSG_LOOK 28 00 00] */
+static void sins5_LookAtMissiles(void)
+{
+    sins5_Say(0, T_SIN5N003);
+    return;
+}
+
+/* [MSG_LOOK 23 00 00] */
+static void sins5_LookAtHazardDoor(void)
+{
+    sins5_Say(0, T_SIN5N011);
+    return;
+}
+
+/* [MSG_USE 7F 00 00] */
+static void sins5_E_1BFE(void)
+{
+    { sins5_MedkitOnSpock(); return; }
+}
+
+/* [MSG_USE 7F 01 00] */
+static void sins5_MedkitOnSpock(void)
+{
+    { sins5_MedkitOnMcCoy(); return; }
+}
+
+/* [MSG_USE 7F 02 00] */
+static void sins5_MedkitOnMcCoy(void)
+{
+    { sins5_MedkitOnRedshirt(); return; }
+}
+
+/* [MSG_USE 7F 03 00] */
+static void sins5_MedkitOnRedshirt(void)
+{
+    sins5_Say(N_Dr_McCoy, T_SIN5_017);
+    return;
+}
+
+/* [MSG_USE 45 FF 00] */
+static void sins5_McCoyScans(void)
+{
+    svc_Anim(2, N_mscans, -1, -1, 0);
+    svc_BridgeSfx(4);
+    sins5_Say(N_Dr_McCoy, T_SIN5_016);
+    if (rv_mccoy_scan_point != 1) {
+        rv_score += 1;
+    }
+    return;
+}
+
+/* [MSG_TALK 00 00 00] */
+static void sins5_TalkToKirk(void)
+{
+    sins5_Say(N_Capt_Kirk, T_SIN5_002);
+    return;
+}
+
+/* [MSG_TALK 01 00 00] */
+static void sins5_TalkToSpock(void)
+{
+    sins5_Say(N_Mr_Spock, T_SIN5_038);
+    sins5_Say(N_Dr_McCoy, T_SIN5_023);
+    sins5_Say(N_Mr_Spock, T_SIN5_033);
+    sins5_Say(N_Dr_McCoy, T_SIN5_019);
+    return;
+}
+
+/* [MSG_TALK 02 00 00] */
+static void sins5_TalkToMcCoy(void)
+{
+    sins5_Say(N_Dr_McCoy, T_SIN5_018);
+    sins5_Say(N_Capt_Kirk, T_SIN5_010);
+    return;
+}
+
+/* [MSG_TALK 03 00 00] */
+static void sins5_TalkToRedshirt(void)
+{
+    sins5_Say(N_Ensign_Mosher, T_SIN5_046);
+    sins5_Say(N_Mr_Spock, T_SIN5_034);
+    sins5_Say(N_Ensign_Mosher, T_SIN5_045);
+    sins5_Say(N_Capt_Kirk, T_SIN5_011);
+    return;
+}
+
+/* Tricorders and the medkit.
+ * [MSG_USE 44 25 00] */
+static void sins5_E_2144(void)
+{
+    { sins5_SpockScansMissiles(); return; }
+}
+
+/* [MSG_USE 44 26 00] */
+static void sins5_E_214C(void)
+{
+    { sins5_SpockScansMissiles(); return; }
+}
+
+/* [MSG_USE 44 27 00] */
+static void sins5_E_2154(void)
+{
+    { sins5_SpockScansMissiles(); return; }
+}
+
+/* [MSG_USE 44 28 00] */
+static void sins5_SpockScansMissiles(void)
+{
+    svc_Anim(1, N_sscans, -1, -1, 0);
+    svc_BridgeSfx(4);
+    sins5_Say(N_Mr_Spock, T_SIN5_012);
+    return;
+}
+
+/* [MSG_USE 44 23 00] */
+static void sins5_SpockScansHazardDoor(void)
+{
+    svc_Anim(1, N_sscans, -1, -1, 0);
+    svc_BridgeSfx(4);
+    sins5_Say(N_Mr_Spock, T_SIN5_024);
+    return;
+}
+
+/* [MSG_USE 45 00 00] */
+static void sins5_E_22BA(void)
+{
+    { sins5_McCoyScansRedshirt(); return; }
+}
+
+/* [MSG_USE 45 01 00] */
+static void sins5_E_22C2(void)
+{
+    { sins5_McCoyScansRedshirt(); return; }
+}
+
+/* [MSG_USE 45 02 00] */
+static void sins5_E_22CA(void)
+{
+    { sins5_McCoyScansRedshirt(); return; }
+}
+
+/* [MSG_USE 45 03 00] */
+static void sins5_McCoyScansRedshirt(void)
+{
+    svc_Anim(2, N_mscans, -1, -1, 0);
+    svc_BridgeSfx(4);
+    sins5_Say(N_Dr_McCoy, T_SIN5_014);
+    return;
+}
+
+/* the scripts, by the offset of their code in the room file */
+const RoomScript sins5_scripts[] = {
+    { 0x026F, sins5_StartRoom },    /* MSG_TICK 01 00 00 */
+    { 0x02EA, sins5_SpockScans },    /* MSG_USE 44 FF 00 */
+    { 0x0378, sins5_SpockScansAlpha },    /* MSG_USE 44 20 00 */
+    { 0x0429, sins5_SpockScansOmega },    /* MSG_USE 44 21 00 */
+    { 0x04DA, sins5_SpockScansLauncher },    /* MSG_USE 44 22 00 */
+    { 0x05B3, sins5_KirkOnAlpha },    /* MSG_USE 00 20 00 */
+    { 0x060F, sins5_KirkOnOmega },    /* MSG_USE 00 21 00 */
+    { 0x066B, sins5_KirkOnLauncher },    /* MSG_USE 00 22 00 */
+    { 0x06BC, sins5_E_06BC },    /* MSG_USE 02 20 00 */
+    { 0x06C4, sins5_McCoyOnOmega },    /* MSG_USE 02 21 00 */
+    { 0x06CC, sins5_McCoyOnComputers },    /* MSG_USE 02 22 00 */
+    { 0x0744, sins5_E_0744 },    /* MSG_USE 03 20 00 */
+    { 0x074C, sins5_MosherOnOmega },    /* MSG_USE 03 21 00 */
+    { 0x0754, sins5_MosherOnComputers },    /* MSG_USE 03 22 00 */
+    { 0x07D8, sins5_SpockOnLauncher },    /* MSG_USE 01 22 00 */
+    { 0x0851, sins5_SpockOnAlpha },    /* MSG_USE 01 20 00 */
+    { 0x0886, sins5_SpockAtAlpha },    /* MSG_WALK_DONE 0B 00 00 */
+    { 0x08AB, sins5_AlphaReports },    /* MSG_ANIM_DONE 0D 00 00 */
+    { 0x094C, sins5_SpockOnOmega },    /* MSG_USE 01 21 00 */
+    { 0x0981, sins5_SpockAtOmega },    /* MSG_WALK_DONE 0A 00 00 */
+    { 0x09A6, sins5_OmegaReports },    /* MSG_ANIM_DONE 0C 00 00 */
+    { 0x0BE4, sins5_CrewGathered },    /* MSG_WALK_DONE 10 00 00 */
+    { 0x0CF4, sins5_BrainOfScythe },    /* MSG_TICK 14 00 00 */
+    { 0x1154, sins5_E_1154 },    /* MSG_USE 73 21 00 */
+    { 0x115C, sins5_ConnectorOnAlpha },    /* MSG_USE 73 20 00 */
+    { 0x119F, sins5_AtComputers },    /* MSG_WALK_DONE 0E 00 00 */
+    { 0x11F0, sins5_ConnectorFitted },    /* MSG_ANIM_DONE 0F 00 00 */
+    { 0x127B, sins5_E_127B },    /* MSG_USE 40 21 00 */
+    { 0x1283, sins5_StunLauncher },    /* MSG_USE 40 22 00 */
+    { 0x128B, sins5_StunComputer },    /* MSG_USE 40 20 00 */
+    { 0x12CE, sins5_KillOmega },    /* MSG_USE 41 21 00 */
+    { 0x12F5, sins5_KirkAtOmega },    /* MSG_WALK_DONE 02 00 00 */
+    { 0x131A, sins5_OmegaHit },    /* MSG_ANIM_DONE 03 00 00 */
+    { 0x1359, sins5_Timer0Done },    /* MSG_TIMER 00 00 00 */
+    { 0x1378, sins5_KillLauncher },    /* MSG_USE 41 22 00 */
+    { 0x139F, sins5_KirkAtLauncher },    /* MSG_WALK_DONE 06 00 00 */
+    { 0x13C4, sins5_LauncherHit },    /* MSG_ANIM_DONE 07 00 00 */
+    { 0x1404, sins5_Timer1Done },    /* MSG_TIMER 01 00 00 */
+    { 0x1423, sins5_KillAlpha },    /* MSG_USE 41 20 00 */
+    { 0x144A, sins5_KirkAtAlpha },    /* MSG_WALK_DONE 04 00 00 */
+    { 0x146F, sins5_AlphaHit },    /* MSG_ANIM_DONE 05 00 00 */
+    { 0x14AF, sins5_Timer2Done },    /* MSG_TIMER 02 00 00 */
+    { 0x14CE, sins5_DefencesTriggered },    /* MSG_ANIM_DONE 01 00 00 */
+    { 0x1625, sins5_Timer3Sound },    /* MSG_TIMER 03 00 00 */
+    { 0x1776, sins5_LookAtScene },    /* MSG_LOOK FF 00 00 */
+    { 0x17E6, sins5_LookAtKirk },    /* MSG_LOOK 00 00 00 */
+    { 0x1871, sins5_LookAtSpock },    /* MSG_LOOK 01 00 00 */
+    { 0x18DA, sins5_LookAtMcCoy },    /* MSG_LOOK 02 00 00 */
+    { 0x1933, sins5_LookAtRedshirt },    /* MSG_LOOK 03 00 00 */
+    { 0x1971, sins5_LookAtLights },    /* MSG_LOOK 24 00 00 */
+    { 0x19C6, sins5_LookAtOmega },    /* MSG_LOOK 21 00 00 */
+    { 0x1A2A, sins5_LookAtLauncher },    /* MSG_LOOK 22 00 00 */
+    { 0x1AAC, sins5_LookAtAlpha },    /* MSG_LOOK 20 00 00 */
+    { 0x1B11, sins5_E_1B11 },    /* MSG_LOOK 25 00 00 */
+    { 0x1B19, sins5_E_1B19 },    /* MSG_LOOK 26 00 00 */
+    { 0x1B21, sins5_E_1B21 },    /* MSG_LOOK 27 00 00 */
+    { 0x1B29, sins5_LookAtMissiles },    /* MSG_LOOK 28 00 00 */
+    { 0x1BA9, sins5_LookAtHazardDoor },    /* MSG_LOOK 23 00 00 */
+    { 0x1BFE, sins5_E_1BFE },    /* MSG_USE 7F 00 00 */
+    { 0x1C06, sins5_MedkitOnSpock },    /* MSG_USE 7F 01 00 */
+    { 0x1C0E, sins5_MedkitOnMcCoy },    /* MSG_USE 7F 02 00 */
+    { 0x1C16, sins5_MedkitOnRedshirt },    /* MSG_USE 7F 03 00 */
+    { 0x1C62, sins5_McCoyScans },    /* MSG_USE 45 FF 00 */
+    { 0x1D0E, sins5_TalkToKirk },    /* MSG_TALK 00 00 00 */
+    { 0x1D5E, sins5_TalkToSpock },    /* MSG_TALK 01 00 00 */
+    { 0x1EE9, sins5_TalkToMcCoy },    /* MSG_TALK 02 00 00 */
+    { 0x1FA1, sins5_TalkToRedshirt },    /* MSG_TALK 03 00 00 */
+    { 0x2144, sins5_E_2144 },    /* MSG_USE 44 25 00 */
+    { 0x214C, sins5_E_214C },    /* MSG_USE 44 26 00 */
+    { 0x2154, sins5_E_2154 },    /* MSG_USE 44 27 00 */
+    { 0x215C, sins5_SpockScansMissiles },    /* MSG_USE 44 28 00 */
+    { 0x2205, sins5_SpockScansHazardDoor },    /* MSG_USE 44 23 00 */
+    { 0x22BA, sins5_E_22BA },    /* MSG_USE 45 00 00 */
+    { 0x22C2, sins5_E_22C2 },    /* MSG_USE 45 01 00 */
+    { 0x22CA, sins5_E_22CA },    /* MSG_USE 45 02 00 */
+    { 0x22D2, sins5_McCoyScansRedshirt },    /* MSG_USE 45 03 00 */
+    { 0, 0 }
+};

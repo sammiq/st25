@@ -47,6 +47,7 @@ typedef struct Chan {
     int bend;                   /* 0..16383 */
     int bend_range;             /* semitones */
     int sustain;
+    int modwheel;               /* 64 and over turns vibrato on */
     int rpn_hi, rpn_lo;
 } Chan;
 
@@ -55,6 +56,7 @@ typedef struct Note {
     int left;                   /* ticks to go */
     int voice;
     int held;                   /* over, but the sustain pedal is down */
+    int vel;                    /* velocity through the driver's curve */
 } Note;
 
 typedef struct Loop {
@@ -78,6 +80,7 @@ typedef struct Voice {
     int seq, chan, note;        /* who plays it; seq -1 when free */
     uint32_t age;
     uint8_t b0;                 /* what B0 holds (key on, block, fnum high) */
+    uint8_t on;                 /* the note is still held (else the voice is in its release) */
 } Voice;
 
 static opl3_chip chip;
@@ -96,6 +99,9 @@ static void opl(int reg, int val)
     OPL3_WriteReg(&chip, reg, val);
 }
 
+int fm_samples_to_tick(void);
+void fm_tick(void);
+
 void fm_init(int rate)
 {
     int i;
@@ -109,14 +115,25 @@ void fm_init(int rate)
         seqs[i].state = SEQ_FREE;
     opl(0x01, 0x20);                    /* waveform select on */
     opl(0x08, 0x00);
-    opl(0xBD, 0xC0);                    /* deep tremolo and vibrato, no rhythm mode */
+    opl(0xBD, 0x00);                    /* normal tremolo and vibrato depth, no rhythm mode (the driver leaves it) */
     for (i = 0; i < NUM_VOICES; i++)
         opl(0xB0 + i, 0);
     tick_acc = 0;
 }
 
+static int tick_len;                    /* output samples per sequencer tick, 0 when idle */
+
 void fm_render(int16_t *lr)
 {
+    if (--tick_len <= 0) {              /* sequence tempi are looked up once per tick */
+        int n = fm_samples_to_tick();
+
+        if (n) {
+            fm_tick();
+            tick_len = n;
+        } else
+            tick_len = 1;
+    }
     OPL3_GenerateResampled(&chip, lr);
 }
 
@@ -137,14 +154,33 @@ static const Timbre *find_timbre(const Chan *c, int chan, int note)
     return t->valid ? t : NULL;
 }
 
-/* Attenuation of a total level (6 bits under the key scaling bits) for a
- * volume of 0..127. */
-static int scale_tl(int ksl_tl, int vol)
+/* The driver's velocity curve: velocity / 8 indexes a table of 82..127, so
+ * the softest note is still two thirds of full level. */
+static int vel_curve(int vel)
 {
-    int tl = ksl_tl & 0x3F;
+    return 82 + 3 * ((vel & 127) >> 3);
+}
 
-    tl += ((63 - tl) * (127 - vol)) / 127;
-    return (ksl_tl & 0xC0) | tl;
+/* Channel volume and expression, then velocity, each as x * y / 128 rounded
+ * up by one unless it is zero (0..127). */
+static int eff_volume(const Chan *c, int vel)
+{
+    int v = (c->volume * c->expression) >> 7;
+
+    if (v)
+        v++;
+    v = (v * vel) >> 7;
+    if (v)
+        v++;
+    return v > 127 ? 127 : v;
+}
+
+/* An operator's KSL/TL byte at volume v: the level (63 - TL) scales with v. */
+static int scale_tl(int ksl_tl, int v)
+{
+    int level = 63 - (ksl_tl & 0x3F);
+
+    return (ksl_tl & 0xC0) | (~(level * v / 127) & 0x3F);
 }
 
 static void set_pitch(int v, double semis, int keyon)
@@ -168,6 +204,7 @@ static void set_pitch(int v, double semis, int keyon)
 
 static void key_off(int v)
 {
+    voices[v].on = 0;
     voices[v].b0 &= ~0x20;
     opl(0xB0 + v, voices[v].b0);
 }
@@ -180,19 +217,19 @@ static double note_semis(const Seq *s, int chan, int note, const Timbre *t)
     return n + (double)(c->bend - 8192) / 8192.0 * c->bend_range;
 }
 
-static void program_voice(int v, const Timbre *t, int vol)
+static void program_voice(int v, const Timbre *t, int vol, int vib)
 {
     int additive = t->fb_c & 1;
     int m = op_off[v][0], c = op_off[v][1];
 
     voices[v].b0 = 0;
     opl(0xB0 + v, 0);
-    opl(0x20 + m, t->mod[0]);
+    opl(0x20 + m, t->mod[0] | vib);
     opl(0x40 + m, additive ? scale_tl(t->mod[1], vol) : t->mod[1]);
     opl(0x60 + m, t->mod[2]);
     opl(0x80 + m, t->mod[3]);
     opl(0xE0 + m, t->mod[4] & 3);
-    opl(0x20 + c, t->car[0]);
+    opl(0x20 + c, t->car[0] | vib);
     opl(0x40 + c, scale_tl(t->car[1], vol));
     opl(0x60 + c, t->car[2]);
     opl(0x80 + c, t->car[3]);
@@ -200,13 +237,21 @@ static void program_voice(int v, const Timbre *t, int vol)
     opl(0xC0 + v, t->fb_c & 0x0F);
 }
 
+/* A free voice; else one whose note is over (the longest dead), else the
+ * oldest note, which is cut off. */
 static int pick_voice(void)
 {
-    int i, best = 0;
+    int i, best = -1;
 
     for (i = 0; i < NUM_VOICES; i++)
         if (voices[i].seq < 0)
             return i;
+    for (i = 0; i < NUM_VOICES; i++)
+        if (!voices[i].on && (best < 0 || voices[i].age < voices[best].age))
+            best = i;
+    if (best >= 0)
+        return best;
+    best = 0;
     for (i = 1; i < NUM_VOICES; i++)
         if (voices[i].age < voices[best].age)
             best = i;
@@ -255,18 +300,21 @@ static void note_on(Seq *s, int si, int chan, int note, int vel, int duration)
                 break;
             }
     }
-    vol = vel * c->volume / 127 * c->expression / 127;
-    program_voice(v, t, vol);
+    vel = vel_curve(vel);
+    vol = eff_volume(c, vel);
+    program_voice(v, t, vol, c->modwheel >= 64 ? 0x40 : 0);
     voices[v].seq = si;
     voices[v].chan = chan;
     voices[v].note = note;
     voices[v].age = ++voice_clock;
+    voices[v].on = 1;
     set_pitch(v, note_semis(s, chan, note, t), 1);
     s->notes[s->nnotes].chan = chan;
     s->notes[s->nnotes].note = note;
     s->notes[s->nnotes].left = duration > 0 ? duration : 1;
     s->notes[s->nnotes].voice = v;
     s->notes[s->nnotes].held = 0;
+    s->notes[s->nnotes].vel = vel;
     s->nnotes++;
 }
 
@@ -323,14 +371,51 @@ static void finish(Seq *s, int si)
     drop_voices_of(si);
 }
 
+/* Channel volume or expression changed: the notes sounding on it follow. */
+static void revolume(Seq *s, int chan)
+{
+    int i;
+
+    for (i = 0; i < s->nnotes; i++) {
+        Note *nt = &s->notes[i];
+        const Timbre *t;
+        int v, m, c, vol;
+
+        if (nt->chan != chan || voices[nt->voice].seq < 0)
+            continue;
+        t = find_timbre(&s->ch[chan], chan, nt->note);
+        if (!t)
+            continue;
+        v = nt->voice;
+        m = op_off[v][0];
+        c = op_off[v][1];
+        vol = eff_volume(&s->ch[chan], nt->vel);
+        if (t->fb_c & 1)
+            opl(0x40 + m, scale_tl(t->mod[1], vol));
+        opl(0x40 + c, scale_tl(t->car[1], vol));
+    }
+}
+
 static void controller(Seq *s, int si, int chan, int cc, int val)
 {
     Chan *c = &s->ch[chan];
     int i;
 
     switch (cc) {
-    case 7: c->volume = val; break;
-    case 11: c->expression = val; break;
+    case 1:
+        c->modwheel = val;
+        for (i = 0; i < s->nnotes; i++) {
+            Note *nt = &s->notes[i];
+            const Timbre *t = find_timbre(c, chan, nt->note);
+
+            if (nt->chan == chan && t && voices[nt->voice].seq >= 0) {
+                opl(0x20 + op_off[nt->voice][0], t->mod[0] | (val >= 64 ? 0x40 : 0));
+                opl(0x20 + op_off[nt->voice][1], t->car[0] | (val >= 64 ? 0x40 : 0));
+            }
+        }
+        break;
+    case 7: c->volume = val; revolume(s, chan); break;
+    case 11: c->expression = val; revolume(s, chan); break;
     case 64:
         c->sustain = val >= 64;
         if (!c->sustain)
@@ -426,8 +511,7 @@ static void run_event(Seq *s, int si)
                 finish(s, si);
                 return;
             }
-            if (type == 0x51 && len == 3 && s->pos + 3 <= s->evnt_end)
-                s->tempo = (s->pos[0] << 16) | (s->pos[1] << 8) | s->pos[2];
+            /* tempo events (type 0x51) are ignored: the timer stays at 120 Hz */
             s->pos += len;
         } else {
             uint32_t len = read_vlq(s);
@@ -478,6 +562,7 @@ static void seq_reset(Seq *s)
         s->ch[i].bend = 8192;
         s->ch[i].bend_range = 2;
         s->ch[i].sustain = 0;
+        s->ch[i].modwheel = 0;
         s->ch[i].rpn_hi = s->ch[i].rpn_lo = 127;
     }
     s->nnotes = 0;

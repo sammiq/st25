@@ -1,0 +1,287 @@
+/* FEATHER2.RDF: the room's scripts, translated from the machine code in the room file
+ * (src/rdf/feather2.asm) by tools/rdf2c.py.  They run on the loaded file (CS_B/CS_W) and the
+ * room state (`room`), and call the game through the svc_ macros of rooms.h.
+ *
+ * FEATHER2.RDF - "The Feathered Serpent", a stretch of overgrown jungle
+ * between the pit (room 1) and the river (room 3). Nothing to do but look
+ * around; Spock reads a humanoid to the west.
+ *
+ * Objects: 20h-22h eyes, 23h the great tree, 24h trees, 25h a vine, 26h
+ * the way west. Exits: 2 room 1, 3 room 3.
+ *
+ * Labels: H_ script headers, L branch targets, C_ conversations,
+ * T_/N_/S_ strings; talk_buf: the conversation buffer of Say.
+ *
+ * Quirks of the original:
+ * - The script chain runs on into code at 02D4: the engine reads its bytes
+ * as key 50 6A 03 2E and next 1EFF (beyond rdf_scripts_end, so the search
+ * stops).
+ */
+
+#include "rooms.h"
+
+/* where the file keeps its strings, conversations and tables */
+enum {
+    N_sscans = 0x00CA,
+    N_FEA2LOOP = 0x00D9,
+    T_FEA2_001 = 0x01D1,
+    N_Dr_McCoy = 0x03DC,
+    N_Mr_Spock = 0x03E6,
+    N_Lt_Stragey = 0x03F0,
+    S_03FC = 0x03FC,
+    T_FEA2N006 = 0x03FD,
+    T_FEA2N007 = 0x0443,
+    T_FEA2N000 = 0x04B9,
+    T_FEA2_010 = 0x04E5,
+    T_FEA2_005 = 0x056E,
+    T_FEA2N001 = 0x05B5,
+    T_FEA2N008 = 0x05F1,
+    T_FEA2_006 = 0x0658,
+    T_FEA2_003 = 0x06B1,
+    T_FEA2_007 = 0x06D3,
+    T_FEA2_002 = 0x0723,
+    T_FEA2_004 = 0x0766,
+    T_FEA2_008 = 0x07D3,
+    T_FEA2_009 = 0x0840,
+    T_FEA2N002 = 0x087C,
+    T_FEA2N005 = 0x08CC,
+    T_FEA2N004 = 0x093D,
+    T_FEA2N003 = 0x09AF,
+    talk_buf = 0x0A02,
+};
+
+/* the room's variables: in the room state, and in the file itself */
+#define fv_talk_buf CS_W(0xA02)
+
+/* functions */
+static void feather2_StartRoom(void);
+static void feather2_UseCommunicator(void);
+static void feather2_StunAnything(void);
+static void feather2_KillAnything(void);
+static void feather2_SpockScans(void);
+static void feather2_McCoyScans(void);
+static void feather2_TalkToMcCoy(void);
+static void feather2_TalkToSpock(void);
+static void feather2_TalkToRedshirt(void);
+static void feather2_LookAtVine(void);
+static void feather2_UseMedkit(void);
+static void feather2_WalkWest(void);
+static void feather2_LookAtEyes1(void);
+static void feather2_LookAtEyes2(void);
+static void feather2_LookAtEyes3(void);
+static void feather2_LookAtTree(void);
+static void feather2_LookAtTrees(void);
+static void feather2_LookAtScene(void);
+static void feather2_LookAtKirk(void);
+static void feather2_LookAtSpock(void);
+static void feather2_LookAtMcCoy(void);
+static void feather2_LookAtRedshirt(void);
+static void feather2_Talk(uint16_t ax);
+static void feather2_Say(uint16_t ax, uint16_t bx);
+
+/* The room starts: the music.
+ * [MSG_TICK 01 00 00] */
+static void feather2_StartRoom(void)
+{
+    svc_Sfx(N_FEA2LOOP);
+    svc_Music(0x1B, STALE_ARG);
+    return;
+}
+
+/* The communicator and phasers don't work ("They're dead, Jim").
+ * [MSG_USE 47 FF 00] */
+static void feather2_UseCommunicator(void)
+{
+    feather2_Say(N_Mr_Spock, T_FEA2_006);
+    return;
+}
+
+/* [MSG_USE 40 FF 00] */
+static void feather2_StunAnything(void)
+{
+    feather2_Say(N_Dr_McCoy, T_FEA2_003);
+    return;
+}
+
+/* [MSG_USE 41 FF 00] */
+static void feather2_KillAnything(void)
+{
+    feather2_Say(N_Dr_McCoy, T_FEA2_003);
+    return;
+}
+
+/* Tricorders and talking.
+ * [MSG_USE 44 FF 00] */
+static void feather2_SpockScans(void)
+{
+    svc_Anim(1, N_sscans, -1, -1, 0);
+    svc_BridgeSfx(4);
+    feather2_Say(N_Mr_Spock, T_FEA2_007);
+    return;
+}
+
+/* [MSG_USE 45 FF 00] */
+static void feather2_McCoyScans(void)
+{
+    feather2_Say(N_Dr_McCoy, T_FEA2_002);
+    return;
+}
+
+/* [MSG_TALK 02 00 00] */
+static void feather2_TalkToMcCoy(void)
+{
+    feather2_Say(N_Dr_McCoy, T_FEA2_004);
+    return;
+}
+
+/* [MSG_TALK 01 00 00] */
+static void feather2_TalkToSpock(void)
+{
+    feather2_Say(N_Mr_Spock, T_FEA2_008);
+    return;
+}
+
+/* [MSG_TALK 03 00 00] */
+static void feather2_TalkToRedshirt(void)
+{
+    feather2_Say(N_Lt_Stragey, T_FEA2_009);
+    return;
+}
+
+/* Looking.
+ * [MSG_LOOK 25 00 00] */
+static void feather2_LookAtVine(void)
+{
+    feather2_Say(S_03FC, T_FEA2N000);
+    feather2_Say(N_Lt_Stragey, T_FEA2_010);
+    feather2_Say(N_Dr_McCoy, T_FEA2_005);
+    return;
+}
+
+/* [MSG_USE 7F FF 00] */
+static void feather2_UseMedkit(void)
+{
+    feather2_Say(N_Dr_McCoy, T_FEA2_001);
+    return;
+}
+
+/* Walking off to the west (exit 2, room 1; exit 3, room 3).
+ * [MSG_WALK 26 00 00] */
+static void feather2_WalkWest(void)
+{
+    svc_Walk(0, 0x14, 0x96, 0);
+    return;
+}
+
+/* [MSG_LOOK 20 00 00] */
+static void feather2_LookAtEyes1(void)
+{
+    feather2_Say(0, T_FEA2N001);
+    return;
+}
+
+/* [MSG_LOOK 21 00 00] */
+static void feather2_LookAtEyes2(void)
+{
+    feather2_Say(0, T_FEA2N001);
+    return;
+}
+
+/* [MSG_LOOK 22 00 00] */
+static void feather2_LookAtEyes3(void)
+{
+    feather2_Say(0, T_FEA2N001);
+    return;
+}
+
+/* [MSG_LOOK 23 00 00] */
+static void feather2_LookAtTree(void)
+{
+    feather2_Say(0, T_FEA2N006);
+    return;
+}
+
+/* [MSG_LOOK 24 00 00] */
+static void feather2_LookAtTrees(void)
+{
+    feather2_Say(0, T_FEA2N007);
+    return;
+}
+
+/* [MSG_LOOK FF 00 00] */
+static void feather2_LookAtScene(void)
+{
+    feather2_Say(0, T_FEA2N008);
+    return;
+}
+
+/* [MSG_LOOK 00 00 00] */
+static void feather2_LookAtKirk(void)
+{
+    feather2_Say(0, T_FEA2N002);
+    return;
+}
+
+/* [MSG_LOOK 01 00 00] */
+static void feather2_LookAtSpock(void)
+{
+    feather2_Say(0, T_FEA2N005);
+    return;
+}
+
+/* [MSG_LOOK 02 00 00] */
+static void feather2_LookAtMcCoy(void)
+{
+    feather2_Say(0, T_FEA2N004);
+    return;
+}
+
+/* [MSG_LOOK 03 00 00] */
+static void feather2_LookAtRedshirt(void)
+{
+    feather2_Say(0, T_FEA2N003);
+    return;
+}
+
+/* Talk: conversation AX (speaker, choices, 0); returns the choice. */
+static void feather2_Talk(uint16_t ax)
+{
+    svc_Talk(ax);
+    return;
+}
+
+/* Say: one line, BX, said by AX (0: narration). */
+static void feather2_Say(uint16_t ax, uint16_t bx)
+{
+    fv_talk_buf = ax;
+    CS_W(0xA04) = bx;
+    feather2_Talk(talk_buf);
+    return;
+}
+
+/* the scripts, by the offset of their code in the room file */
+const RoomScript feather2_scripts[] = {
+    { 0x00D7, feather2_StartRoom },    /* MSG_TICK 01 00 00 */
+    { 0x0104, feather2_UseCommunicator },    /* MSG_USE 47 FF 00 */
+    { 0x0114, feather2_StunAnything },    /* MSG_USE 40 FF 00 */
+    { 0x0124, feather2_KillAnything },    /* MSG_USE 41 FF 00 */
+    { 0x0134, feather2_SpockScans },    /* MSG_USE 44 FF 00 */
+    { 0x0165, feather2_McCoyScans },    /* MSG_USE 45 FF 00 */
+    { 0x0175, feather2_TalkToMcCoy },    /* MSG_TALK 02 00 00 */
+    { 0x0185, feather2_TalkToSpock },    /* MSG_TALK 01 00 00 */
+    { 0x0195, feather2_TalkToRedshirt },    /* MSG_TALK 03 00 00 */
+    { 0x01A5, feather2_LookAtVine },    /* MSG_LOOK 25 00 00 */
+    { 0x01C7, feather2_UseMedkit },    /* MSG_USE 7F FF 00 */
+    { 0x022A, feather2_WalkWest },    /* MSG_WALK 26 00 00 */
+    { 0x0244, feather2_LookAtEyes1 },    /* MSG_LOOK 20 00 00 */
+    { 0x0253, feather2_LookAtEyes2 },    /* MSG_LOOK 21 00 00 */
+    { 0x0262, feather2_LookAtEyes3 },    /* MSG_LOOK 22 00 00 */
+    { 0x0271, feather2_LookAtTree },    /* MSG_LOOK 23 00 00 */
+    { 0x0280, feather2_LookAtTrees },    /* MSG_LOOK 24 00 00 */
+    { 0x028F, feather2_LookAtScene },    /* MSG_LOOK FF 00 00 */
+    { 0x029E, feather2_LookAtKirk },    /* MSG_LOOK 00 00 00 */
+    { 0x02AD, feather2_LookAtSpock },    /* MSG_LOOK 01 00 00 */
+    { 0x02BC, feather2_LookAtMcCoy },    /* MSG_LOOK 02 00 00 */
+    { 0x02CB, feather2_LookAtRedshirt },    /* MSG_LOOK 03 00 00 */
+    { 0, 0 }
+};

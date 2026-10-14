@@ -1,0 +1,986 @@
+/* VENG1.RDF: the room's scripts, translated from the machine code in the room file
+ * (src/rdf/veng1.asm) by tools/rdf2c.py.  They run on the loaded file (CS_B/CS_W) and the
+ * room state (`room`), and call the game through the svc_ macros of rooms.h.
+ *
+ * VENG1.RDF - "Vengeance", the corridor to auxiliary control on the
+ * Republic. The door is jammed: drill the seal off its maintenance panel,
+ * open it, oil the debris in the gears with the hypo (filled in room 6)
+ * and pull it out. A molecular saw lies here.
+ *
+ * Actors: 8 the door, 9 the open panel, 0Ah the saw, 0Bh a body, 0Ch the
+ * panel (closed, then cleared). Objects: those, 9 the debris, 20h the
+ * door, 21h the panel, 22h a vent. Exit 1: the turbolift.
+ *
+ * Labels: H_ script headers, L branch targets, C_ conversations,
+ * T_/N_/S_ strings; talk_buf: the conversation buffer of Say.
+ *
+ * Quirks of the original:
+ * - The script chain runs on into code at 1D35: the engine reads its bytes
+ * as key 50 B8 03 00 and next 2E50 (beyond rdf_scripts_end, so the search
+ * stops).
+ */
+
+#include "rooms.h"
+
+/* where the file keeps its strings, conversations and tables */
+enum {
+    N_VEN1LOOP = 0x00D4,
+    N_s7r1d1c = 0x00EE,
+    N_s7r1c1 = 0x010E,
+    N_s7r1md = 0x0134,
+    N_s7r1p1 = 0x0153,
+    N_s7r1p2 = 0x0178,
+    N_s7r1p3 = 0x01AD,
+    T_VEN1N007 = 0x0225,
+    N_s7r1d1 = 0x025E,
+    N_s7r1g1 = 0x027D,
+    T_VEN4N014 = 0x0309,
+    N_sscanw = 0x0372,
+    T_VEN1_011 = 0x03AA,
+    T_VEN1N022 = 0x044C,
+    T_VEN1N019 = 0x04B0,
+    T_VEN1N010 = 0x0504,
+    T_VEN1N021 = 0x0566,
+    T_VEN1N001 = 0x05AD,
+    T_VEN1N000 = 0x0609,
+    T_VEN1N002 = 0x065A,
+    T_VEN1N004 = 0x06D9,
+    T_VEN1N003 = 0x0730,
+    T_VEN1N005 = 0x07D2,
+    T_VEN1N020 = 0x083C,
+    T_VEN1_001 = 0x089A,
+    T_VEN1_013 = 0x08F5,
+    T_VEN1_005 = 0x096F,
+    T_VEN1_004 = 0x09BD,
+    T_VEN1_002 = 0x0A2A,
+    T_VEN1_016 = 0x0A75,
+    T_VEN1_015 = 0x0AD9,
+    T_VEN1_008 = 0x0BC8,
+    N_sscanw_2 = 0x0C43,
+    T_VEN1_012 = 0x0C7B,
+    N_sscann = 0x0D1A,
+    T_VEN1_007 = 0x0D57,
+    T_VEN1_009 = 0x0DAD,
+    N_sscane = 0x0DF8,
+    T_VEN1_014 = 0x0E38,
+    T_VEN1_006 = 0x0EC1,
+    T_VEN1_010 = 0x0F31,
+    N_kusemn = 0x0FB2,
+    T_VEN1N016 = 0x0FEA,
+    T_VEN1N017 = 0x106A,
+    N_s7r1p2_2 = 0x1093,
+    T_VEN1_F33 = 0x10E8,
+    T_VEN1N013 = 0x1138,
+    T_VEN1N014 = 0x1194,
+    T_VEN1N009 = 0x11EB,
+    T_VEN1N018 = 0x1248,
+    N_kusemn_2 = 0x12B8,
+    N_MADR7E2A = 0x12D6,
+    T_VEN1N008 = 0x132A,
+    N_kusemn_3 = 0x13A0,
+    T_VEN1N012 = 0x13F4,
+    T_VEN1N015 = 0x1426,
+    N_kuseln = 0x1490,
+    T_VEN1N023 = 0x14CE,
+    N_kusemn_4 = 0x1545,
+    T_VEN1N006 = 0x1599,
+    N_s7r1p3_2 = 0x15DE,
+    T_VEN1N011 = 0x1606,
+    T_VEN2_098 = 0x1690,
+    T_VENA_F40 = 0x16EF,
+    T_VENA_F32 = 0x1776,
+    T_VENA_F34 = 0x1884,
+    T_VEN4N010 = 0x191E,
+    T_VEN6N007 = 0x195F,
+    T_MUD4_018 = 0x19B4,
+    T_BRIDU146 = 0x19F9,
+    T_MUD4_018_2 = 0x1A39,
+    T_VEN2U093 = 0x1A7D,
+    T_VEN2_028 = 0x1AE8,
+    T_VEN2_066 = 0x1B36,
+    T_DEM3_019 = 0x1BDD,
+    T_VEN4_016 = 0x1C10,
+    T_G_014 = 0x1C58,
+    T_G_014_2 = 0x1C91,
+    T_VEN0_016 = 0x1CCA,
+    T_VEN0_016_2 = 0x1D05,
+    N_Capt_Kirk = 0x1DBC,
+    N_Dr_McCoy = 0x1DC7,
+    N_Mr_Spock = 0x1DD1,
+    N_Ensign_Kije = 0x1DDB,
+    N_Lt_Uhura = 0x1DE7,
+    N_Elasi_Captain = 0x1DF1,
+    talk_buf = 0x1DFF,
+};
+
+/* the room's variables: in the room state, and in the file itself */
+#define fv_door_done CS_B(0xCA)
+#define fv_door_opening CS_B(0xCB)
+#define fv_mccoy_line CS_W(0x1BA0)
+#define fv_talk_buf CS_W(0x1DFF)
+#define rv_attack_timer ROOM_W(0x51)
+#define rv_board_timer ROOM_W(0x49)
+#define rv_complied ROOM_B(0x45)
+#define rv_comply_timer ROOM_W(0x4D)
+#define rv_debris_oiled ROOM_B(0x3B)
+#define rv_elasi_here ROOM_B(0x43)
+#define rv_enterprise_away ROOM_B(0x36)
+#define rv_gears_cleared ROOM_B(0x39)
+#define rv_hypo_oiled ROOM_B(0x3A)
+#define rv_panel_open ROOM_B(0x37)
+#define rv_panel_unsealed ROOM_B(0x38)
+#define rv_power_to ROOM_B(0x3C)
+#define rv_rescued ROOM_B(0x42)
+#define rv_saw_taken ROOM_B(0x60)
+#define rv_stall_timer ROOM_W(0x4B)
+#define rv_torpedo_timer ROOM_W(0x4F)
+
+/* functions */
+static void veng1_StartRoom(void);
+static void veng1_E_01E1(void);
+static void veng1_WalkToDoor(void);
+static void veng1_DoorOpens(void);
+static void veng1_E_02B1(void);
+static void veng1_ThroughDoor(void);
+static void veng1_ToTurbolift(void);
+static void veng1_LookAtBody(void);
+static void veng1_E_0368(void);
+static void veng1_LookAtVent(void);
+static void veng1_E_0433(void);
+static void veng1_LookAtPanel(void);
+static void veng1_E_0553(void);
+static void veng1_LookAtDoor(void);
+static void veng1_LookAtSaw(void);
+static void veng1_LookAtDebris(void);
+static void veng1_LookAtKirk(void);
+static void veng1_LookAtMcCoy(void);
+static void veng1_LookAtSpock(void);
+static void veng1_LookAtRedshirt(void);
+static void veng1_LookAtCorridor(void);
+static void veng1_TalkToKirk(void);
+static void veng1_TalkToSpock(void);
+static void veng1_TalkToMcCoy(void);
+static void veng1_TalkToRedshirt(void);
+static void veng1_E_0AB5(void);
+static void veng1_PhaserDoor(void);
+static void veng1_PhaserDoor2(void);
+static void veng1_PhaserDoor3(void);
+static void veng1_E_0B95(void);
+static void veng1_PhaserPanel(void);
+static void veng1_PhaserPanel2(void);
+static void veng1_PhaserPanel3(void);
+static void veng1_PhaserPanel4(void);
+static void veng1_PhaserPanel5(void);
+static void veng1_SpockScansSaw(void);
+static void veng1_E_0D10(void);
+static void veng1_SpockScansDoor(void);
+static void veng1_E_0DE6(void);
+static void veng1_SpockScansPanel(void);
+static void veng1_SpockScansPanel2(void);
+static void veng1_E_0F81(void);
+static void veng1_OpenPanel(void);
+static void veng1_KirkAtPanel(void);
+static void veng1_TriedPanel(void);
+static void veng1_SawOnPanel(void);
+static void veng1_E_1181(void);
+static void veng1_SawOnDoor(void);
+static void veng1_DrillOnDebris(void);
+static void veng1_SawOnDebris(void);
+static void veng1_DrillOnPanel(void);
+static void veng1_KirkAtPanel2(void);
+static void veng1_DrilledPanel(void);
+static void veng1_HypoOnDebris(void);
+static void veng1_KirkAtDebris(void);
+static void veng1_OiledDebris(void);
+static void veng1_GetSaw(void);
+static void veng1_KirkAtSaw(void);
+static void veng1_TookSaw(void);
+static void veng1_GetDebris(void);
+static void veng1_KirkAtDebris2(void);
+static void veng1_PulledDebris(void);
+static void veng1_ElasiDeadlines(void);
+static void veng1_E_1870(void);
+static void veng1_KillAnything(void);
+static void veng1_LookAtHypo(void);
+static void veng1_CallEnterprise(void);
+static void veng1_E_1BA8(void);
+static void veng1_MTricorderOnBody(void);
+static void veng1_McCoyOnBody(void);
+static void veng1_Talk(uint16_t ax);
+static void veng1_Say(uint16_t ax, uint16_t bx);
+
+/* The room starts: the door, the body, the saw and the panel as they were left.
+ * [MSG_TICK 01 00 00] */
+static void veng1_StartRoom(void)
+{
+    svc_Sfx(N_VEN1LOOP);
+    svc_Anim(8, N_s7r1d1c, 0xA1, 0x7E, 0);
+    svc_Anim(0xB, N_s7r1c1, 0x103, 0xA2, 0);
+    if (rv_saw_taken != 1) {
+        svc_Anim(0xA, N_s7r1md, 0x3D, 0x9F, 0);
+    }
+    svc_Anim(0xC, N_s7r1p1, 0xD1, 0x6A, 0);
+    if (rv_panel_open == 1) {
+        svc_Anim(9, N_s7r1p2, 0xD1, 0x6A, 0);
+        svc_StopAnim(0xC);
+    }
+    if (rv_gears_cleared == 1) {
+        svc_Anim(0xC, N_s7r1p3, 0xD1, 0x6A, 0);
+        svc_StopAnim(9);
+    }
+    return;
+}
+
+/* Walking to the door: with the gears cleared, Kirk walks up (msg 2) and
+ * it opens as he reaches it (region 0, anim msg 1). Once both are done,
+ * on to auxiliary control (room 2).
+ * [MSG_WALK 20 00 00] */
+static void veng1_E_01E1(void)
+{
+    { veng1_WalkToDoor(); return; }
+}
+
+/* [MSG_WALK 08 00 00] */
+static void veng1_WalkToDoor(void)
+{
+    if (rv_gears_cleared == 1) {
+        room.busy = 1;
+        svc_Walk(0, 0xA0, 0x82, 2);
+        fv_door_opening = 1;
+        room.fall[0] = 0;
+        return;
+    }
+    veng1_Say(0, T_VEN1N007);
+    return;
+}
+
+/* [MSG_REGION 00 00 00] */
+static void veng1_DoorOpens(void)
+{
+    if (fv_door_opening == 1) {
+        svc_Anim(8, N_s7r1d1, 0xA1, 0x7E, 1);
+        svc_Anim(0xC, N_s7r1g1, 0xD8, 0x79, 0);
+        svc_BridgeSfx(5);
+    }
+    return;
+}
+
+/* [MSG_WALK_DONE 02 00 00] */
+static void veng1_E_02B1(void)
+{
+    { veng1_ThroughDoor(); return; }
+}
+
+/* [MSG_ANIM_DONE 01 00 00] */
+static void veng1_ThroughDoor(void)
+{
+    fv_door_done++;
+    if (fv_door_done != 2) {
+        return;
+    }
+    svc_GotoRoom(2, 1);
+    return;
+}
+
+/* Exit 1: the turbolift.
+ * [MSG_EXIT 01 00 00] */
+static void veng1_ToTurbolift(void)
+{
+    svc_BridgeSfx(5);
+    svc_Turbolift(1, 0);
+    return;
+}
+
+/* Looking.
+ * [MSG_LOOK 0B 00 00] */
+static void veng1_LookAtBody(void)
+{
+    veng1_Say(0, T_VEN4N014);
+    return;
+}
+
+/* [MSG_USE 44 22 00] */
+static void veng1_E_0368(void)
+{
+    { veng1_LookAtVent(); return; }
+}
+
+/* [MSG_LOOK 22 00 00] */
+static void veng1_LookAtVent(void)
+{
+    svc_Anim(1, N_sscanw, -1, -1, 0);
+    svc_BridgeSfx(4);
+    veng1_Say(N_Mr_Spock, T_VEN1_011);
+    return;
+}
+
+/* [MSG_LOOK 0C 00 00] */
+static void veng1_E_0433(void)
+{
+    { veng1_LookAtPanel(); return; }
+}
+
+/* [MSG_LOOK 21 00 00] */
+static void veng1_LookAtPanel(void)
+{
+    if (rv_panel_open != 1) {
+        veng1_Say(0, T_VEN1N022);
+        return;
+    }
+    if (rv_gears_cleared != 1) {
+        veng1_Say(0, T_VEN1N019);
+        return;
+    }
+    veng1_Say(0, T_VEN1N010);
+    return;
+}
+
+/* [MSG_LOOK 08 00 00] */
+static void veng1_E_0553(void)
+{
+    { veng1_LookAtDoor(); return; }
+}
+
+/* [MSG_LOOK 20 00 00] */
+static void veng1_LookAtDoor(void)
+{
+    veng1_Say(0, T_VEN1N021);
+    return;
+}
+
+/* [MSG_LOOK 0A 00 00] */
+static void veng1_LookAtSaw(void)
+{
+    veng1_Say(0, T_VEN1N001);
+    return;
+}
+
+/* [MSG_LOOK 09 00 00] */
+static void veng1_LookAtDebris(void)
+{
+    veng1_Say(0, T_VEN1N000);
+    return;
+}
+
+/* [MSG_LOOK 00 00 00] */
+static void veng1_LookAtKirk(void)
+{
+    veng1_Say(0, T_VEN1N002);
+    return;
+}
+
+/* [MSG_LOOK 02 00 00] */
+static void veng1_LookAtMcCoy(void)
+{
+    veng1_Say(0, T_VEN1N004);
+    return;
+}
+
+/* [MSG_LOOK 01 00 00] */
+static void veng1_LookAtSpock(void)
+{
+    veng1_Say(0, T_VEN1N003);
+    return;
+}
+
+/* [MSG_LOOK 03 00 00] */
+static void veng1_LookAtRedshirt(void)
+{
+    veng1_Say(0, T_VEN1N005);
+    return;
+}
+
+/* [MSG_LOOK FF 00 00] */
+static void veng1_LookAtCorridor(void)
+{
+    veng1_Say(0, T_VEN1N020);
+    return;
+}
+
+/* [MSG_TALK 00 00 00] */
+static void veng1_TalkToKirk(void)
+{
+    veng1_Say(N_Capt_Kirk, T_VEN1_001);
+    return;
+}
+
+/* [MSG_TALK 01 00 00] */
+static void veng1_TalkToSpock(void)
+{
+    veng1_Say(N_Mr_Spock, T_VEN1_013);
+    veng1_Say(N_Dr_McCoy, T_VEN1_005);
+    return;
+}
+
+/* [MSG_TALK 02 00 00] */
+static void veng1_TalkToMcCoy(void)
+{
+    veng1_Say(N_Dr_McCoy, T_VEN1_004);
+    veng1_Say(N_Capt_Kirk, T_VEN1_002);
+    return;
+}
+
+/* [MSG_TALK 03 00 00] */
+static void veng1_TalkToRedshirt(void)
+{
+    veng1_Say(N_Ensign_Kije, T_VEN1_016);
+    return;
+}
+
+/* Phasers on the door and the panel.
+ * [MSG_USE 41 08 00] */
+static void veng1_E_0AB5(void)
+{
+    { veng1_PhaserDoor(); return; }
+}
+
+/* [MSG_USE 41 20 00] */
+static void veng1_PhaserDoor(void)
+{
+    { veng1_PhaserDoor2(); return; }
+}
+
+/* [MSG_USE 40 08 00] */
+static void veng1_PhaserDoor2(void)
+{
+    { veng1_PhaserDoor3(); return; }
+}
+
+/* [MSG_USE 40 20 00] */
+static void veng1_PhaserDoor3(void)
+{
+    veng1_Say(N_Ensign_Kije, T_VEN1_015);
+    return;
+}
+
+/* [MSG_USE 40 0C 00] */
+static void veng1_E_0B95(void)
+{
+    { veng1_PhaserPanel(); return; }
+}
+
+/* [MSG_USE 40 0C 00] */
+static void veng1_PhaserPanel(void)
+{
+    { veng1_PhaserPanel2(); return; }
+}
+
+/* [MSG_USE 40 09 00] */
+static void veng1_PhaserPanel2(void)
+{
+    { veng1_PhaserPanel3(); return; }
+}
+
+/* [MSG_USE 41 09 00] */
+static void veng1_PhaserPanel3(void)
+{
+    { veng1_PhaserPanel4(); return; }
+}
+
+/* [MSG_USE 40 21 00] */
+static void veng1_PhaserPanel4(void)
+{
+    { veng1_PhaserPanel5(); return; }
+}
+
+/* [MSG_USE 41 21 00] */
+static void veng1_PhaserPanel5(void)
+{
+    veng1_Say(N_Mr_Spock, T_VEN1_008);
+    return;
+}
+
+/* Spock's tricorder.
+ * [MSG_USE 44 0A 00] */
+static void veng1_SpockScansSaw(void)
+{
+    svc_Anim(1, N_sscanw_2, -1, -1, 0);
+    svc_BridgeSfx(4);
+    veng1_Say(N_Mr_Spock, T_VEN1_012);
+    return;
+}
+
+/* [MSG_USE 44 20 00] */
+static void veng1_E_0D10(void)
+{
+    { veng1_SpockScansDoor(); return; }
+}
+
+/* [MSG_USE 44 08 00] */
+static void veng1_SpockScansDoor(void)
+{
+    svc_Anim(1, N_sscann, -1, -1, 0);
+    svc_BridgeSfx(4);
+    if (rv_gears_cleared != 1) {
+        veng1_Say(N_Mr_Spock, T_VEN1_007);
+        return;
+    }
+    veng1_Say(N_Mr_Spock, T_VEN1_009);
+    return;
+}
+
+/* [MSG_USE 44 0C 00] */
+static void veng1_E_0DE6(void)
+{
+    { veng1_SpockScansPanel(); return; }
+}
+
+/* [MSG_USE 44 09 00] */
+static void veng1_SpockScansPanel(void)
+{
+    { veng1_SpockScansPanel2(); return; }
+}
+
+/* [MSG_USE 44 21 00] */
+static void veng1_SpockScansPanel2(void)
+{
+    svc_Anim(1, N_sscane, -1, -1, 0);
+    svc_BridgeSfx(4);
+    if (rv_panel_unsealed == 1) {
+    } else {
+        veng1_Say(N_Mr_Spock, T_VEN1_014);
+        return;
+    }
+    if (rv_gears_cleared != 1) {
+        veng1_Say(N_Mr_Spock, T_VEN1_006);
+        return;
+    }
+    veng1_Say(N_Mr_Spock, T_VEN1_010);
+    return;
+}
+
+/* Opening the panel (msgs 9, 0Ah): sealed until drilled (msgs 5, 6).
+ * [MSG_GET 0C 00 00] */
+static void veng1_E_0F81(void)
+{
+    { veng1_OpenPanel(); return; }
+}
+
+/* [MSG_USE 00 0C 00] */
+static void veng1_OpenPanel(void)
+{
+    svc_Walk(0, 0xD3, 0x84, 9);
+    room.busy = 1;
+    return;
+}
+
+/* [MSG_WALK_DONE 09 00 00] */
+static void veng1_KirkAtPanel(void)
+{
+    svc_Anim(0, N_kusemn, -1, -1, 0xA);
+    return;
+}
+
+/* [MSG_ANIM_DONE 0A 00 00] */
+static void veng1_TriedPanel(void)
+{
+    room.busy = 0;
+    if (rv_panel_unsealed != 1) {
+        veng1_Say(0, T_VEN1N016);
+        svc_Walk(0, 0xC9, 0x98, 0);
+        return;
+    }
+    if (rv_panel_open == 1) {
+    } else {
+        rv_panel_open = 1;
+        veng1_Say(0, T_VEN1N017);
+        svc_Anim(9, N_s7r1p2_2, 0xD1, 0x6A, 0);
+        svc_StopAnim(0xC);
+        svc_Walk(0, 0xC9, 0x98, 0);
+        return;
+    }
+    veng1_Say(0, T_VEN1_F33);
+    svc_Walk(0, 0xC9, 0x98, 0);
+    return;
+}
+
+/* The saw and the drill where they do not work.
+ * [MSG_USE 86 21 00] */
+static void veng1_SawOnPanel(void)
+{
+    veng1_Say(0, T_VEN1N013);
+    return;
+}
+
+/* [MSG_USE 86 08 00] */
+static void veng1_E_1181(void)
+{
+    { veng1_SawOnDoor(); return; }
+}
+
+/* [MSG_USE 86 20 00] */
+static void veng1_SawOnDoor(void)
+{
+    veng1_Say(0, T_VEN1N014);
+    return;
+}
+
+/* [MSG_USE 81 09 00] */
+static void veng1_DrillOnDebris(void)
+{
+    veng1_Say(0, T_VEN1N009);
+    return;
+}
+
+/* [MSG_USE 86 09 00] */
+static void veng1_SawOnDebris(void)
+{
+    veng1_Say(0, T_VEN1N018);
+    return;
+}
+
+/* [MSG_USE 81 0C 00] */
+static void veng1_DrillOnPanel(void)
+{
+    room.busy = 1;
+    svc_Walk(0, 0xD3, 0x84, 5);
+    return;
+}
+
+/* [MSG_WALK_DONE 05 00 00] */
+static void veng1_KirkAtPanel2(void)
+{
+    svc_Anim(0, N_kusemn_2, -1, -1, 6);
+    svc_Sfx(N_MADR7E2A);
+    return;
+}
+
+/* [MSG_ANIM_DONE 06 00 00] */
+static void veng1_DrilledPanel(void)
+{
+    svc_Walk(0, 0xC9, 0x98, 0);
+    room.busy = 0;
+    if (rv_panel_unsealed != 1) {
+        rv_panel_unsealed = 1;
+        veng1_Say(0, T_VEN1N008);
+        goto L1370;
+    }
+L1370:;
+    return;
+}
+
+/* Oiling the debris with the hypo (msgs 7, 8).
+ * [MSG_USE 82 09 00] */
+static void veng1_HypoOnDebris(void)
+{
+    room.busy = 1;
+    svc_Walk(0, 0xD3, 0x84, 7);
+    return;
+}
+
+/* [MSG_WALK_DONE 07 00 00] */
+static void veng1_KirkAtDebris(void)
+{
+    svc_Anim(0, N_kusemn_3, -1, -1, 8);
+    return;
+}
+
+/* [MSG_ANIM_DONE 08 00 00] */
+static void veng1_OiledDebris(void)
+{
+    svc_Walk(0, 0xC9, 0x98, 0);
+    room.busy = 0;
+    if (rv_hypo_oiled != 1) {
+        veng1_Say(0, T_VEN1N012);
+        return;
+    }
+    rv_debris_oiled = 1;
+    veng1_Say(0, T_VEN1N015);
+    return;
+}
+
+/* Taking the saw (msgs 3, 4).
+ * [MSG_GET 0A 00 00] */
+static void veng1_GetSaw(void)
+{
+    room.busy = 1;
+    svc_Walk(0, 0x32, 0xA4, 3);
+    return;
+}
+
+/* [MSG_WALK_DONE 03 00 00] */
+static void veng1_KirkAtSaw(void)
+{
+    svc_Anim(0, N_kuseln, -1, -1, 4);
+    return;
+}
+
+/* [MSG_ANIM_DONE 04 00 00] */
+static void veng1_TookSaw(void)
+{
+    svc_StopAnim(0xA);
+    veng1_Say(0, T_VEN1N023);
+    svc_GiveItem(IT_LMD);
+    rv_saw_taken = 1;
+    room.busy = 0;
+    return;
+}
+
+/* Pulling out the debris, once oiled (msgs 0Bh, 0Ch).
+ * [MSG_GET 09 00 00] */
+static void veng1_GetDebris(void)
+{
+    room.busy = 1;
+    svc_Walk(0, 0xD3, 0x84, 0xB);
+    return;
+}
+
+/* [MSG_WALK_DONE 0B 00 00] */
+static void veng1_KirkAtDebris2(void)
+{
+    svc_Anim(0, N_kusemn_4, -1, -1, 0xC);
+    return;
+}
+
+/* [MSG_ANIM_DONE 0C 00 00] */
+static void veng1_PulledDebris(void)
+{
+    svc_Walk(0, 0xC9, 0x98, 0);
+    room.busy = 0;
+    if (rv_debris_oiled != 1) {
+        veng1_Say(0, T_VEN1N006);
+        return;
+    }
+    svc_StopAnim(9);
+    svc_Anim(0xC, N_s7r1p3_2, 0xD1, 0x6A, 0);
+    veng1_Say(0, T_VEN1N011);
+    rv_gears_cleared = 1;
+    return;
+}
+
+/* Every tick, common to the mission's rooms: the Elasi deadlines set on
+ * the bridge (room 2). Until the Enterprise returns: boarding unless the
+ * shields are up, the thirty minutes, the wait after Kirk complies (then
+ * a warning and the torpedoes), the chance after they lower their
+ * shields. When one runs out, the game is over.
+ * [MSG_TICK FF FF FF] */
+static void veng1_ElasiDeadlines(void)
+{
+    if (rv_board_timer != 0) {
+        rv_board_timer--;
+        if (rv_board_timer == 0) {
+            if (rv_power_to != 2) {
+                goto L1760;
+            }
+        }
+    }
+    if (rv_stall_timer != 0) {
+        rv_stall_timer--;
+        if (rv_stall_timer == 0) {
+            if (rv_complied != 1) {
+                goto L1760;
+            }
+        }
+    }
+    if (rv_comply_timer != 0) {
+        rv_comply_timer--;
+        if (rv_comply_timer == 0) {
+            if (rv_rescued != 1) {
+                veng1_Say(N_Elasi_Captain, T_VEN2_098);
+                rv_torpedo_timer = 0xA8C;
+            }
+        }
+    }
+    if (rv_torpedo_timer != 0) {
+        rv_torpedo_timer--;
+        if (rv_torpedo_timer == 0) {
+            if (rv_rescued != 1) {
+                veng1_Say(0, T_VENA_F40);
+                svc_GameOver();
+            }
+        }
+    }
+    if (rv_attack_timer != 0) {
+        rv_attack_timer--;
+        if (rv_attack_timer == 0) {
+            if (rv_rescued != 1) {
+                goto L1760;
+            }
+        }
+    }
+    return;
+L1760:;
+    veng1_Say(0, T_VENA_F32);
+    svc_GameOver();
+    return;
+}
+
+/* [MSG_USE 40 FF 00] */
+static void veng1_E_1870(void)
+{
+    { veng1_KillAnything(); return; }
+}
+
+/* [MSG_USE 41 FF 00] */
+static void veng1_KillAnything(void)
+{
+    veng1_Say(N_Mr_Spock, T_VENA_F34);
+    return;
+}
+
+/* The hypo, empty or full of oil.
+ * [MSG_LOOK 82 00 00] */
+static void veng1_LookAtHypo(void)
+{
+    if (rv_hypo_oiled != 1) {
+        veng1_Say(0, T_VEN4N010);
+        return;
+    }
+    veng1_Say(0, T_VEN6N007);
+    return;
+}
+
+/* The communicator: before the Enterprise leaves, Uhura; while the Elasi
+ * jam it, Spock; otherwise Uhura, tracking the distress call.
+ * [MSG_USE 47 00 00] */
+static void veng1_CallEnterprise(void)
+{
+    if (rv_enterprise_away != 1) {
+        veng1_Say(N_Capt_Kirk, T_MUD4_018);
+        veng1_Say(N_Lt_Uhura, T_BRIDU146);
+        return;
+    }
+    if (rv_elasi_here == 1) {
+    } else {
+        veng1_Say(N_Capt_Kirk, T_MUD4_018_2);
+        veng1_Say(N_Lt_Uhura, T_VEN2U093);
+        veng1_Say(N_Capt_Kirk, T_VEN2_028);
+        return;
+    }
+    veng1_Say(N_Mr_Spock, T_VEN2_066);
+    return;
+}
+
+/* McCoy and the body.
+ * [MSG_USE 7F 0B 00] */
+static void veng1_E_1BA8(void)
+{
+    { veng1_MTricorderOnBody(); return; }
+}
+
+/* [MSG_USE 45 0B 00] */
+static void veng1_MTricorderOnBody(void)
+{
+    { veng1_McCoyOnBody(); return; }
+}
+
+/* [MSG_USE 02 0B 00] */
+static void veng1_McCoyOnBody(void)
+{
+    uint16_t ax = 0;
+    ax = (uint16_t)svc_Random(0, 5);
+    fv_mccoy_line = ax;
+    if (fv_mccoy_line == 0) {
+        veng1_Say(N_Dr_McCoy, T_DEM3_019);
+        return;
+    }
+    if (fv_mccoy_line == 1) {
+        veng1_Say(N_Dr_McCoy, T_VEN4_016);
+        return;
+    }
+    if (fv_mccoy_line == 2) {
+        veng1_Say(N_Dr_McCoy, T_G_014);
+        return;
+    }
+    if (fv_mccoy_line == 3) {
+        veng1_Say(N_Dr_McCoy, T_G_014_2);
+        return;
+    }
+    if (fv_mccoy_line == 4) {
+        veng1_Say(N_Dr_McCoy, T_VEN0_016);
+        return;
+    }
+    veng1_Say(N_Dr_McCoy, T_VEN0_016_2);
+    return;
+}
+
+/* Talk: conversation AX (speaker, choices, 0); returns the choice. */
+static void veng1_Talk(uint16_t ax)
+{
+    svc_Talk(ax);
+    return;
+}
+
+/* Say: one line, BX, said by AX (0: narration). */
+static void veng1_Say(uint16_t ax, uint16_t bx)
+{
+    fv_talk_buf = ax;
+    CS_W(0x1E01) = bx;
+    veng1_Talk(talk_buf);
+    return;
+}
+
+/* the scripts, by the offset of their code in the room file */
+const RoomScript veng1_scripts[] = {
+    { 0x00D2, veng1_StartRoom },    /* MSG_TICK 01 00 00 */
+    { 0x01E1, veng1_E_01E1 },    /* MSG_WALK 20 00 00 */
+    { 0x01E9, veng1_WalkToDoor },    /* MSG_WALK 08 00 00 */
+    { 0x0254, veng1_DoorOpens },    /* MSG_REGION 00 00 00 */
+    { 0x02B1, veng1_E_02B1 },    /* MSG_WALK_DONE 02 00 00 */
+    { 0x02B9, veng1_ThroughDoor },    /* MSG_ANIM_DONE 01 00 00 */
+    { 0x02D9, veng1_ToTurbolift },    /* MSG_EXIT 01 00 00 */
+    { 0x02FE, veng1_LookAtBody },    /* MSG_LOOK 0B 00 00 */
+    { 0x0368, veng1_E_0368 },    /* MSG_USE 44 22 00 */
+    { 0x0370, veng1_LookAtVent },    /* MSG_LOOK 22 00 00 */
+    { 0x0433, veng1_E_0433 },    /* MSG_LOOK 0C 00 00 */
+    { 0x043B, veng1_LookAtPanel },    /* MSG_LOOK 21 00 00 */
+    { 0x0553, veng1_E_0553 },    /* MSG_LOOK 08 00 00 */
+    { 0x055B, veng1_LookAtDoor },    /* MSG_LOOK 20 00 00 */
+    { 0x05A2, veng1_LookAtSaw },    /* MSG_LOOK 0A 00 00 */
+    { 0x05FE, veng1_LookAtDebris },    /* MSG_LOOK 09 00 00 */
+    { 0x064F, veng1_LookAtKirk },    /* MSG_LOOK 00 00 00 */
+    { 0x06CE, veng1_LookAtMcCoy },    /* MSG_LOOK 02 00 00 */
+    { 0x0724, veng1_LookAtSpock },    /* MSG_LOOK 01 00 00 */
+    { 0x07C7, veng1_LookAtRedshirt },    /* MSG_LOOK 03 00 00 */
+    { 0x0831, veng1_LookAtCorridor },    /* MSG_LOOK FF 00 00 */
+    { 0x088F, veng1_TalkToKirk },    /* MSG_TALK 00 00 00 */
+    { 0x08EA, veng1_TalkToSpock },    /* MSG_TALK 01 00 00 */
+    { 0x09B2, veng1_TalkToMcCoy },    /* MSG_TALK 02 00 00 */
+    { 0x0A6A, veng1_TalkToRedshirt },    /* MSG_TALK 03 00 00 */
+    { 0x0AB5, veng1_E_0AB5 },    /* MSG_USE 41 08 00 */
+    { 0x0ABD, veng1_PhaserDoor },    /* MSG_USE 41 20 00 */
+    { 0x0AC5, veng1_PhaserDoor2 },    /* MSG_USE 40 08 00 */
+    { 0x0ACD, veng1_PhaserDoor3 },    /* MSG_USE 40 20 00 */
+    { 0x0B95, veng1_E_0B95 },    /* MSG_USE 40 0C 00 */
+    { 0x0B9D, veng1_PhaserPanel },    /* MSG_USE 40 0C 00 */
+    { 0x0BA5, veng1_PhaserPanel2 },    /* MSG_USE 40 09 00 */
+    { 0x0BAD, veng1_PhaserPanel3 },    /* MSG_USE 41 09 00 */
+    { 0x0BB5, veng1_PhaserPanel4 },    /* MSG_USE 40 21 00 */
+    { 0x0BBD, veng1_PhaserPanel5 },    /* MSG_USE 41 21 00 */
+    { 0x0C41, veng1_SpockScansSaw },    /* MSG_USE 44 0A 00 */
+    { 0x0D10, veng1_E_0D10 },    /* MSG_USE 44 20 00 */
+    { 0x0D18, veng1_SpockScansDoor },    /* MSG_USE 44 08 00 */
+    { 0x0DE6, veng1_E_0DE6 },    /* MSG_USE 44 0C 00 */
+    { 0x0DEE, veng1_SpockScansPanel },    /* MSG_USE 44 09 00 */
+    { 0x0DF6, veng1_SpockScansPanel2 },    /* MSG_USE 44 21 00 */
+    { 0x0F81, veng1_E_0F81 },    /* MSG_GET 0C 00 00 */
+    { 0x0F89, veng1_OpenPanel },    /* MSG_USE 00 0C 00 */
+    { 0x0FB0, veng1_KirkAtPanel },    /* MSG_WALK_DONE 09 00 00 */
+    { 0x0FD5, veng1_TriedPanel },    /* MSG_ANIM_DONE 0A 00 00 */
+    { 0x112D, veng1_SawOnPanel },    /* MSG_USE 86 21 00 */
+    { 0x1181, veng1_E_1181 },    /* MSG_USE 86 08 00 */
+    { 0x1189, veng1_SawOnDoor },    /* MSG_USE 86 20 00 */
+    { 0x11E0, veng1_DrillOnDebris },    /* MSG_USE 81 09 00 */
+    { 0x123D, veng1_SawOnDebris },    /* MSG_USE 86 09 00 */
+    { 0x128F, veng1_DrillOnPanel },    /* MSG_USE 81 0C 00 */
+    { 0x12B6, veng1_KirkAtPanel2 },    /* MSG_WALK_DONE 05 00 00 */
+    { 0x12F5, veng1_DrilledPanel },    /* MSG_ANIM_DONE 06 00 00 */
+    { 0x1377, veng1_HypoOnDebris },    /* MSG_USE 82 09 00 */
+    { 0x139E, veng1_KirkAtDebris },    /* MSG_WALK_DONE 07 00 00 */
+    { 0x13C3, veng1_OiledDebris },    /* MSG_ANIM_DONE 08 00 00 */
+    { 0x1467, veng1_GetSaw },    /* MSG_GET 0A 00 00 */
+    { 0x148E, veng1_KirkAtSaw },    /* MSG_WALK_DONE 03 00 00 */
+    { 0x14B3, veng1_TookSaw },    /* MSG_ANIM_DONE 04 00 00 */
+    { 0x151C, veng1_GetDebris },    /* MSG_GET 09 00 00 */
+    { 0x1543, veng1_KirkAtDebris2 },    /* MSG_WALK_DONE 0B 00 00 */
+    { 0x1568, veng1_PulledDebris },    /* MSG_ANIM_DONE 0C 00 00 */
+    { 0x164C, veng1_ElasiDeadlines },    /* MSG_TICK FF FF FF */
+    { 0x1870, veng1_E_1870 },    /* MSG_USE 40 FF 00 */
+    { 0x1878, veng1_KillAnything },    /* MSG_USE 41 FF 00 */
+    { 0x190D, veng1_LookAtHypo },    /* MSG_LOOK 82 00 00 */
+    { 0x19A3, veng1_CallEnterprise },    /* MSG_USE 47 00 00 */
+    { 0x1BA8, veng1_E_1BA8 },    /* MSG_USE 7F 0B 00 */
+    { 0x1BB0, veng1_MTricorderOnBody },    /* MSG_USE 45 0B 00 */
+    { 0x1BB8, veng1_McCoyOnBody },    /* MSG_USE 02 0B 00 */
+    { 0, 0 }
+};

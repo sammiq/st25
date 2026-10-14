@@ -1,0 +1,1272 @@
+/* DEMON3.RDF: the room's scripts, translated from the machine code in the room file
+ * (src/rdf/demon3.asm) by tools/rdf2c.py.  They run on the loaded file (CS_B/CS_W) and the
+ * room state (`room`), and call the game through the svc_ macros of rooms.h.
+ *
+ * DEMON3.RDF - "Demon World", the cave-in inside Mount Idyll. Brother
+ * Kandrey is trapped under the rubble in front of an alien door. Kirk clears
+ * it boulder by boulder with his phaser on kill, top first: the crew take
+ * cover, Kirk fires, and the boulder breaks up. Shooting a lower one while
+ * the top boulder is still up brings that down on Ensign Everts. Under the
+ * last boulder is the miner, whom McCoy can save. The door opens to the
+ * android's repaired hand on its panel; Everts, if he tries the panel,
+ * gets a shock, and the fifth time it kills him.
+ *
+ * Actors: 8 the light over the door, 9-12 (0Ch) the boulders, top to
+ * bottom, 13 (0Dh) the miner, 14 (0Eh) the door, 15 (0Fh) the panel,
+ * 17 (11h) the falling rubble.
+ * Objects: 9-0Ch the boulders, 0Dh the miner, 0Eh/21h the door, 0Fh/20h
+ * the hand panel, 22h the structure.
+ * Exits: 0 through the door (room 4), 1 back out (room 2).
+ * Timers: 0 the top boulder falls, 1 it hits Everts, 3 the panel takes the
+ * hand.
+ *
+ * Labels: H_ script headers, L branch targets, C_ conversations,
+ * T_/N_/S_ strings; talk_buf: the conversation buffer of Say.
+ *
+ * Quirks of the original:
+ * - The script chain runs on into code at 16F9: the engine reads its bytes
+ * as key 50 B8 03 00 and next 2E50 (beyond rdf_scripts_end, so the search
+ * stops).
+ */
+
+#include "rooms.h"
+
+/* where the file keeps its strings, conversations and tables */
+enum {
+    N_drbldr = 0x00D8,
+    N_redkil = 0x00DF,
+    N_sbldr1 = 0x00E6,
+    N_sbldr2 = 0x00ED,
+    N_sbldr3 = 0x00F4,
+    N_sbldr4 = 0x00FB,
+    N_bldr1 = 0x0102,
+    N_bldr2 = 0x0108,
+    N_bldr3 = 0x010E,
+    N_bldr4 = 0x0114,
+    N_kstnds = 0x011A,
+    N_kwaitn = 0x0128,
+    N_swaitn = 0x012F,
+    N_mwaitn = 0x0136,
+    N_rwaitn = 0x013D,
+    N_deadre = 0x0144,
+    N_drmine = 0x014B,
+    N_miner = 0x0152,
+    N_door = 0x0158,
+    N_door2 = 0x015D,
+    N_panel = 0x0163,
+    N_demon3a = 0x0169,
+    N_demon3 = 0x0171,
+    N_light = 0x0178,
+    N_rkille = 0x017E,
+    N_kfiren = 0x018C,
+    N_s0r3s1 = 0x0193,
+    N_s0r3s2 = 0x019A,
+    N_s0r3s3 = 0x01A1,
+    N_s0r3s4 = 0x01A8,
+    N_museln = 0x01AF,
+    N_kusehn = 0x01B6,
+    N_rusehn = 0x01BD,
+    N_mscann = 0x01C4,
+    N_mscanw = 0x01CB,
+    N_sscann = 0x01D2,
+    N_DEM3LOOP = 0x01E1,
+    N_BOULDERK = 0x035D,
+    T_DEM3_013 = 0x0662,
+    T_DEM3_007 = 0x06D3,
+    T_DEM3_006 = 0x07A5,
+    S_0885 = 0x0885,
+    T_DEM3_008 = 0x0A19,
+    T_DEM3_009 = 0x0A9A,
+    T_DEM3_031 = 0x0BD7,
+    T_DEM3_030 = 0x0C30,
+    N_EFX3 = 0x0CDF,
+    T_DEM3_A32 = 0x0CFE,
+    T_DEM3_016 = 0x0E13,
+    T_DEM3_005 = 0x0ED2,
+    N_MUR4E1 = 0x0F61,
+    N_SE0FORCE = 0x0F9B,
+    T_DEM3_015 = 0x104E,
+    T_DEM3_014 = 0x118E,
+    T_DEM3N017 = 0x1248,
+    T_DEM3N010 = 0x12A4,
+    T_DEM3N018 = 0x12F4,
+    T_DEM3N011 = 0x1383,
+    T_DEM3N013 = 0x13D5,
+    T_DEM3N013_2 = 0x1443,
+    T_DEM3N020 = 0x14B1,
+    T_DEM3N016 = 0x1522,
+    T_DEM3N012 = 0x15AB,
+    T_DEM3N014 = 0x15F5,
+    T_DEM3N019 = 0x1648,
+    T_DEM3N015 = 0x16AD,
+    N_Capt_Kirk = 0x177B,
+    N_Dr_McCoy = 0x1786,
+    N_Mr_Spock = 0x1790,
+    N_Ensign_Everts = 0x179A,
+    N_Brother_Kandrey = 0x17A8,
+    N_wes = 0x17B8,
+    S_17BC = 0x17BC,
+    T_DEM3N004 = 0x17BD,
+    T_DEM3N001 = 0x17F6,
+    T_DEM3N002 = 0x1835,
+    T_DEM3N003 = 0x1894,
+    T_DEM3N006 = 0x18C9,
+    T_DEM3N000 = 0x1912,
+    T_DEM3_002 = 0x1979,
+    T_DEM3_029 = 0x19E3,
+    T_DEM3_026 = 0x1A03,
+    T_DEM3_028 = 0x1A30,
+    T_DEM3_025 = 0x1A7D,
+    T_DEM3_003 = 0x1AC6,
+    T_DEM3_024 = 0x1ADD,
+    T_DEM3_036 = 0x1B0F,
+    T_DEM3_004 = 0x1B92,
+    T_DEM3_001 = 0x1BDE,
+    T_DEM3_020 = 0x1C06,
+    T_DEM3_010 = 0x1C6D,
+    T_DEM3_023 = 0x1D0A,
+    T_DEM3_021 = 0x1D60,
+    T_DEM3_022 = 0x1D94,
+    T_DEM3_017 = 0x1DB6,
+    T_DEM3_018 = 0x1EC4,
+    T_DEM3_012 = 0x1EEE,
+    T_DEM3_027 = 0x1F7B,
+    T_DEM3N009 = 0x2060,
+    T_DEM3_011 = 0x208C,
+    T_DEM3N007 = 0x20CA,
+    T_DEM3N008 = 0x2115,
+    T_DEM3_019 = 0x2164,
+    S_2185 = 0x2185,
+    T_DEM3_F21 = 0x21C2,
+    talk_buf = 0x225A,
+};
+
+/* the room's variables: in the room state, and in the file itself */
+#define fv_boulder CS_B(0xCC)
+#define fv_crew_ready CS_B(0xCA)
+#define fv_door_shots CS_W(0xD6)
+#define fv_everts_in_place CS_B(0xCE)
+#define fv_in_cover CS_B(0xD1)
+#define fv_kirk_fired CS_B(0xD3)
+#define fv_kirk_in_place CS_B(0xCD)
+#define fv_mccoy_in_place CS_B(0xD0)
+#define fv_rubble_anim CS_W(0xD4)
+#define fv_spock_in_place CS_B(0xCF)
+#define fv_talk_buf CS_W(0x225A)
+#define fv_top_boulder_safe CS_B(0xCB)
+#define rv_boulder1_down ROOM_B(0x49)
+#define rv_boulder2_down ROOM_B(0x4A)
+#define rv_boulder3_down ROOM_B(0x4B)
+#define rv_boulder4_down ROOM_B(0x4C)
+#define rv_boulders_down ROOM_B(0x39)
+#define rv_cave_music ROOM_B(0x56)
+#define rv_door_open ROOM_B(0x4D)
+#define rv_everts_shocked ROOM_W(0x45)
+#define rv_hand_repaired ROOM_B(0x3B)
+#define rv_healed_miner ROOM_B(0x3C)
+#define rv_miner_dead ROOM_B(0x40)
+#define rv_panel_tries ROOM_W(0x41)
+#define rv_rubble_cleared ROOM_W(0x43)
+#define rv_score ROOM_W(0x58)
+
+/* functions */
+static void demon3_StartRoom(void);
+static void demon3_TopBoulderFalls(void);
+static void demon3_BoulderHitsEverts(void);
+static void demon3_PanelTakesHand(void);
+static void demon3_EvertsCrushed(void);
+static void demon3_MinerUncovered(void);
+static void demon3_McCoyAtEverts(void);
+static void demon3_McCoyInCover(void);
+static void demon3_SpockInCover(void);
+static void demon3_EvertsInCover(void);
+static void demon3_KirkInCover(void);
+static void demon3_part_053E(void);
+static void demon3_part_0567(void);
+static void demon3_BoulderBreaks(void);
+static void demon3_E_0649(void);
+static void demon3_PhaserDeadEverts(void);
+static void demon3_E_06B0(void);
+static void demon3_StunBoulder2(void);
+static void demon3_StunBoulder3(void);
+static void demon3_StunBoulder(void);
+static void demon3_ShootBoulder1(void);
+static void demon3_ShootBoulder2(void);
+static void demon3_ShootBoulder3(void);
+static void demon3_ShootBoulder4(void);
+static void demon3_part_093F(void);
+static void demon3_SpockScansMiner(void);
+static void demon3_SpockScansPanel(void);
+static void demon3_E_0B16(void);
+static void demon3_SpockScansBoulder2(void);
+static void demon3_SpockScansBoulder3(void);
+static void demon3_SpockScansBoulder(void);
+static void demon3_E_0B65(void);
+static void demon3_McCoyScansBoulder2(void);
+static void demon3_McCoyScansBoulder3(void);
+static void demon3_McCoyScansBoulder(void);
+static void demon3_E_0BAE(void);
+static void demon3_SpockUsesPanel(void);
+static void demon3_McCoyUsesPanel(void);
+static void demon3_EvertsUsesPanel(void);
+static void demon3_part_0C93(void);
+static void demon3_EvertsAtPanel(void);
+static void demon3_EvertsTouchesPanel(void);
+static void demon3_EvertsDead(void);
+static void demon3_SpockScansDoor(void);
+static void demon3_SpockScans(void);
+static void demon3_E_0DD7(void);
+static void demon3_McCoyScansDoor2(void);
+static void demon3_McCoyScansDoor(void);
+static void demon3_E_0E7B(void);
+static void demon3_PhaserDoor2(void);
+static void demon3_PhaserDoor3(void);
+static void demon3_PhaserDoor(void);
+static void demon3_UseHandOnPanel(void);
+static void demon3_KirkAtPanel(void);
+static void demon3_KirkPutsHand(void);
+static void demon3_SpockScansMiner2(void);
+static void demon3_McCoyScansMiner(void);
+static void demon3_E_1035(void);
+static void demon3_HealMiner(void);
+static void demon3_McCoyAtMiner(void);
+static void demon3_MinerHealed(void);
+static void demon3_part_1115(void);
+static void demon3_GetMiner(void);
+static void demon3_TalkToMiner(void);
+static void demon3_TalkToKirk(void);
+static void demon3_TalkToSpock(void);
+static void demon3_TalkToMcCoy(void);
+static void demon3_TalkToRedshirt(void);
+static void demon3_LookAtKirk(void);
+static void demon3_LookAtSpock(void);
+static void demon3_LookAtMcCoy(void);
+static void demon3_LookAtDeadEverts(void);
+static void demon3_LookAtScene(void);
+static void demon3_LookAtRedshirt(void);
+static void demon3_LookAtMiner(void);
+static void demon3_LookAtBoulder1(void);
+static void demon3_LookAtBoulder2(void);
+static void demon3_LookAtBoulder3(void);
+static void demon3_LookAtBoulder4(void);
+static void demon3_LookAtStructure(void);
+static void demon3_E_1592(void);
+static void demon3_LookAtDoor(void);
+static void demon3_E_1635(void);
+static void demon3_LookAtPanel(void);
+static void demon3_LookAtLight(void);
+static void demon3_Talk(uint16_t ax);
+static void demon3_Say(uint16_t ax, uint16_t bx);
+
+/* The room starts: the boulders still up, the door if it is open.
+ * [MSG_TICK 01 00 00] */
+static void demon3_StartRoom(void)
+{
+    svc_Sfx(N_DEM3LOOP);
+    svc_Anim0(8, N_light, 0xAB, 3, 0);
+    fv_top_boulder_safe = 1;
+    if (rv_boulder1_down != 1) {
+        svc_Anim0(9, N_bldr1, 0x26, 0, 0);
+        fv_top_boulder_safe = 0;
+    }
+    if (rv_boulder2_down != 1) {
+        svc_Anim0(0xA, N_bldr2, 0x22, 0, 0);
+    }
+    if (rv_boulder3_down != 1) {
+        svc_Anim0(0xB, N_bldr3, 0x22, 0, 0);
+    }
+    if (rv_boulder4_down != 1) {
+        svc_Anim0(0xC, N_bldr4, 0x22, 0, 0);
+    }
+    if (rv_door_open == 1) {
+        svc_Anim0(0xE, N_door2, 0x82, 0xC, 0);
+    }
+    if (rv_door_open != 1) {
+        svc_LoadMap(N_demon3a);
+    }
+    if (rv_healed_miner != 1) {
+        if (rv_boulder4_down == 1) {
+            svc_Anim0(0xD, N_miner, 0xDA, 0x6C, 0);
+        }
+    }
+    if (room.redshirt_dead == 1) {
+        if (rv_everts_shocked != 1) {
+            svc_Anim0(3, N_deadre, 0x46, 0xA0, 0);
+        }
+    }
+    if (rv_panel_tries == 0) {
+        rv_panel_tries++;
+    }
+    if (rv_cave_music != 1) {
+        rv_cave_music = 1;
+        svc_Music(0, -1);
+    }
+    return;
+}
+
+/* Timer 0 (set when a lower boulder goes first): the top boulder
+ * comes down, and on timer 1...
+ * [MSG_TIMER 00 00 00] */
+static void demon3_TopBoulderFalls(void)
+{
+    fv_top_boulder_safe = 1;
+    svc_Anim(9, N_drbldr, 0x26, 0, 0);
+    room.timers[1] = 0xD;
+    rv_boulder1_down = 1;
+    rv_boulders_down++;
+    room.busy = 1;
+    svc_Music(2, -1);
+    svc_Sfx(N_BOULDERK);
+    return;
+}
+
+/* ...Kirk and Everts are caught (anim msg 1).
+ * [MSG_TIMER 01 00 00] */
+static void demon3_BoulderHitsEverts(void)
+{
+    fv_kirk_fired = 0;
+    svc_Anim(3, N_redkil, 0x46, 0xA0, 0);
+    svc_Anim(0, N_redkil, 0x46, 0xA0, 1);
+    return;
+}
+
+/* [MSG_TIMER 03 00 00] */
+static void demon3_PanelTakesHand(void)
+{
+    if (rv_hand_repaired == 1) {
+        demon3_Say(S_17BC, T_DEM3N008);
+        svc_Anim0(0xE, N_door, 0x82, 0xC, 0);
+        svc_LoadMap(N_demon3);
+        rv_door_open = 1;
+        rv_score += 2;
+        return;
+    }
+    demon3_Say(S_17BC, T_DEM3N007);
+    return;
+}
+
+/* Everts is dead; McCoy goes to him (msg 5).
+ * [MSG_ANIM_DONE 01 00 00] */
+static void demon3_EvertsCrushed(void)
+{
+    svc_Anim(0, N_kstnds, 0xEE, 0xA9, 0);
+    svc_Anim(3, N_deadre, 0x46, 0xA0, 0);
+    svc_StopAnim(1);
+    svc_Walk(2, 0x9C, 0xB2, 5);
+    fv_in_cover = 0;
+    room.redshirt_dead = 1;
+    return;
+}
+
+/* The last boulder has gone: the miner is uncovered, +3 score.
+ * [MSG_ANIM_DONE 02 00 00] */
+static void demon3_MinerUncovered(void)
+{
+    svc_Anim0(0xD, N_miner, 0xDA, 0x6C, 0);
+    rv_score += 3;
+    return;
+}
+
+/* [MSG_WALK_DONE 05 00 00] */
+static void demon3_McCoyAtEverts(void)
+{
+    svc_Anim(2, N_mscanw, -1, -1, 0);
+    svc_BridgeSfx(4);
+    demon3_Say(N_Dr_McCoy, T_DEM3_019);
+    room.busy = 0;
+    return;
+}
+
+/* The crew reach cover (walk msgs 1-4). When everyone is there, Kirk
+ * fires (anim msg 4).
+ * [MSG_WALK_DONE 03 00 00] */
+static void demon3_McCoyInCover(void)
+{
+    svc_Anim(2, N_mwaitn, 0xD6, 0xB8, 0);
+    fv_mccoy_in_place = 1;
+    { demon3_part_053E(); return; }
+}
+
+/* [MSG_WALK_DONE 02 00 00] */
+static void demon3_SpockInCover(void)
+{
+    svc_Anim(1, N_swaitn, 0xAE, 0xB4, 0);
+    fv_spock_in_place = 1;
+    { demon3_part_053E(); return; }
+}
+
+/* [MSG_WALK_DONE 04 00 00] */
+static void demon3_EvertsInCover(void)
+{
+    svc_Anim(3, N_rwaitn, 0x46, 0xA0, 0);
+    fv_everts_in_place = 1;
+    { demon3_part_053E(); return; }
+}
+
+/* [MSG_WALK_DONE 01 00 00] */
+static void demon3_KirkInCover(void)
+{
+    svc_Anim(0, N_kwaitn, 0x79, 0xA0, 0);
+    fv_kirk_in_place = 1;
+    { demon3_part_053E(); return; }
+}
+
+static void demon3_part_053E(void)
+{
+    if (fv_kirk_in_place == 1) {
+        if (fv_spock_in_place == 1) {
+            if (fv_mccoy_in_place == 1) {
+                if (room.redshirt_dead == 1)
+                    { demon3_part_0567(); return; }
+                if (fv_everts_in_place == 1) {
+                    { demon3_part_0567(); return; }
+                }
+            }
+        }
+    }
+    return;
+}
+
+static void demon3_part_0567(void)
+{
+    if (fv_kirk_fired == 1)
+        { demon3_BoulderBreaks(); return; }
+    svc_Anim(0, N_kfiren, -1, -1, 4);
+    fv_kirk_fired = 1;
+    return;
+}
+
+/* The shot has hit: the boulder breaks up (rubble_anim), msg 2 for the
+ * last one. If the top boulder is still up, timer 0 brings it down.
+ * [MSG_ANIM_DONE 04 00 00] */
+static void demon3_BoulderBreaks(void)
+{
+    uint16_t stk[32 + 8] = { 0 };       /* the top 8 are what a service call reads past the stack */
+    int sp_ = 32;
+    fv_kirk_in_place = 0;
+    fv_spock_in_place = 0;
+    fv_mccoy_in_place = 0;
+    fv_everts_in_place = 0;
+    fv_crew_ready = 0;
+    stk[--sp_] = 2;
+    if (fv_boulder != 4) {
+        stk[--sp_] = 0;
+    }
+    stk[--sp_] = 0;
+    stk[--sp_] = 0x22;
+    if (fv_boulder == 1) {
+        stk[--sp_] = N_sbldr1;
+        stk[--sp_] = 9;
+    } else if (fv_boulder == 2) {
+        stk[--sp_] = N_sbldr2;
+        stk[--sp_] = 0xA;
+    } else if (fv_boulder == 3) {
+        stk[--sp_] = N_sbldr3;
+        stk[--sp_] = 0xB;
+    } else if (fv_boulder == 4) {
+        stk[--sp_] = N_sbldr4;
+        stk[--sp_] = 0xC;
+    } else {
+        demon3_Say(N_wes, S_2185);
+    }
+    stk[--sp_] = 2;
+    ScriptService(stk[sp_], stk[sp_ + 1], stk[sp_ + 2], stk[sp_ + 3], stk[sp_ + 4], stk[sp_ + 5]);
+    sp_ += 6;
+    stk[--sp_] = 0;
+    stk[--sp_] = 0;
+    stk[--sp_] = 0;
+    stk[--sp_] = fv_rubble_anim;
+    stk[--sp_] = 0x11;
+    stk[--sp_] = 0;
+    ScriptService(stk[sp_], stk[sp_ + 1], stk[sp_ + 2], stk[sp_ + 3], stk[sp_ + 4], stk[sp_ + 5]);
+    sp_ += 6;
+    stk[--sp_] = 6;
+    stk[--sp_] = 0xF;
+    ScriptService(stk[sp_], stk[sp_ + 1], stk[sp_ + 2], stk[sp_ + 3], stk[sp_ + 4], stk[sp_ + 5]);
+    sp_ += 2;
+    if (fv_top_boulder_safe != 1) {
+        room.timers[0] = 1;
+    }
+    room.busy = 0;
+    return;
+}
+
+/* Phasers on Everts (dead: McCoy objects), and on the boulders: stun
+ * does nothing...
+ * [MSG_USE 40 03 00] */
+static void demon3_E_0649(void)
+{
+    { demon3_PhaserDeadEverts(); return; }
+}
+
+/* [MSG_USE 41 03 00] */
+static void demon3_PhaserDeadEverts(void)
+{
+    if (room.redshirt_dead == 1) {
+        demon3_Say(N_Dr_McCoy, T_DEM3_013);
+        goto L06A9;
+    }
+L06A9:;
+    return;
+}
+
+/* [MSG_USE 40 09 00] */
+static void demon3_E_06B0(void)
+{
+    { demon3_StunBoulder2(); return; }
+}
+
+/* [MSG_USE 40 0A 00] */
+static void demon3_StunBoulder2(void)
+{
+    { demon3_StunBoulder3(); return; }
+}
+
+/* [MSG_USE 40 0B 00] */
+static void demon3_StunBoulder3(void)
+{
+    { demon3_StunBoulder(); return; }
+}
+
+/* [MSG_USE 40 0C 00] */
+static void demon3_StunBoulder(void)
+{
+    demon3_Say(N_Mr_Spock, T_DEM3_007);
+    return;
+}
+
+/* ...on kill, each boulder once, top first, after the crew take cover.
+ * [MSG_USE 41 09 00] */
+static void demon3_ShootBoulder1(void)
+{
+    if (fv_crew_ready == 1) {
+        return;
+    }
+    if (rv_boulder1_down == 1) {
+        return;
+    }
+    rv_boulder1_down = 1;
+    rv_boulders_down++;
+    fv_boulder = 1;
+    fv_top_boulder_safe = 1;
+    fv_rubble_anim = N_s0r3s2;
+    { demon3_part_093F(); return; }
+}
+
+/* [MSG_USE 41 0A 00] */
+static void demon3_ShootBoulder2(void)
+{
+    if (fv_crew_ready == 1) {
+        return;
+    }
+    if (rv_boulder2_down == 1) {
+        return;
+    }
+    rv_boulder2_down = 1;
+    rv_boulders_down++;
+    fv_boulder = 2;
+    fv_rubble_anim = N_s0r3s3;
+    { demon3_part_093F(); return; }
+}
+
+/* [MSG_USE 41 0B 00] */
+static void demon3_ShootBoulder3(void)
+{
+    if (rv_boulder1_down == 1) {
+    } else {
+        demon3_Say(N_Mr_Spock, T_DEM3_006);
+        return;
+    }
+    if (fv_crew_ready == 1) {
+        return;
+    }
+    if (rv_boulder3_down == 1) {
+        return;
+    }
+    rv_boulder3_down = 1;
+    rv_boulders_down++;
+    fv_boulder = 3;
+    fv_rubble_anim = N_s0r3s1;
+    { demon3_part_093F(); return; }
+}
+
+/* [MSG_USE 41 0C 00] */
+static void demon3_ShootBoulder4(void)
+{
+    if (rv_boulder2_down == 1) {
+    } else {
+        demon3_Say(N_Mr_Spock, S_0885);
+        return;
+    }
+    if (fv_crew_ready == 1) {
+        return;
+    }
+    if (rv_boulder4_down == 1) {
+        return;
+    }
+    rv_boulder4_down = 1;
+    rv_boulders_down++;
+    fv_boulder = 4;
+    fv_rubble_anim = N_s0r3s4;
+    rv_rubble_cleared = 1;
+    { demon3_part_093F(); return; }
+}
+
+static void demon3_part_093F(void)
+{
+    uint16_t ax = 0, dx = 0;
+    room.busy = 1;
+    { int32_t r = svc_ActorPos(0); ax = (uint16_t)r; dx = (uint16_t)(r >> 16); }
+    if (dx != 0xA0) {
+        fv_in_cover = 0;
+        fv_kirk_fired = 0;
+    }
+    if (ax != 0x79) {
+        fv_in_cover = 0;
+        fv_kirk_fired = 0;
+    }
+    if (fv_in_cover == 1) {
+        { demon3_part_0567(); return; }
+    }
+    demon3_Say(N_Capt_Kirk, T_DEM3_001);
+    svc_Walk(0, 0x79, 0xA0, 1);
+    svc_Walk(1, 0xAE, 0xB4, 2);
+    svc_Walk(2, 0xD6, 0xB8, 3);
+    if (room.redshirt_dead != 1) {
+        svc_Walk(3, 0x46, 0xA0, 4);
+    }
+    fv_crew_ready = 1;
+    fv_in_cover = 1;
+    return;
+}
+
+/* Tricorders.
+ * [MSG_USE 44 0D 00] */
+static void demon3_SpockScansMiner(void)
+{
+    svc_Anim(1, N_sscann, -1, -1, 0);
+    svc_BridgeSfx(4);
+    demon3_Say(N_Mr_Spock, T_DEM3_008);
+    return;
+}
+
+/* [MSG_USE 44 20 00] */
+static void demon3_SpockScansPanel(void)
+{
+    svc_Anim(1, N_sscann, -1, -1, 0);
+    svc_BridgeSfx(4);
+    demon3_Say(N_Mr_Spock, T_DEM3_009);
+    return;
+}
+
+/* [MSG_USE 44 09 00] */
+static void demon3_E_0B16(void)
+{
+    { demon3_SpockScansBoulder2(); return; }
+}
+
+/* [MSG_USE 44 0A 00] */
+static void demon3_SpockScansBoulder2(void)
+{
+    { demon3_SpockScansBoulder3(); return; }
+}
+
+/* [MSG_USE 44 0B 00] */
+static void demon3_SpockScansBoulder3(void)
+{
+    { demon3_SpockScansBoulder(); return; }
+}
+
+/* [MSG_USE 44 0C 00] */
+static void demon3_SpockScansBoulder(void)
+{
+    if (rv_rubble_cleared != 1) {
+        svc_Anim(1, N_sscann, -1, -1, 0);
+        svc_BridgeSfx(4);
+        demon3_Say(N_Mr_Spock, T_DEM3_010);
+    }
+    return;
+}
+
+/* [MSG_USE 45 09 00] */
+static void demon3_E_0B65(void)
+{
+    { demon3_McCoyScansBoulder2(); return; }
+}
+
+/* [MSG_USE 45 0A 00] */
+static void demon3_McCoyScansBoulder2(void)
+{
+    { demon3_McCoyScansBoulder3(); return; }
+}
+
+/* [MSG_USE 45 0B 00] */
+static void demon3_McCoyScansBoulder3(void)
+{
+    { demon3_McCoyScansBoulder(); return; }
+}
+
+/* [MSG_USE 45 0C 00] */
+static void demon3_McCoyScansBoulder(void)
+{
+    svc_Anim(2, N_mscann, -1, -1, 0);
+    svc_BridgeSfx(4);
+    demon3_Say(N_Dr_McCoy, T_DEM3_020);
+    return;
+}
+
+/* The crew at the panel: Everts insists on going himself.
+ * [MSG_USE 00 20 00] */
+static void demon3_E_0BAE(void)
+{
+    { demon3_SpockUsesPanel(); return; }
+}
+
+/* [MSG_USE 01 20 00] */
+static void demon3_SpockUsesPanel(void)
+{
+    { demon3_McCoyUsesPanel(); return; }
+}
+
+/* [MSG_USE 02 20 00] */
+static void demon3_McCoyUsesPanel(void)
+{
+    if (rv_boulders_down != 4) {
+        return;
+    }
+    if (room.redshirt_dead == 1) {
+        return;
+    }
+    demon3_Say(N_Ensign_Everts, T_DEM3_031);
+    { demon3_part_0C93(); return; }
+}
+
+/* [MSG_USE 03 20 00] */
+static void demon3_EvertsUsesPanel(void)
+{
+    if (room.redshirt_dead == 1) {
+        return;
+    }
+    if (rv_boulders_down == 4)
+        { demon3_part_0C93(); return; }
+    demon3_Say(N_Ensign_Everts, T_DEM3_030);
+    return;
+}
+
+static void demon3_part_0C93(void)
+{
+    svc_Walk(3, 0xD8, 0x70, 8);
+    return;
+}
+
+/* [MSG_WALK_DONE 08 00 00] */
+static void demon3_EvertsAtPanel(void)
+{
+    svc_Anim(3, N_rusehn, -1, -1, 5);
+    return;
+}
+
+/* Everts' hand on the panel (anim msg 5), once the rubble is cleared:
+ * a line from everts_lines for each try, and the fifth kills him.
+ * [MSG_ANIM_DONE 05 00 00] */
+static void demon3_EvertsTouchesPanel(void)
+{
+    uint16_t ax = 0, bx = 0;
+    uint16_t t0;
+    if (rv_rubble_cleared == 1) {
+        rv_panel_tries++;
+        ax = N_Ensign_Everts;
+        bx = rv_panel_tries;
+        if (bx != 5)
+            goto L0D40;
+        svc_Sfx(N_EFX3);
+        demon3_Say(N_Ensign_Everts, T_DEM3_A32);
+        svc_Anim(3, N_rkille, -1, -1, 3);
+        svc_BridgeSfx(6);
+        room.redshirt_dead = 1;
+        rv_everts_shocked = 1;
+    }
+    return;
+L0D40:;
+    bx = bx << 1;
+    t0 = bx;
+    bx = CS_W(0x1EE2 + bx);
+    demon3_Say(ax, bx);
+    svc_Walk(3, 0xBE, 0x9B, 0);
+    return;
+}
+
+/* [MSG_ANIM_DONE 03 00 00] */
+static void demon3_EvertsDead(void)
+{
+    demon3_Say(N_Dr_McCoy, T_DEM3_018);
+    return;
+}
+
+/* [MSG_USE 44 21 00] */
+static void demon3_SpockScansDoor(void)
+{
+    svc_Anim(1, N_sscann, -1, -1, 0);
+    svc_BridgeSfx(4);
+    demon3_Say(N_Mr_Spock, T_DEM3_012);
+    return;
+}
+
+/* [MSG_USE 44 FF 00] */
+static void demon3_SpockScans(void)
+{
+    svc_Anim(1, N_sscann, -1, -1, 0);
+    svc_BridgeSfx(4);
+    demon3_Say(N_Mr_Spock, T_DEM3_027);
+    return;
+}
+
+/* [MSG_USE 45 0E 00] */
+static void demon3_E_0DD7(void)
+{
+    { demon3_McCoyScansDoor2(); return; }
+}
+
+/* [MSG_USE 45 21 00] */
+static void demon3_McCoyScansDoor2(void)
+{
+    { demon3_McCoyScansDoor(); return; }
+}
+
+/* [MSG_USE 45 22 00] */
+static void demon3_McCoyScansDoor(void)
+{
+    svc_Anim(2, N_mscann, -1, -1, 0);
+    svc_BridgeSfx(4);
+    demon3_Say(N_Dr_McCoy, T_DEM3_016);
+    return;
+}
+
+/* Phasers on the door: no effect, then Spock objects.
+ * [MSG_USE 40 0E 00] */
+static void demon3_E_0E7B(void)
+{
+    { demon3_PhaserDoor2(); return; }
+}
+
+/* [MSG_USE 41 0E 00] */
+static void demon3_PhaserDoor2(void)
+{
+    { demon3_PhaserDoor3(); return; }
+}
+
+/* [MSG_USE 40 21 00] */
+static void demon3_PhaserDoor3(void)
+{
+    { demon3_PhaserDoor(); return; }
+}
+
+/* [MSG_USE 41 21 00] */
+static void demon3_PhaserDoor(void)
+{
+    fv_door_shots++;
+    if (fv_door_shots == 1) {
+        demon3_Say(0, T_DEM3N009);
+    }
+    if (fv_door_shots == 2) {
+        demon3_Say(N_Mr_Spock, T_DEM3_011);
+    }
+    return;
+}
+
+/* The android's hand on the panel, once the rubble is cleared: Kirk
+ * walks there (msg 7), reaches (anim msg 6), and on timer 3 the door
+ * opens if the hand has been repaired, +2 score.
+ * [MSG_USE 42 20 00] */
+static void demon3_UseHandOnPanel(void)
+{
+    if (rv_boulders_down != 4) {
+        demon3_Say(N_Mr_Spock, T_DEM3_005);
+        return;
+    }
+    if (rv_door_open == 1) {
+        return;
+    }
+    svc_Walk(0, 0xD8, 0x70, 7);
+    return;
+}
+
+/* [MSG_WALK_DONE 07 00 00] */
+static void demon3_KirkAtPanel(void)
+{
+    svc_Anim(0, N_kusehn, -1, -1, 6);
+    room.fall[0] = 3;
+    svc_Sfx(N_MUR4E1);
+    return;
+}
+
+/* [MSG_ANIM_DONE 06 00 00] */
+static void demon3_KirkPutsHand(void)
+{
+    svc_Anim0(0xF, N_panel, 0xD6, 0x3D, 0);
+    room.timers[3] = 0xA;
+    svc_Sfx(N_SE0FORCE);
+    return;
+}
+
+/* [MSG_USE 44 0D 00] */
+static void demon3_SpockScansMiner2(void)
+{
+    svc_Anim(1, N_sscann, -1, -1, 0);
+    svc_BridgeSfx(4);
+    if (rv_miner_dead == 1) {
+        demon3_Say(N_Mr_Spock, T_DEM3_022);
+        return;
+    }
+    demon3_Say(N_Mr_Spock, T_DEM3_023);
+    return;
+}
+
+/* [MSG_USE 45 0D 00] */
+static void demon3_McCoyScansMiner(void)
+{
+    svc_Anim(2, N_mscann, -1, -1, 0);
+    svc_BridgeSfx(4);
+    if (rv_miner_dead == 1) {
+        { demon3_part_1115(); return; }
+    }
+    demon3_Say(N_Dr_McCoy, T_DEM3_023);
+    return;
+}
+
+/* McCoy treats the miner (msgs 6, 7), +2 score.
+ * [MSG_USE 02 0D 00] */
+static void demon3_E_1035(void)
+{
+    { demon3_HealMiner(); return; }
+}
+
+/* [MSG_USE 7F 0D 00] */
+static void demon3_HealMiner(void)
+{
+    if (rv_healed_miner == 1) {
+        demon3_Say(N_Dr_McCoy, T_DEM3_015);
+        return;
+    }
+    svc_Walk(2, 0xE6, 0x7B, 6);
+    fv_in_cover = 0;
+    fv_kirk_fired = 0;
+    return;
+}
+
+/* [MSG_WALK_DONE 06 00 00] */
+static void demon3_McCoyAtMiner(void)
+{
+    svc_Anim(2, N_museln, -1, -1, 7);
+    return;
+}
+
+/* [MSG_ANIM_DONE 07 00 00] */
+static void demon3_MinerHealed(void)
+{
+    if (rv_miner_dead == 1) {
+        { demon3_part_1115(); return; }
+    }
+    demon3_Say(N_Dr_McCoy, T_DEM3_021);
+    rv_healed_miner = 1;
+    svc_Anim(0xD, N_drmine, 0xDA, 0x6C, 0);
+    rv_score += 2;
+    svc_Walk(2, 0x104, 0x96, 0);
+    room.fall[2] = 3;
+    return;
+}
+
+static void demon3_part_1115(void)
+{
+    demon3_Say(N_Dr_McCoy, T_DEM3_022);
+    return;
+}
+
+/* [MSG_GET 0D 00 00] */
+static void demon3_GetMiner(void)
+{
+    demon3_Say(N_Dr_McCoy, T_DEM3_017);
+    return;
+}
+
+/* Talking.
+ * [MSG_TALK 0D 00 00] */
+static void demon3_TalkToMiner(void)
+{
+    if (rv_healed_miner == 1) {
+        demon3_Say(N_Brother_Kandrey, T_DEM3_F21);
+    }
+    return;
+}
+
+/* [MSG_TALK 00 00 00] */
+static void demon3_TalkToKirk(void)
+{
+    demon3_Say(N_Capt_Kirk, T_DEM3_002);
+    demon3_Say(N_Mr_Spock, T_DEM3_029);
+    demon3_Say(N_Dr_McCoy, T_DEM3_026);
+    return;
+}
+
+/* [MSG_TALK 01 00 00] */
+static void demon3_TalkToSpock(void)
+{
+    demon3_Say(N_Mr_Spock, T_DEM3_028);
+    return;
+}
+
+/* [MSG_TALK 02 00 00] */
+static void demon3_TalkToMcCoy(void)
+{
+    if (room.redshirt_dead == 1) {
+        demon3_Say(N_Dr_McCoy, T_DEM3_014);
+        return;
+    }
+    demon3_Say(N_Dr_McCoy, T_DEM3_025);
+    demon3_Say(N_Capt_Kirk, T_DEM3_003);
+    demon3_Say(N_Dr_McCoy, T_DEM3_024);
+    return;
+}
+
+/* [MSG_TALK 03 00 00] */
+static void demon3_TalkToRedshirt(void)
+{
+    demon3_Say(N_Ensign_Everts, T_DEM3_036);
+    demon3_Say(N_Capt_Kirk, T_DEM3_004);
+    return;
+}
+
+/* Looking at things.
+ * [MSG_LOOK 00 00 00] */
+static void demon3_LookAtKirk(void)
+{
+    demon3_Say(0, T_DEM3N004);
+    return;
+}
+
+/* [MSG_LOOK 01 00 00] */
+static void demon3_LookAtSpock(void)
+{
+    demon3_Say(0, T_DEM3N001);
+    return;
+}
+
+/* [MSG_LOOK 02 00 00] */
+static void demon3_LookAtMcCoy(void)
+{
+    demon3_Say(0, T_DEM3N002);
+    return;
+}
+
+/* [MSG_LOOK 03 00 00] */
+static void demon3_LookAtDeadEverts(void)
+{
+    if (room.redshirt_dead == 1) {
+        demon3_Say(0, T_DEM3N017);
+        return;
+    }
+    demon3_Say(S_17BC, T_DEM3N003);
+    return;
+}
+
+/* [MSG_LOOK FF 00 00] */
+static void demon3_LookAtScene(void)
+{
+    demon3_Say(0, T_DEM3N010);
+    return;
+}
+
+/* [MSG_LOOK 03 00 00] */
+static void demon3_LookAtRedshirt(void)
+{
+    if (room.redshirt_dead != 1) {
+        demon3_Say(N_Ensign_Everts, T_DEM3N003);
+        return;
+    }
+    demon3_Say(0, T_DEM3N018);
+    return;
+}
+
+/* [MSG_LOOK 0D 00 00] */
+static void demon3_LookAtMiner(void)
+{
+    if (rv_healed_miner == 1) {
+        demon3_Say(S_17BC, T_DEM3N000);
+        return;
+    }
+    demon3_Say(S_17BC, T_DEM3N006);
+    return;
+}
+
+/* [MSG_LOOK 09 00 00] */
+static void demon3_LookAtBoulder1(void)
+{
+    demon3_Say(0, T_DEM3N011);
+    return;
+}
+
+/* [MSG_LOOK 0A 00 00] */
+static void demon3_LookAtBoulder2(void)
+{
+    demon3_Say(0, T_DEM3N013);
+    return;
+}
+
+/* [MSG_LOOK 0B 00 00] */
+static void demon3_LookAtBoulder3(void)
+{
+    demon3_Say(0, T_DEM3N013_2);
+    return;
+}
+
+/* [MSG_LOOK 0C 00 00] */
+static void demon3_LookAtBoulder4(void)
+{
+    demon3_Say(0, T_DEM3N020);
+    return;
+}
+
+/* [MSG_LOOK 22 00 00] */
+static void demon3_LookAtStructure(void)
+{
+    demon3_Say(0, T_DEM3N016);
+    return;
+}
+
+/* [MSG_LOOK 0E 00 00] */
+static void demon3_E_1592(void)
+{
+    { demon3_LookAtDoor(); return; }
+}
+
+/* [MSG_LOOK 21 00 00] */
+static void demon3_LookAtDoor(void)
+{
+    if (rv_door_open != 1) {
+        demon3_Say(0, T_DEM3N012);
+        return;
+    }
+    demon3_Say(0, T_DEM3N014);
+    return;
+}
+
+/* [MSG_LOOK 0F 00 00] */
+static void demon3_E_1635(void)
+{
+    { demon3_LookAtPanel(); return; }
+}
+
+/* [MSG_LOOK 20 00 00] */
+static void demon3_LookAtPanel(void)
+{
+    demon3_Say(0, T_DEM3N019);
+    return;
+}
+
+/* [MSG_LOOK 08 00 00] */
+static void demon3_LookAtLight(void)
+{
+    demon3_Say(0, T_DEM3N015);
+    return;
+}
+
+/* Talk: conversation AX (speaker, choices, 0); returns the choice. */
+static void demon3_Talk(uint16_t ax)
+{
+    svc_Talk(ax);
+    return;
+}
+
+/* Say: one line, BX, said by AX (0: narration). */
+static void demon3_Say(uint16_t ax, uint16_t bx)
+{
+    fv_talk_buf = ax;
+    CS_W(0x225C) = bx;
+    demon3_Talk(talk_buf);
+    return;
+}
+
+/* the scripts, by the offset of their code in the room file */
+const RoomScript demon3_scripts[] = {
+    { 0x01DF, demon3_StartRoom },    /* MSG_TICK 01 00 00 */
+    { 0x0322, demon3_TopBoulderFalls },    /* MSG_TIMER 00 00 00 */
+    { 0x037C, demon3_BoulderHitsEverts },    /* MSG_TIMER 01 00 00 */
+    { 0x03B5, demon3_PanelTakesHand },    /* MSG_TIMER 03 00 00 */
+    { 0x0400, demon3_EvertsCrushed },    /* MSG_ANIM_DONE 01 00 00 */
+    { 0x045E, demon3_MinerUncovered },    /* MSG_ANIM_DONE 02 00 00 */
+    { 0x047F, demon3_McCoyAtEverts },    /* MSG_WALK_DONE 05 00 00 */
+    { 0x04B4, demon3_McCoyInCover },    /* MSG_WALK_DONE 03 00 00 */
+    { 0x04D9, demon3_SpockInCover },    /* MSG_WALK_DONE 02 00 00 */
+    { 0x04FE, demon3_EvertsInCover },    /* MSG_WALK_DONE 04 00 00 */
+    { 0x0522, demon3_KirkInCover },    /* MSG_WALK_DONE 01 00 00 */
+    { 0x0591, demon3_BoulderBreaks },    /* MSG_ANIM_DONE 04 00 00 */
+    { 0x0649, demon3_E_0649 },    /* MSG_USE 40 03 00 */
+    { 0x0651, demon3_PhaserDeadEverts },    /* MSG_USE 41 03 00 */
+    { 0x06B0, demon3_E_06B0 },    /* MSG_USE 40 09 00 */
+    { 0x06B8, demon3_StunBoulder2 },    /* MSG_USE 40 0A 00 */
+    { 0x06C0, demon3_StunBoulder3 },    /* MSG_USE 40 0B 00 */
+    { 0x06C8, demon3_StunBoulder },    /* MSG_USE 40 0C 00 */
+    { 0x0730, demon3_ShootBoulder1 },    /* MSG_USE 41 09 00 */
+    { 0x0763, demon3_ShootBoulder2 },    /* MSG_USE 41 0A 00 */
+    { 0x0790, demon3_ShootBoulder3 },    /* MSG_USE 41 0B 00 */
+    { 0x0870, demon3_ShootBoulder4 },    /* MSG_USE 41 0C 00 */
+    { 0x09ED, demon3_SpockScansMiner },    /* MSG_USE 44 0D 00 */
+    { 0x0A6E, demon3_SpockScansPanel },    /* MSG_USE 44 20 00 */
+    { 0x0B16, demon3_E_0B16 },    /* MSG_USE 44 09 00 */
+    { 0x0B1E, demon3_SpockScansBoulder2 },    /* MSG_USE 44 0A 00 */
+    { 0x0B26, demon3_SpockScansBoulder3 },    /* MSG_USE 44 0B 00 */
+    { 0x0B2E, demon3_SpockScansBoulder },    /* MSG_USE 44 0C 00 */
+    { 0x0B65, demon3_E_0B65 },    /* MSG_USE 45 09 00 */
+    { 0x0B6D, demon3_McCoyScansBoulder2 },    /* MSG_USE 45 0A 00 */
+    { 0x0B75, demon3_McCoyScansBoulder3 },    /* MSG_USE 45 0B 00 */
+    { 0x0B7D, demon3_McCoyScansBoulder },    /* MSG_USE 45 0C 00 */
+    { 0x0BAE, demon3_E_0BAE },    /* MSG_USE 00 20 00 */
+    { 0x0BB6, demon3_SpockUsesPanel },    /* MSG_USE 01 20 00 */
+    { 0x0BBE, demon3_McCoyUsesPanel },    /* MSG_USE 02 20 00 */
+    { 0x0C18, demon3_EvertsUsesPanel },    /* MSG_USE 03 20 00 */
+    { 0x0CAD, demon3_EvertsAtPanel },    /* MSG_WALK_DONE 08 00 00 */
+    { 0x0CC9, demon3_EvertsTouchesPanel },    /* MSG_ANIM_DONE 05 00 00 */
+    { 0x0D65, demon3_EvertsDead },    /* MSG_ANIM_DONE 03 00 00 */
+    { 0x0D75, demon3_SpockScansDoor },    /* MSG_USE 44 21 00 */
+    { 0x0DA6, demon3_SpockScans },    /* MSG_USE 44 FF 00 */
+    { 0x0DD7, demon3_E_0DD7 },    /* MSG_USE 45 0E 00 */
+    { 0x0DDF, demon3_McCoyScansDoor2 },    /* MSG_USE 45 21 00 */
+    { 0x0DE7, demon3_McCoyScansDoor },    /* MSG_USE 45 22 00 */
+    { 0x0E7B, demon3_E_0E7B },    /* MSG_USE 40 0E 00 */
+    { 0x0E83, demon3_PhaserDoor2 },    /* MSG_USE 41 0E 00 */
+    { 0x0E8B, demon3_PhaserDoor3 },    /* MSG_USE 40 21 00 */
+    { 0x0E93, demon3_PhaserDoor },    /* MSG_USE 41 21 00 */
+    { 0x0EC1, demon3_UseHandOnPanel },    /* MSG_USE 42 20 00 */
+    { 0x0F46, demon3_KirkAtPanel },    /* MSG_WALK_DONE 07 00 00 */
+    { 0x0F7E, demon3_KirkPutsHand },    /* MSG_ANIM_DONE 06 00 00 */
+    { 0x0FBA, demon3_SpockScansMiner2 },    /* MSG_USE 44 0D 00 */
+    { 0x0FFB, demon3_McCoyScansMiner },    /* MSG_USE 45 0D 00 */
+    { 0x1035, demon3_E_1035 },    /* MSG_USE 02 0D 00 */
+    { 0x103D, demon3_HealMiner },    /* MSG_USE 7F 0D 00 */
+    { 0x10B1, demon3_McCoyAtMiner },    /* MSG_WALK_DONE 06 00 00 */
+    { 0x10CD, demon3_MinerHealed },    /* MSG_ANIM_DONE 07 00 00 */
+    { 0x1125, demon3_GetMiner },    /* MSG_GET 0D 00 00 */
+    { 0x1135, demon3_TalkToMiner },    /* MSG_TALK 0D 00 00 */
+    { 0x114B, demon3_TalkToKirk },    /* MSG_TALK 00 00 00 */
+    { 0x116D, demon3_TalkToSpock },    /* MSG_TALK 01 00 00 */
+    { 0x117D, demon3_TalkToMcCoy },    /* MSG_TALK 02 00 00 */
+    { 0x11F1, demon3_TalkToRedshirt },    /* MSG_TALK 03 00 00 */
+    { 0x120A, demon3_LookAtKirk },    /* MSG_LOOK 00 00 00 */
+    { 0x1219, demon3_LookAtSpock },    /* MSG_LOOK 01 00 00 */
+    { 0x1228, demon3_LookAtMcCoy },    /* MSG_LOOK 02 00 00 */
+    { 0x1237, demon3_LookAtDeadEverts },    /* MSG_LOOK 03 00 00 */
+    { 0x1299, demon3_LookAtScene },    /* MSG_LOOK FF 00 00 */
+    { 0x12D9, demon3_LookAtRedshirt },    /* MSG_LOOK 03 00 00 */
+    { 0x1358, demon3_LookAtMiner },    /* MSG_LOOK 0D 00 00 */
+    { 0x1378, demon3_LookAtBoulder1 },    /* MSG_LOOK 09 00 00 */
+    { 0x13CA, demon3_LookAtBoulder2 },    /* MSG_LOOK 0A 00 00 */
+    { 0x1438, demon3_LookAtBoulder3 },    /* MSG_LOOK 0B 00 00 */
+    { 0x14A6, demon3_LookAtBoulder4 },    /* MSG_LOOK 0C 00 00 */
+    { 0x1517, demon3_LookAtStructure },    /* MSG_LOOK 22 00 00 */
+    { 0x1592, demon3_E_1592 },    /* MSG_LOOK 0E 00 00 */
+    { 0x159A, demon3_LookAtDoor },    /* MSG_LOOK 21 00 00 */
+    { 0x1635, demon3_E_1635 },    /* MSG_LOOK 0F 00 00 */
+    { 0x163D, demon3_LookAtPanel },    /* MSG_LOOK 20 00 00 */
+    { 0x16A2, demon3_LookAtLight },    /* MSG_LOOK 08 00 00 */
+    { 0, 0 }
+};

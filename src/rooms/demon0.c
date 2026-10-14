@@ -1,0 +1,681 @@
+/* DEMON0.RDF: the room's scripts, translated from the machine code in the room file
+ * (src/rdf/demon0.asm) by tools/rdf2c.py.  They run on the loaded file (CS_B/CS_W) and the
+ * room state (`room`), and call the game through the svc_ macros of rooms.h.
+ *
+ * DEMON0.RDF - "Demon World", the colony on Pollux V where the landing
+ * party beams down. Prelate Angiven walks out to meet them; the doors of
+ * the two buildings open when the crew walks to them.
+ *
+ * Actors: 8 Prelate Angiven, 9 the right door, 10 (0Ah) the left door.
+ * Objects: 20h the buildings, 21h/22h the trees, 23h the snow, 24h the
+ * bushes, 25h the sign, 26h/27h the ground in front of the left/right door.
+ * Regions 0/1: the doorsteps. Exit 0: the path to the mountain.
+ *
+ * Labels: H_ script headers, L branch targets, C_ conversations,
+ * T_/N_/S_ strings; talk_buf: the conversation buffer of Say.
+ *
+ * Quirks of the original:
+ * - The script chain runs on into code at 0838: the engine reads its bytes
+ * as key 50 B8 03 00 and next 2E50 (beyond rdf_scripts_end, so the search
+ * stops).
+ */
+
+#include "rooms.h"
+
+/* where the file keeps its strings, conversations and tables */
+enum {
+    N_prelclap = 0x00CE,
+    N_prel = 0x00D7,
+    N_s0r0d1 = 0x00DC,
+    N_s0r0d3 = 0x00E3,
+    N_s0r0d2 = 0x00EA,
+    N_s0r0d4 = 0x00F1,
+    N_sscans = 0x00FF,
+    N_mscans = 0x0106,
+    N_DEM0LOOP = 0x0115,
+    T_DEM0_016 = 0x01D9,
+    T_DEM0_039 = 0x0422,
+    T_DEM0_017 = 0x048F,
+    T_DEM0_015 = 0x04D1,
+    T_DEM0_013 = 0x0536,
+    T_DEM0_040 = 0x0578,
+    S_05DD = 0x05DD,
+    N_Capt_Kirk = 0x0A25,
+    N_Prel_Angiven = 0x0A30,
+    N_Dr_McCoy = 0x0A3E,
+    N_Mr_Spock = 0x0A48,
+    N_Ensign_Everts = 0x0A52,
+    S_0A64 = 0x0A64,
+    N_Sign = 0x0A65,
+    T_DEM0N004 = 0x155B,
+    T_DEM0N000 = 0x15D7,
+    T_DEM0N006 = 0x162E,
+    T_DEM0N001 = 0x16AD,
+    T_DEM0N007 = 0x1709,
+    T_DEM0N010 = 0x1748,
+    T_DEM0N009 = 0x1794,
+    T_DEM0N005 = 0x17BC,
+    T_DEM0N002 = 0x1828,
+    T_DEM0N003 = 0x1892,
+    T_DEM0_019 = 0x191B,
+    T_DEM0_014 = 0x19C1,
+    T_DEM0_011 = 0x1AAB,
+    T_DEM0_023 = 0x1AD7,
+    T_DEM0_029 = 0x1B53,
+    T_DEM0_041 = 0x1BA8,
+    T_DEM0_043 = 0x1BE8,
+    T_DEM0_026 = 0x1C2D,
+    T_DEM0_042 = 0x1C6B,
+    T_DEM0_025 = 0x1CBD,
+    T_DEM0_007 = 0x1CD4,
+    T_DEM0_044 = 0x1D05,
+    T_DEM0_009 = 0x1D24,
+    T_DEM0_027 = 0x1D66,
+    T_DEM0_004 = 0x1DA4,
+    T_DEM0_024 = 0x1DE8,
+    T_DEM0_030 = 0x1E1D,
+    T_DEM0_001 = 0x1E95,
+    T_DEM0_022 = 0x1F72,
+    T_DEM0_018 = 0x1F9E,
+    T_DEM0_021 = 0x1FF4,
+    T_DEM0_028 = 0x20D5,
+    T_DEM0_020 = 0x21C8,
+    PrelateHello = 0x21F6,
+    KirkIntroduces = 0x21FC,
+    PrelateOnDemons = 0x2206,
+    PrelateOnGates = 0x220C,
+    KirkAsksEvidence = 0x2212,
+    PrelateOnSkeptics = 0x221A,
+    KirkAsksMine = 0x2220,
+    PrelateOnMine = 0x2228,
+    PrelateByeRude = 0x222E,
+    PrelateByePolite = 0x2234,
+    PrelateOffended = 0x223A,
+    talk_buf = 0x2240,
+};
+
+/* the room's variables: in the room state, and in the file itself */
+#define fv_going_left_door CS_B(0xCC)
+#define fv_going_right_door CS_B(0xCD)
+#define fv_left_door_steps CS_B(0xCB)
+#define fv_right_door_steps CS_B(0xCA)
+#define fv_talk_buf CS_W(0x2240)
+#define rv_asked_witnesses ROOM_B(0x36)
+#define rv_came_from ROOM_B(0x3A)
+#define rv_flora_said ROOM_B(0x38)
+#define rv_met_prelate ROOM_B(0x33)
+#define rv_prelate_greeted ROOM_B(0x35)
+#define rv_score ROOM_W(0x58)
+#define rv_was_rude ROOM_W(0x29)
+
+/* functions */
+static void demon0_StartRoom(void);
+static void demon0_PrelateEnters(void);
+static void demon0_PrelateClaps(void);
+static void demon0_PrelateGreets(void);
+static void demon0_McCoyFlora(void);
+static void demon0_LeaveRoom(void);
+static void demon0_E_026F(void);
+static void demon0_WalkToRightDoor(void);
+static void demon0_ReachRightDoor(void);
+static void demon0_E_02D2(void);
+static void demon0_EnterRightDoor(void);
+static void demon0_E_02FD(void);
+static void demon0_WalkToLeftDoor(void);
+static void demon0_ReachLeftDoor(void);
+static void demon0_E_0360(void);
+static void demon0_EnterLeftDoor(void);
+static void demon0_TalkToPrelate(void);
+static void demon0_LookAtPrelate(void);
+static void demon0_E_040F(void);
+static void demon0_PhaserSnow(void);
+static void demon0_E_047C(void);
+static void demon0_PhaserSign(void);
+static void demon0_PhaserBuilding(void);
+static void demon0_PhaserPrelate(void);
+static void demon0_LookAtSign(void);
+static void demon0_LookAtTrees(void);
+static void demon0_LookAtTrees2(void);
+static void demon0_LookAtSnow(void);
+static void demon0_LookAtScene(void);
+static void demon0_LookAtBushes(void);
+static void demon0_LookAtKirk(void);
+static void demon0_LookAtMcCoy(void);
+static void demon0_LookAtRedshirt(void);
+static void demon0_LookAtSpock(void);
+static void demon0_E_068F(void);
+static void demon0_LookAtDoor(void);
+static void demon0_LookAtBuilding(void);
+static void demon0_TalkToKirk(void);
+static void demon0_TalkToRedshirt(void);
+static void demon0_TalkToMcCoy(void);
+static void demon0_TalkToSpock(void);
+static void demon0_AskWitnesses(void);
+static void demon0_ScanWithSTricorder(void);
+static void demon0_ScanWithMTricorder(void);
+static void demon0_ScanPrelate(void);
+static uint16_t demon0_Talk(uint16_t ax);
+static void demon0_RudeToPrelate(void);
+static void demon0_Say(uint16_t ax, uint16_t bx);
+
+/* The room starts: wind, and the closed doors.
+ * [MSG_TICK 01 00 00] */
+static void demon0_StartRoom(void)
+{
+    svc_Sfx(N_DEM0LOOP);
+    svc_Anim0(9, N_s0r0d3, 0xFC, 0x99, 0);
+    svc_Anim0(0xA, N_s0r0d4, 0x9E, 0x82, 0);
+    return;
+}
+
+/* The Prelate walks out to meet the landing party...
+ * [MSG_TICK 02 00 00] */
+static void demon0_PrelateEnters(void)
+{
+    if (rv_met_prelate != 1) {
+        svc_Anim0(8, N_prel, 0x78, 0xBE, 0);
+    }
+    return;
+}
+
+/* ...claps his hands...
+ * [MSG_TICK 3C 00 00] */
+static void demon0_PrelateClaps(void)
+{
+    if (rv_met_prelate != 1) {
+        svc_Anim(8, N_prelclap, 0x78, 0xBE, 0);
+    }
+    return;
+}
+
+/* ...and welcomes them, once.
+ * [MSG_TICK 64 00 00] */
+static void demon0_PrelateGreets(void)
+{
+    if (rv_met_prelate != 1) {
+        if (rv_prelate_greeted != 1) {
+            rv_prelate_greeted = 1;
+            demon0_Talk(PrelateHello);
+        }
+    }
+    return;
+}
+
+/* McCoy admires the plants, once.
+ * [MSG_TICK 8C 00 00] */
+static void demon0_McCoyFlora(void)
+{
+    if (rv_flora_said == 1) {
+    } else {
+        demon0_Say(N_Dr_McCoy, T_DEM0_016);
+        rv_flora_said = 1;
+    }
+    return;
+}
+
+/* Leaving by the path to the mountain. RS_MORE: the engine goes on to
+ * its default (load exit_room[0]).
+ * [MSG_EXIT 00 00 00] */
+static void demon0_LeaveRoom(void)
+{
+    rv_came_from = 1;
+    room.more = 1;
+    return;
+}
+
+/* Walking to the right door (or clicking it): Kirk walks to its step
+ * (msg 1 when he arrives), to stop facing east (RS_FALL, 2 = 'e').
+ * [MSG_WALK 27 00 00] */
+static void demon0_E_026F(void)
+{
+    { demon0_WalkToRightDoor(); return; }
+}
+
+/* [MSG_WALK 09 00 00] */
+static void demon0_WalkToRightDoor(void)
+{
+    room.busy = 1;
+    fv_going_right_door = 1;
+    room.fall[0] = 2;
+    svc_Walk(0, 0xF3, 0x9E, 1);
+    return;
+}
+
+/* Region 1, the right doorstep: if Kirk is on his way in, the door
+ * opens (msg 1 when done).
+ * [MSG_REGION 01 00 00] */
+static void demon0_ReachRightDoor(void)
+{
+    if (fv_going_right_door == 1) {
+        svc_Anim(9, N_s0r0d1, 0xFE, 0x99, 1);
+        svc_BridgeSfx(5);
+    }
+    return;
+}
+
+/* Kirk has arrived (walk msg 1) or the door has opened (anim msg 1):
+ * when both have happened, go through to room 5.
+ * [MSG_WALK_DONE 01 00 00] */
+static void demon0_E_02D2(void)
+{
+    { demon0_EnterRightDoor(); return; }
+}
+
+/* [MSG_ANIM_DONE 01 00 00] */
+static void demon0_EnterRightDoor(void)
+{
+    fv_right_door_steps++;
+    if (fv_right_door_steps != 2) {
+        return;
+    }
+    svc_GotoRoom(5, 0);
+    return;
+}
+
+/* The same for the left door, msg 2, into room 6 by entrance 3.
+ * [MSG_WALK 26 00 00] */
+static void demon0_E_02FD(void)
+{
+    { demon0_WalkToLeftDoor(); return; }
+}
+
+/* [MSG_WALK 0A 00 00] */
+static void demon0_WalkToLeftDoor(void)
+{
+    room.busy = 1;
+    fv_going_left_door = 1;
+    room.fall[0] = 2;
+    svc_Walk(0, 0x9D, 0x86, 2);
+    return;
+}
+
+/* [MSG_REGION 00 00 00] */
+static void demon0_ReachLeftDoor(void)
+{
+    if (fv_going_left_door == 1) {
+        svc_Anim(0xA, N_s0r0d2, 0x9E, 0x82, 2);
+        svc_BridgeSfx(5);
+    }
+    return;
+}
+
+/* [MSG_WALK_DONE 02 00 00] */
+static void demon0_E_0360(void)
+{
+    { demon0_EnterLeftDoor(); return; }
+}
+
+/* [MSG_ANIM_DONE 02 00 00] */
+static void demon0_EnterLeftDoor(void)
+{
+    fv_left_door_steps++;
+    if (fv_left_door_steps != 2) {
+        return;
+    }
+    svc_GotoRoom(6, 3);
+    return;
+}
+
+/* Talking to the Prelate, once: +3 to the score, then a conversation in
+ * which each sceptical answer costs points (RudeToPrelate, once).
+ * [MSG_TALK 08 00 00] */
+static void demon0_TalkToPrelate(void)
+{
+    uint16_t ax = 0;
+    uint16_t t0;
+    uint16_t t1;
+    if (rv_met_prelate != 0) {
+        return;
+    }
+    rv_score += 3;
+    rv_met_prelate = 1;
+    ax = (uint16_t)demon0_Talk(KirkIntroduces);
+    if (ax == 0) {
+        ax = PrelateOnDemons;
+    } else if (ax == 1) {
+        ax = PrelateOnGates;
+    } else {
+        demon0_RudeToPrelate();
+        goto AskEvidence;
+    }
+    demon0_Talk(ax);
+AskEvidence:;
+    ax = (uint16_t)demon0_Talk(KirkAsksEvidence);
+    ax = ax | ax;
+    if (ax != 0) {
+        t0 = ax;
+        demon0_RudeToPrelate();
+    }
+    demon0_Talk(PrelateOnSkeptics);
+    ax = (uint16_t)demon0_Talk(KirkAsksMine);
+    ax = ax | ax;
+    if (ax != 0) {
+        t1 = ax;
+        demon0_RudeToPrelate();
+    }
+    demon0_Talk(PrelateOnMine);
+    ax = PrelateByeRude;
+    if (rv_was_rude == 0) {
+        ax = PrelateByePolite;
+    }
+    demon0_Talk(ax);
+    return;
+}
+
+/* Looking at the Prelate (no speaker: narration).
+ * [MSG_LOOK 08 00 00] */
+static void demon0_LookAtPrelate(void)
+{
+    demon0_Say(0, T_DEM0N004);
+    return;
+}
+
+/* Phasers on the snow (23h), the sign (25h), the buildings (20h) and the
+ * Prelate (8): the crew objects.
+ * [MSG_USE 40 23 00] */
+static void demon0_E_040F(void)
+{
+    { demon0_PhaserSnow(); return; }
+}
+
+/* [MSG_USE 41 23 00] */
+static void demon0_PhaserSnow(void)
+{
+    demon0_Say(N_Ensign_Everts, T_DEM0_039);
+    return;
+}
+
+/* [MSG_USE 40 25 00] */
+static void demon0_E_047C(void)
+{
+    { demon0_PhaserSign(); return; }
+}
+
+/* [MSG_USE 41 25 00] */
+static void demon0_PhaserSign(void)
+{
+    demon0_Say(N_Dr_McCoy, T_DEM0_017);
+    return;
+}
+
+/* [MSG_USE 41 20 00] */
+static void demon0_PhaserBuilding(void)
+{
+    demon0_Say(N_Dr_McCoy, T_DEM0_015);
+    demon0_Say(N_Mr_Spock, T_DEM0_013);
+    if (room.redshirt_dead != 1) {
+        demon0_Say(N_Ensign_Everts, T_DEM0_040);
+        goto L05BB;
+    }
+L05BB:;
+    return;
+}
+
+/* [MSG_USE 41 08 00] */
+static void demon0_PhaserPrelate(void)
+{
+    demon0_Say(N_Dr_McCoy, T_DEM0_020);
+    return;
+}
+
+/* Looking at things.
+ * [MSG_LOOK 25 00 00] */
+static void demon0_LookAtSign(void)
+{
+    demon0_Say(N_Sign, S_05DD);
+    return;
+}
+
+/* [MSG_LOOK 21 00 00] */
+static void demon0_LookAtTrees(void)
+{
+    demon0_Say(0, T_DEM0N006);
+    return;
+}
+
+/* [MSG_LOOK 22 00 00] */
+static void demon0_LookAtTrees2(void)
+{
+    demon0_Say(0, T_DEM0N006);
+    return;
+}
+
+/* [MSG_LOOK 23 00 00] */
+static void demon0_LookAtSnow(void)
+{
+    demon0_Say(0, T_DEM0N007);
+    return;
+}
+
+/* [MSG_LOOK FF 00 00] */
+static void demon0_LookAtScene(void)
+{
+    demon0_Say(0, T_DEM0N000);
+    return;
+}
+
+/* [MSG_LOOK 24 00 00] */
+static void demon0_LookAtBushes(void)
+{
+    demon0_Say(0, T_DEM0N010);
+    return;
+}
+
+/* [MSG_LOOK 00 00 00] */
+static void demon0_LookAtKirk(void)
+{
+    demon0_Say(0, T_DEM0N005);
+    return;
+}
+
+/* [MSG_LOOK 02 00 00] */
+static void demon0_LookAtMcCoy(void)
+{
+    demon0_Say(0, T_DEM0N002);
+    return;
+}
+
+/* [MSG_LOOK 03 00 00] */
+static void demon0_LookAtRedshirt(void)
+{
+    demon0_Say(0, T_DEM0N003);
+    return;
+}
+
+/* [MSG_LOOK 01 00 00] */
+static void demon0_LookAtSpock(void)
+{
+    demon0_Say(0, T_DEM0N009);
+    return;
+}
+
+/* [MSG_LOOK 09 00 00] */
+static void demon0_E_068F(void)
+{
+    { demon0_LookAtDoor(); return; }
+}
+
+/* [MSG_LOOK 0A 00 00] */
+static void demon0_LookAtDoor(void)
+{
+    { demon0_LookAtBuilding(); return; }
+}
+
+/* [MSG_LOOK 20 00 00] */
+static void demon0_LookAtBuilding(void)
+{
+    demon0_Say(S_0A64, T_DEM0N001);
+    return;
+}
+
+/* Talking to the crew.
+ * [MSG_TALK 00 00 00] */
+static void demon0_TalkToKirk(void)
+{
+    demon0_Say(N_Capt_Kirk, T_DEM0_009);
+    demon0_Say(N_Dr_McCoy, T_DEM0_027);
+    demon0_Say(N_Capt_Kirk, T_DEM0_004);
+    demon0_Say(N_Dr_McCoy, T_DEM0_024);
+    return;
+}
+
+/* [MSG_TALK 03 00 00] */
+static void demon0_TalkToRedshirt(void)
+{
+    demon0_Say(N_Ensign_Everts, T_DEM0_043);
+    demon0_Say(N_Dr_McCoy, T_DEM0_026);
+    demon0_Say(N_Ensign_Everts, T_DEM0_042);
+    demon0_Say(N_Dr_McCoy, T_DEM0_025);
+    demon0_Say(N_Capt_Kirk, T_DEM0_007);
+    demon0_Say(N_Ensign_Everts, T_DEM0_044);
+    return;
+}
+
+/* [MSG_TALK 02 00 00] */
+static void demon0_TalkToMcCoy(void)
+{
+    if (rv_met_prelate == 1) {
+        demon0_Say(N_Capt_Kirk, T_DEM0_011);
+        demon0_Say(N_Dr_McCoy, T_DEM0_023);
+        demon0_Say(N_Mr_Spock, T_DEM0_029);
+        if (room.redshirt_dead != 1) {
+            demon0_Say(N_Ensign_Everts, T_DEM0_041);
+        }
+        return;
+    }
+    demon0_Say(N_Dr_McCoy, T_DEM0_019);
+    if (rv_asked_witnesses != 1)
+        { demon0_AskWitnesses(); return; }
+    return;
+}
+
+/* [MSG_TALK 01 00 00] */
+static void demon0_TalkToSpock(void)
+{
+    if (rv_met_prelate == 1) {
+        demon0_Say(N_Mr_Spock, T_DEM0_014);
+        return;
+    }
+    demon0_Say(N_Mr_Spock, T_DEM0_014);
+    if (rv_asked_witnesses != 1)
+        { demon0_AskWitnesses(); return; }
+    return;
+}
+
+static void demon0_AskWitnesses(void)
+{
+    demon0_Say(N_Capt_Kirk, T_DEM0_001);
+    demon0_Say(N_Prel_Angiven, T_DEM0_030);
+    rv_asked_witnesses = 1;
+    return;
+}
+
+/* Tricorders: Spock's on anything, McCoy's on anything and on the
+ * Prelate. The last script: its next is Talk (see the quirk above).
+ * [MSG_USE 44 FF 00] */
+static void demon0_ScanWithSTricorder(void)
+{
+    svc_Anim(1, N_sscans, -1, -1, 0);
+    svc_BridgeSfx(4);
+    demon0_Say(N_Mr_Spock, T_DEM0_028);
+    return;
+}
+
+/* [MSG_USE 45 FF 00] */
+static void demon0_ScanWithMTricorder(void)
+{
+    svc_Anim(2, N_mscans, -1, -1, 0);
+    svc_BridgeSfx(4);
+    demon0_Say(N_Dr_McCoy, T_DEM0_021);
+    return;
+}
+
+/* [MSG_USE 45 08 00] */
+static void demon0_ScanPrelate(void)
+{
+    svc_Anim(2, N_mscans, -1, -1, 0);
+    svc_BridgeSfx(4);
+    if (rv_met_prelate != 1) {
+        demon0_Say(N_Dr_McCoy, T_DEM0_022);
+        return;
+    }
+    demon0_Say(N_Dr_McCoy, T_DEM0_018);
+    return;
+}
+
+/* Talk: conversation AX (speaker, choices, 0); returns the choice. */
+static uint16_t demon0_Talk(uint16_t ax)
+{
+    ax = (uint16_t)svc_Talk(ax);
+    return ax;
+}
+
+/* The first sceptical answer: -3 to the score, and the Prelate takes
+ * offence. BX: &room, read again as SI may not be (it is, from scripts). */
+static void demon0_RudeToPrelate(void)
+{
+    if (rv_was_rude == 0) {
+        rv_score -= 3;
+        rv_was_rude = 1;
+        demon0_Talk(PrelateOffended);
+    }
+    return;
+}
+
+/* Say: one line, BX, said by AX (0: narration). */
+static void demon0_Say(uint16_t ax, uint16_t bx)
+{
+    fv_talk_buf = ax;
+    CS_W(0x2242) = bx;
+    demon0_Talk(talk_buf);
+    return;
+}
+
+/* the scripts, by the offset of their code in the room file */
+const RoomScript demon0_scripts[] = {
+    { 0x0113, demon0_StartRoom },    /* MSG_TICK 01 00 00 */
+    { 0x0162, demon0_PrelateEnters },    /* MSG_TICK 02 00 00 */
+    { 0x0185, demon0_PrelateClaps },    /* MSG_TICK 3C 00 00 */
+    { 0x01A8, demon0_PrelateGreets },    /* MSG_TICK 64 00 00 */
+    { 0x01C5, demon0_McCoyFlora },    /* MSG_TICK 8C 00 00 */
+    { 0x0260, demon0_LeaveRoom },    /* MSG_EXIT 00 00 00 */
+    { 0x026F, demon0_E_026F },    /* MSG_WALK 27 00 00 */
+    { 0x0277, demon0_WalkToRightDoor },    /* MSG_WALK 09 00 00 */
+    { 0x02A0, demon0_ReachRightDoor },    /* MSG_REGION 01 00 00 */
+    { 0x02D2, demon0_E_02D2 },    /* MSG_WALK_DONE 01 00 00 */
+    { 0x02DA, demon0_EnterRightDoor },    /* MSG_ANIM_DONE 01 00 00 */
+    { 0x02FD, demon0_E_02FD },    /* MSG_WALK 26 00 00 */
+    { 0x0305, demon0_WalkToLeftDoor },    /* MSG_WALK 0A 00 00 */
+    { 0x032E, demon0_ReachLeftDoor },    /* MSG_REGION 00 00 00 */
+    { 0x0360, demon0_E_0360 },    /* MSG_WALK_DONE 02 00 00 */
+    { 0x0368, demon0_EnterLeftDoor },    /* MSG_ANIM_DONE 02 00 00 */
+    { 0x038B, demon0_TalkToPrelate },    /* MSG_TALK 08 00 00 */
+    { 0x03FF, demon0_LookAtPrelate },    /* MSG_LOOK 08 00 00 */
+    { 0x040F, demon0_E_040F },    /* MSG_USE 40 23 00 */
+    { 0x0417, demon0_PhaserSnow },    /* MSG_USE 41 23 00 */
+    { 0x047C, demon0_E_047C },    /* MSG_USE 40 25 00 */
+    { 0x0484, demon0_PhaserSign },    /* MSG_USE 41 25 00 */
+    { 0x04C6, demon0_PhaserBuilding },    /* MSG_USE 41 20 00 */
+    { 0x05C2, demon0_PhaserPrelate },    /* MSG_USE 41 08 00 */
+    { 0x05D2, demon0_LookAtSign },    /* MSG_LOOK 25 00 00 */
+    { 0x0608, demon0_LookAtTrees },    /* MSG_LOOK 21 00 00 */
+    { 0x0617, demon0_LookAtTrees2 },    /* MSG_LOOK 22 00 00 */
+    { 0x0626, demon0_LookAtSnow },    /* MSG_LOOK 23 00 00 */
+    { 0x0635, demon0_LookAtScene },    /* MSG_LOOK FF 00 00 */
+    { 0x0644, demon0_LookAtBushes },    /* MSG_LOOK 24 00 00 */
+    { 0x0653, demon0_LookAtKirk },    /* MSG_LOOK 00 00 00 */
+    { 0x0662, demon0_LookAtMcCoy },    /* MSG_LOOK 02 00 00 */
+    { 0x0671, demon0_LookAtRedshirt },    /* MSG_LOOK 03 00 00 */
+    { 0x0680, demon0_LookAtSpock },    /* MSG_LOOK 01 00 00 */
+    { 0x068F, demon0_E_068F },    /* MSG_LOOK 09 00 00 */
+    { 0x0697, demon0_LookAtDoor },    /* MSG_LOOK 0A 00 00 */
+    { 0x069F, demon0_LookAtBuilding },    /* MSG_LOOK 20 00 00 */
+    { 0x06AF, demon0_TalkToKirk },    /* MSG_TALK 00 00 00 */
+    { 0x06DA, demon0_TalkToRedshirt },    /* MSG_TALK 03 00 00 */
+    { 0x0717, demon0_TalkToMcCoy },    /* MSG_TALK 02 00 00 */
+    { 0x075E, demon0_TalkToSpock },    /* MSG_TALK 01 00 00 */
+    { 0x079B, demon0_ScanWithSTricorder },    /* MSG_USE 44 FF 00 */
+    { 0x07CC, demon0_ScanWithMTricorder },    /* MSG_USE 45 FF 00 */
+    { 0x07FD, demon0_ScanPrelate },    /* MSG_USE 45 08 00 */
+    { 0, 0 }
+};

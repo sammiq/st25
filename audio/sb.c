@@ -25,6 +25,7 @@ static uint32_t step;                   /* source samples per output sample, 16.
 static int out_rate = 48000;
 static int16_t last, next;
 static int16_t status_word;
+static int16_t fetch(void);
 
 void sb_init(int rate)
 {
@@ -122,4 +123,10 @@ int16_t sb_render(void)
         next = fetch();
     }
     return (int16_t)v;
+}
+
+/* 1 while the DAC is still playing the programmed block, else 0 */
+int sb_busy(void)
+{
+    return dma_on;
 }

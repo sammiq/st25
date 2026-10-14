@@ -1,0 +1,1075 @@
+/* VENG6.RDF: the room's scripts, translated from the machine code in the room file
+ * (src/rdf/veng6.asm) by tools/rdf2c.py.  They run on the loaded file (CS_B/CS_W) and the
+ * room state (`room`), and call the game through the svc_ macros of rooms.h.
+ *
+ * VENG6.RDF - "Vengeance", the Republic's engineering section. Two power
+ * cables run the impulse engines and the fusion mixture regulator into a
+ * junction box; with the engineering journals Spock sets its impedance and
+ * impulse power returns. The oil for the hypo is here too.
+ *
+ * Actors: 8/9 the cables at the engines and the regulator, 0Ah (10) the
+ * junction box, 0Bh (11) the journals, 0Ch (12) the door, 0Dh (13) a
+ * body, 0Eh (14) the power light, 0Fh (15) the closet. Objects: those,
+ * 20h/21h the power ports, 22h the oil, 23h the closet, 24h the regulator,
+ * 25h the engines, 26h their controls, 27h the door. Exit 2: the corridor
+ * (room 5).
+ *
+ * Labels: H_ script headers, L branch targets, C_ conversations,
+ * T_/N_/S_ strings; talk_buf: the conversation buffer of Say.
+ *
+ * Quirks of the original:
+ * - The script chain runs on into code at 21D3: the engine reads its bytes
+ * as key 50 B8 03 00 and next 2E50 (beyond rdf_scripts_end, so the search
+ * stops).
+ */
+
+#include "rooms.h"
+
+/* where the file keeps its strings, conversations and tables */
+enum {
+    N_s7r6d1c = 0x00D6,
+    N_s7r6c1 = 0x00F7,
+    N_s7r6j1 = 0x0116,
+    N_s7r6cl = 0x013C,
+    N_s7r6cr = 0x0161,
+    N_s7r6i1 = 0x0187,
+    N_VEN6LON = 0x01A6,
+    N_VEN6LOFF = 0x01C1,
+    N_s7r6ej = 0x01E1,
+    N_s7r6p1c = 0x0200,
+    N_s7r6p1o = 0x0226,
+    N_s7r6d1 = 0x028C,
+    T_VEN5N007 = 0x0307,
+    T_VEN6N011 = 0x034D,
+    T_VEN6N015 = 0x03D0,
+    T_VEN6N013 = 0x041C,
+    T_VEN6N017 = 0x0473,
+    T_VEN6N010 = 0x04E5,
+    T_VEN6N009 = 0x0536,
+    T_VEN6N012 = 0x0591,
+    T_VEN6N025 = 0x0600,
+    T_VEN6_021 = 0x0650,
+    T_VEN6N001 = 0x06F5,
+    T_VEN6N003 = 0x0751,
+    T_VEN6N002 = 0x07CF,
+    T_VEN6N000 = 0x0833,
+    T_VEN0N016 = 0x086C,
+    T_VEN6N019 = 0x089F,
+    T_VEN6_005 = 0x08FA,
+    T_VEN6_009 = 0x0999,
+    T_VEN6_014 = 0x09E6,
+    T_VEN6_008 = 0x0A72,
+    T_VEN6_018 = 0x0ADD,
+    T_VEN6_023 = 0x0B8A,
+    N_kuseln = 0x0C75,
+    N_suseln = 0x0C93,
+    N_EFX4 = 0x0CB1,
+    N_s7r6cl_2 = 0x0CCE,
+    T_VEN6N020 = 0x0CF6,
+    N_kuseln_2 = 0x0DFC,
+    N_suseln_2 = 0x0E1A,
+    N_EFX4_2 = 0x0E38,
+    N_s7r6cr_2 = 0x0E55,
+    T_VEN6N022 = 0x0E7E,
+    T_VEN6_012 = 0x0F29,
+    T_COMPA185 = 0x0FA8,
+    T_VEN6_003 = 0x0FDE,
+    T_VEN6_017 = 0x1009,
+    T_VEN6_016 = 0x10C9,
+    T_VEN6_002 = 0x1169,
+    N_suseln_3 = 0x11C6,
+    T_VEN6_019 = 0x11F4,
+    N_s7r6i1_2 = 0x122B,
+    N_VEN6LON_2 = 0x125A,
+    T_VEN6_011 = 0x1281,
+    T_VEN6N006 = 0x1317,
+    N_kusehw = 0x1354,
+    T_VEN6N007 = 0x1386,
+    N_kusehw_2 = 0x13F7,
+    N_s7r6p2 = 0x1426,
+    N_s7r6p1 = 0x145A,
+    T_VEN6N005 = 0x149C,
+    N_sscans = 0x14FC,
+    T_VEN6_010 = 0x1539,
+    T_VEN6_020 = 0x157C,
+    T_VEN6_001 = 0x1643,
+    N_sscans_2 = 0x1685,
+    T_VEN6_007 = 0x16C6,
+    T_VEN6_013 = 0x1754,
+    N_sscans_3 = 0x17FC,
+    T_VEN6_015 = 0x1834,
+    T_VEN6_006 = 0x1907,
+    T_MUD1N014 = 0x1996,
+    T_VEN6N008 = 0x19D7,
+    N_kusemw = 0x1A51,
+    T_VEN6N024 = 0x1A93,
+    T_VEN2_098 = 0x1B2E,
+    T_VENA_F40 = 0x1B8D,
+    T_VENA_F32 = 0x1C14,
+    T_VENA_F34 = 0x1D22,
+    T_VEN4N010 = 0x1DBC,
+    T_VEN6N007_2 = 0x1DFD,
+    T_MUD4_018 = 0x1E52,
+    T_BRIDU146 = 0x1E97,
+    T_MUD4_018_2 = 0x1ED7,
+    T_VEN2U093 = 0x1F1B,
+    T_VEN2_028 = 0x1F86,
+    T_VEN2_066 = 0x1FD4,
+    T_DEM3_019 = 0x207B,
+    T_VEN4_016 = 0x20AE,
+    T_G_014 = 0x20F6,
+    T_G_014_2 = 0x212F,
+    T_VEN0_016 = 0x2168,
+    T_VEN0_016_2 = 0x21A3,
+    N_Capt_Kirk = 0x22BE,
+    N_Dr_McCoy = 0x22C9,
+    N_Mr_Spock = 0x22D3,
+    N_Ensign_Kije = 0x22DD,
+    N_computer = 0x22E9,
+    N_Lt_Uhura = 0x22F6,
+    N_Elasi_Captain = 0x2300,
+    S_230E = 0x230E,
+    T_VEN6N016 = 0x230F,
+    T_VEN6N018 = 0x2367,
+    T_VEN6_022 = 0x23ED,
+    talk_buf = 0x24E3,
+};
+
+/* the room's variables: in the room state, and in the file itself */
+#define fv_at_engines CS_B(0xCA)
+#define fv_at_regulator CS_B(0xCB)
+#define fv_cable_item CS_W(0xCC)
+#define fv_mccoy_line CS_W(0x203E)
+#define fv_talk_buf CS_W(0x24E3)
+#define rv_attack_timer ROOM_W(0x51)
+#define rv_board_timer ROOM_W(0x49)
+#define rv_closet_open ROOM_B(0x63)
+#define rv_complied ROOM_B(0x45)
+#define rv_comply_timer ROOM_W(0x4D)
+#define rv_elasi_here ROOM_B(0x43)
+#define rv_enterprise_away ROOM_B(0x36)
+#define rv_hypo_oiled ROOM_B(0x3A)
+#define rv_journals_taken ROOM_B(0x62)
+#define rv_power_on ROOM_B(0x34)
+#define rv_power_to ROOM_B(0x3C)
+#define rv_read_journals ROOM_B(0x61)
+#define rv_rescued ROOM_B(0x42)
+#define rv_stall_timer ROOM_W(0x4B)
+#define rv_torpedo_timer ROOM_W(0x4F)
+#define rv_wired ROOM_B(0x5D)
+
+/* functions */
+static void veng6_StartRoom(void);
+static void veng6_E_024B(void);
+static void veng6_WalkToDoor(void);
+static void veng6_AtDoor(void);
+static void veng6_DoorOpened(void);
+static void veng6_LookAtPowerPort(void);
+static void veng6_LookAtRegulatorPort(void);
+static void veng6_E_02F4(void);
+static void veng6_LookAtDoor(void);
+static void veng6_LookAtOil(void);
+static void veng6_E_03BD(void);
+static void veng6_LookAtCloset(void);
+static void veng6_E_0409(void);
+static void veng6_LookAtCable(void);
+static void veng6_LookAtRegulator(void);
+static void veng6_E_04D2(void);
+static void veng6_LookAtEngines(void);
+static void veng6_LookAtControls(void);
+static void veng6_LookAtJunction(void);
+static void veng6_LookAtJournals(void);
+static void veng6_LookAtKirk(void);
+static void veng6_LookAtSpock(void);
+static void veng6_LookAtMcCoy(void);
+static void veng6_LookAtRedshirt(void);
+static void veng6_LookAtBody(void);
+static void veng6_LookAtEngineering(void);
+static void veng6_TalkToKirk(void);
+static void veng6_TalkToSpock(void);
+static void veng6_TalkToMcCoy(void);
+static void veng6_TalkToRedshirt(void);
+static void veng6_E_0BED(void);
+static void veng6_Cable1OnEngines(void);
+static void veng6_E_0C04(void);
+static void veng6_Cable2OnEngines(void);
+static void veng6_part_0C13(void);
+static void veng6_E_0C5D(void);
+static void veng6_AtEngines(void);
+static void veng6_EnginesWired(void);
+static void veng6_E_0D74(void);
+static void veng6_Cable1OnRegulator(void);
+static void veng6_E_0D8B(void);
+static void veng6_Cable2OnRegulator(void);
+static void veng6_part_0D9A(void);
+static void veng6_E_0DE4(void);
+static void veng6_AtRegulator(void);
+static void veng6_RegulatorWired(void);
+static void veng6_E_0F00(void);
+static void veng6_McCoyOnJunction(void);
+static void veng6_KijeOnJunction(void);
+static void veng6_UseJunction(void);
+static void veng6_SpockAtJunction(void);
+static void veng6_PowerRestored(void);
+static void veng6_HypoOnOil(void);
+static void veng6_KirkAtOil(void);
+static void veng6_FilledHypo(void);
+static void veng6_UseCloset(void);
+static void veng6_KirkAtCloset(void);
+static void veng6_ClosetToggled(void);
+static void veng6_SpockScansEngines(void);
+static void veng6_SpockScansRegulator(void);
+static void veng6_SpockScansJunction(void);
+static void veng6_FusionOnControls(void);
+static void veng6_GetJunction(void);
+static void veng6_GetOil(void);
+static void veng6_GetJournals(void);
+static void veng6_KirkAtJournals(void);
+static void veng6_TookJournals(void);
+static void veng6_ElasiDeadlines(void);
+static void veng6_E_1D0E(void);
+static void veng6_KillAnything(void);
+static void veng6_LookAtHypo(void);
+static void veng6_CallEnterprise(void);
+static void veng6_E_2046(void);
+static void veng6_MTricorderOnBody(void);
+static void veng6_McCoyOnBody(void);
+static void veng6_Talk(uint16_t ax);
+static void veng6_Say(uint16_t ax, uint16_t bx);
+
+/* The room starts: the door, the cables, the power light, the closet.
+ * [MSG_TICK 01 00 00] */
+static void veng6_StartRoom(void)
+{
+    svc_Anim(0xC, N_s7r6d1c, 0x13E, 0xA8, 0);
+    svc_Anim(0xD, N_s7r6c1, 0x82, 0x5C, 0);
+    svc_Anim(0xA, N_s7r6j1, 0x9A, 0xAF, 0);
+    if ((rv_wired & 1) != 0) {
+        svc_Anim(8, N_s7r6cl, 0x5D, 0x95, 0);
+    }
+    if ((rv_wired & 2) != 0) {
+        svc_Anim(9, N_s7r6cr, 0x107, 0x94, 0);
+    }
+    if (rv_power_on == 1) {
+        svc_Anim(0xE, N_s7r6i1, 0x9E, 0x59, 0);
+        svc_Sfx(N_VEN6LON);
+    } else {
+        svc_Sfx(N_VEN6LOFF);
+    }
+    if (rv_journals_taken != 1) {
+        svc_Anim(0xB, N_s7r6ej, 0x24, 0x82, 0);
+    }
+    svc_Anim(0xF, N_s7r6p1c, 0x19, 0x86, 0);
+    if (rv_closet_open == 1) {
+        svc_Anim(0xF, N_s7r6p1o, 0x19, 0x86, 0);
+    }
+    return;
+}
+
+/* Walking out to the corridor (msg 2, anim msg 1).
+ * [MSG_WALK 0C 00 00] */
+static void veng6_E_024B(void)
+{
+    { veng6_WalkToDoor(); return; }
+}
+
+/* [MSG_WALK 27 00 00] */
+static void veng6_WalkToDoor(void)
+{
+    svc_Walk(0, 0x120, 0xAD, 2);
+    return;
+}
+
+/* [MSG_WALK_DONE 02 00 00] */
+static void veng6_AtDoor(void)
+{
+    room.busy = 1;
+    svc_BridgeSfx(5);
+    svc_Anim(0xC, N_s7r6d1, 0x13E, 0xA8, 1);
+    return;
+}
+
+/* [MSG_ANIM_DONE 01 00 00] */
+static void veng6_DoorOpened(void)
+{
+    svc_Walk(0, 0x136, 0xAA, 0);
+    return;
+}
+
+/* Looking.
+ * [MSG_LOOK 20 00 00] */
+static void veng6_LookAtPowerPort(void)
+{
+    veng6_Say(S_230E, T_VEN6N018);
+    return;
+}
+
+/* [MSG_LOOK 21 00 00] */
+static void veng6_LookAtRegulatorPort(void)
+{
+    veng6_Say(S_230E, T_VEN6N016);
+    return;
+}
+
+/* [MSG_LOOK 27 00 00] */
+static void veng6_E_02F4(void)
+{
+    { veng6_LookAtDoor(); return; }
+}
+
+/* [MSG_LOOK 0C 00 00] */
+static void veng6_LookAtDoor(void)
+{
+    veng6_Say(0, T_VEN5N007);
+    return;
+}
+
+/* [MSG_LOOK 22 00 00] */
+static void veng6_LookAtOil(void)
+{
+    veng6_Say(0, T_VEN6N011);
+    return;
+}
+
+/* [MSG_LOOK 0F 00 00] */
+static void veng6_E_03BD(void)
+{
+    { veng6_LookAtCloset(); return; }
+}
+
+/* [MSG_LOOK 23 00 00] */
+static void veng6_LookAtCloset(void)
+{
+    veng6_Say(0, T_VEN6N015);
+    return;
+}
+
+/* [MSG_LOOK 09 00 00] */
+static void veng6_E_0409(void)
+{
+    { veng6_LookAtCable(); return; }
+}
+
+/* [MSG_LOOK 08 00 00] */
+static void veng6_LookAtCable(void)
+{
+    veng6_Say(0, T_VEN6N013);
+    return;
+}
+
+/* [MSG_LOOK 24 00 00] */
+static void veng6_LookAtRegulator(void)
+{
+    veng6_Say(0, T_VEN6N017);
+    return;
+}
+
+/* [MSG_LOOK 0E 00 00] */
+static void veng6_E_04D2(void)
+{
+    { veng6_LookAtEngines(); return; }
+}
+
+/* [MSG_LOOK 25 00 00] */
+static void veng6_LookAtEngines(void)
+{
+    veng6_Say(0, T_VEN6N010);
+    return;
+}
+
+/* [MSG_LOOK 26 00 00] */
+static void veng6_LookAtControls(void)
+{
+    veng6_Say(0, T_VEN6N009);
+    return;
+}
+
+/* [MSG_LOOK 0A 00 00] */
+static void veng6_LookAtJunction(void)
+{
+    veng6_Say(0, T_VEN6N012);
+    return;
+}
+
+/* [MSG_LOOK 0B 00 00] */
+static void veng6_LookAtJournals(void)
+{
+    veng6_Say(0, T_VEN6N025);
+    veng6_Say(N_Mr_Spock, T_VEN6_021);
+    return;
+}
+
+/* [MSG_LOOK 00 00 00] */
+static void veng6_LookAtKirk(void)
+{
+    veng6_Say(0, T_VEN6N001);
+    return;
+}
+
+/* [MSG_LOOK 01 00 00] */
+static void veng6_LookAtSpock(void)
+{
+    veng6_Say(0, T_VEN6N003);
+    return;
+}
+
+/* [MSG_LOOK 02 00 00] */
+static void veng6_LookAtMcCoy(void)
+{
+    veng6_Say(0, T_VEN6N002);
+    return;
+}
+
+/* [MSG_LOOK 03 00 00] */
+static void veng6_LookAtRedshirt(void)
+{
+    veng6_Say(0, T_VEN6N000);
+    return;
+}
+
+/* [MSG_LOOK 0D 00 00] */
+static void veng6_LookAtBody(void)
+{
+    veng6_Say(0, T_VEN0N016);
+    return;
+}
+
+/* [MSG_LOOK FF 00 00] */
+static void veng6_LookAtEngineering(void)
+{
+    veng6_Say(0, T_VEN6N019);
+    return;
+}
+
+/* [MSG_TALK 00 00 00] */
+static void veng6_TalkToKirk(void)
+{
+    veng6_Say(N_Capt_Kirk, T_VEN6_005);
+    veng6_Say(N_Dr_McCoy, T_VEN6_009);
+    return;
+}
+
+/* [MSG_TALK 01 00 00] */
+static void veng6_TalkToSpock(void)
+{
+    veng6_Say(N_Mr_Spock, T_VEN6_014);
+    return;
+}
+
+/* [MSG_TALK 02 00 00] */
+static void veng6_TalkToMcCoy(void)
+{
+    veng6_Say(N_Dr_McCoy, T_VEN6_008);
+    veng6_Say(N_Mr_Spock, T_VEN6_018);
+    return;
+}
+
+/* [MSG_TALK 03 00 00] */
+static void veng6_TalkToRedshirt(void)
+{
+    veng6_Say(N_Ensign_Kije, T_VEN6_023);
+    return;
+}
+
+/* Either cable on the engines' power port: Kirk and Spock both walk
+ * over (msgs 3, 4, anim 5) and cable it to the junction box.
+ * [MSG_USE 84 20 00] */
+static void veng6_E_0BED(void)
+{
+    { veng6_Cable1OnEngines(); return; }
+}
+
+/* [MSG_USE 84 26 00] */
+static void veng6_Cable1OnEngines(void)
+{
+    fv_cable_item = 0x84;
+    { veng6_part_0C13(); return; }
+}
+
+/* [MSG_USE 85 20 00] */
+static void veng6_E_0C04(void)
+{
+    { veng6_Cable2OnEngines(); return; }
+}
+
+/* [MSG_USE 85 26 00] */
+static void veng6_Cable2OnEngines(void)
+{
+    fv_cable_item = 0x85;
+    { veng6_part_0C13(); return; }
+}
+
+static void veng6_part_0C13(void)
+{
+    if ((rv_wired & 1) != 0) {
+        return;
+    }
+    room.busy = 1;
+    svc_Walk(1, 0x91, 0xB4, 3);
+    svc_Walk(0, 0x5C, 0xA0, 4);
+    return;
+}
+
+/* [MSG_WALK_DONE 03 00 00] */
+static void veng6_E_0C5D(void)
+{
+    { veng6_AtEngines(); return; }
+}
+
+/* [MSG_WALK_DONE 04 00 00] */
+static void veng6_AtEngines(void)
+{
+    if (fv_at_engines != 1) {
+        fv_at_engines++;
+        return;
+    }
+    svc_Anim(0, N_kuseln, -1, -1, 5);
+    svc_Anim(1, N_suseln, -1, -1, 0);
+    svc_Sfx(N_EFX4);
+    return;
+}
+
+/* [MSG_ANIM_DONE 05 00 00] */
+static void veng6_EnginesWired(void)
+{
+    uint16_t ax = 0;
+    svc_Anim(8, N_s7r6cl_2, 0x5D, 0x95, 0);
+    veng6_Say(0, T_VEN6N020);
+    rv_wired |= 1;
+    ax = fv_cable_item;
+    svc_TakeItem(ax);
+    room.busy = 0;
+    return;
+}
+
+/* Either cable on the regulator's port (msgs 6, 7, anim 8): the same
+ * from the junction box to the fusion mixture regulator.
+ * [MSG_USE 84 21 00] */
+static void veng6_E_0D74(void)
+{
+    { veng6_Cable1OnRegulator(); return; }
+}
+
+/* [MSG_USE 84 24 00] */
+static void veng6_Cable1OnRegulator(void)
+{
+    fv_cable_item = 0x84;
+    { veng6_part_0D9A(); return; }
+}
+
+/* [MSG_USE 85 21 00] */
+static void veng6_E_0D8B(void)
+{
+    { veng6_Cable2OnRegulator(); return; }
+}
+
+/* [MSG_USE 85 24 00] */
+static void veng6_Cable2OnRegulator(void)
+{
+    fv_cable_item = 0x85;
+    { veng6_part_0D9A(); return; }
+}
+
+static void veng6_part_0D9A(void)
+{
+    if ((rv_wired & 2) != 0) {
+        return;
+    }
+    room.busy = 1;
+    svc_Walk(1, 0xAC, 0xB4, 6);
+    svc_Walk(0, 0x107, 0xA0, 7);
+    return;
+}
+
+/* [MSG_WALK_DONE 06 00 00] */
+static void veng6_E_0DE4(void)
+{
+    { veng6_AtRegulator(); return; }
+}
+
+/* [MSG_WALK_DONE 07 00 00] */
+static void veng6_AtRegulator(void)
+{
+    if (fv_at_regulator != 1) {
+        fv_at_regulator++;
+        return;
+    }
+    svc_Anim(0, N_kuseln_2, -1, -1, 8);
+    svc_Anim(1, N_suseln_2, -1, -1, 0);
+    svc_Sfx(N_EFX4_2);
+    return;
+}
+
+/* [MSG_ANIM_DONE 08 00 00] */
+static void veng6_RegulatorWired(void)
+{
+    uint16_t ax = 0;
+    svc_Anim(9, N_s7r6cr_2, 0x107, 0x94, 0);
+    veng6_Say(0, T_VEN6N022);
+    rv_wired |= 2;
+    ax = fv_cable_item;
+    svc_TakeItem(ax);
+    room.busy = 0;
+    return;
+}
+
+/* The junction box, both cables in: Spock sets the impedance, but only
+ * from the engineering journals (msgs 9, anim 0Ah). Impulse power returns.
+ * [MSG_USE 01 0A 00] */
+static void veng6_E_0F00(void)
+{
+    { veng6_McCoyOnJunction(); return; }
+}
+
+/* [MSG_USE 02 0A 00] */
+static void veng6_McCoyOnJunction(void)
+{
+    { veng6_KijeOnJunction(); return; }
+}
+
+/* [MSG_USE 03 0A 00] */
+static void veng6_KijeOnJunction(void)
+{
+    { veng6_UseJunction(); return; }
+}
+
+/* [MSG_USE 00 0A 00] */
+static void veng6_UseJunction(void)
+{
+    if (rv_power_on == 1) {
+        veng6_Say(N_Mr_Spock, T_VEN6_012);
+        return;
+    }
+    if ((rv_wired & 1) == 0) {
+    } else {
+        if ((rv_wired & 2) == 0) {
+        } else {
+            veng6_Say(N_computer, T_COMPA185);
+            veng6_Say(N_Capt_Kirk, T_VEN6_003);
+            if (rv_read_journals == 1) {
+            } else {
+                veng6_Say(N_Mr_Spock, T_VEN6_017);
+                return;
+            }
+            veng6_Say(N_Mr_Spock, T_VEN6_016);
+            veng6_Say(N_Capt_Kirk, T_VEN6_002);
+            svc_Walk(1, 0x99, 0xB4, 9);
+            return;
+        }
+    }
+    veng6_Say(N_Mr_Spock, T_VEN6_011);
+    return;
+}
+
+/* [MSG_WALK_DONE 09 00 00] */
+static void veng6_SpockAtJunction(void)
+{
+    svc_Anim(1, N_suseln_3, -1, -1, 0xA);
+    return;
+}
+
+/* [MSG_ANIM_DONE 0A 00 00] */
+static void veng6_PowerRestored(void)
+{
+    veng6_Say(N_Mr_Spock, T_VEN6_019);
+    svc_Anim(0xE, N_s7r6i1_2, 0x9E, 0x59, 0);
+    rv_power_on = 1;
+    svc_DigiOff();
+    svc_Sfx(N_VEN6LON_2);
+    rv_wired |= 4;
+    return;
+}
+
+/* Filling the hypo from the oil canister (msgs 0Dh, 0Eh).
+ * [MSG_USE 82 22 00] */
+static void veng6_HypoOnOil(void)
+{
+    if (rv_hypo_oiled != 1) {
+        room.busy = 1;
+        svc_Walk(0, 0x3C, 0x9E, 0xD);
+        return;
+    }
+    veng6_Say(0, T_VEN6N006);
+    return;
+}
+
+/* [MSG_WALK_DONE 0D 00 00] */
+static void veng6_KirkAtOil(void)
+{
+    svc_Anim(0, N_kusehw, -1, -1, 0xE);
+    return;
+}
+
+/* [MSG_ANIM_DONE 0E 00 00] */
+static void veng6_FilledHypo(void)
+{
+    room.busy = 0;
+    veng6_Say(0, T_VEN6N007);
+    rv_hypo_oiled = 1;
+    return;
+}
+
+/* Opening and closing the closet (msgs 0Fh, 10h).
+ * [MSG_USE 00 0F 00] */
+static void veng6_UseCloset(void)
+{
+    room.busy = 1;
+    svc_Walk(0, 0x36, 0x9F, 0xF);
+    return;
+}
+
+/* [MSG_WALK_DONE 0F 00 00] */
+static void veng6_KirkAtCloset(void)
+{
+    svc_Anim(0, N_kusehw_2, -1, -1, 0x10);
+    return;
+}
+
+/* [MSG_ANIM_DONE 10 00 00] */
+static void veng6_ClosetToggled(void)
+{
+    room.busy = 0;
+    if (rv_closet_open == 1) {
+        svc_Anim(0xF, N_s7r6p2, 0x19, 0x86, 0);
+        svc_BridgeSfx(5);
+        rv_closet_open = 0;
+        return;
+    }
+    svc_Anim(0xF, N_s7r6p1, 0x19, 0x86, 0);
+    svc_BridgeSfx(5);
+    rv_closet_open = 1;
+    if (rv_journals_taken != 1) {
+        veng6_Say(0, T_VEN6N005);
+        goto L14F3;
+    }
+L14F3:;
+    return;
+}
+
+/* Spock's tricorder and the fusion pack.
+ * [MSG_USE 44 25 00] */
+static void veng6_SpockScansEngines(void)
+{
+    svc_Anim(1, N_sscans, -1, -1, 0);
+    svc_BridgeSfx(4);
+    if (rv_power_on == 1) {
+        veng6_Say(N_Mr_Spock, T_VEN6_010);
+        return;
+    }
+    veng6_Say(N_Mr_Spock, T_VEN6_020);
+    veng6_Say(N_Capt_Kirk, T_VEN6_001);
+    veng6_Say(N_Mr_Spock, T_VEN6_022);
+    return;
+}
+
+/* [MSG_USE 44 24 00] */
+static void veng6_SpockScansRegulator(void)
+{
+    svc_Anim(1, N_sscans_2, -1, -1, 0);
+    svc_BridgeSfx(4);
+    if (rv_power_on == 1) {
+    } else {
+        veng6_Say(N_Mr_Spock, T_VEN6_007);
+        return;
+    }
+    veng6_Say(N_Mr_Spock, T_VEN6_013);
+    return;
+}
+
+/* [MSG_USE 44 0A 00] */
+static void veng6_SpockScansJunction(void)
+{
+    svc_Anim(1, N_sscans_3, -1, -1, 0);
+    svc_BridgeSfx(4);
+    veng6_Say(N_Mr_Spock, T_VEN6_015);
+    return;
+}
+
+/* [MSG_USE 83 26 00] */
+static void veng6_FusionOnControls(void)
+{
+    veng6_Say(N_Mr_Spock, T_VEN6_006);
+    return;
+}
+
+/* Taking things.
+ * [MSG_GET 0A 00 00] */
+static void veng6_GetJunction(void)
+{
+    veng6_Say(0, T_MUD1N014);
+    return;
+}
+
+/* [MSG_GET 22 00 00] */
+static void veng6_GetOil(void)
+{
+    veng6_Say(0, T_VEN6N008);
+    return;
+}
+
+/* Taking the journals (msgs 0Bh, 0Ch).
+ * [MSG_GET 0B 00 00] */
+static void veng6_GetJournals(void)
+{
+    room.busy = 1;
+    svc_Walk(0, 0x36, 0x9F, 0xB);
+    return;
+}
+
+/* [MSG_WALK_DONE 0B 00 00] */
+static void veng6_KirkAtJournals(void)
+{
+    svc_Anim(0, N_kusemw, -1, -1, 0xC);
+    return;
+}
+
+/* [MSG_ANIM_DONE 0C 00 00] */
+static void veng6_TookJournals(void)
+{
+    svc_StopAnim(0xB);
+    room.busy = 0;
+    veng6_Say(0, T_VEN6N024);
+    rv_journals_taken = 1;
+    svc_GiveItem(IT_TECH);
+    return;
+}
+
+/* Every tick, common to the mission's rooms: the Elasi deadlines set on
+ * the bridge (room 2). Until the Enterprise returns: boarding unless the
+ * shields are up, the thirty minutes, the wait after Kirk complies (then
+ * a warning and the torpedoes), the chance after they lower their
+ * shields. When one runs out, the game is over.
+ * [MSG_TICK FF FF FF] */
+static void veng6_ElasiDeadlines(void)
+{
+    if (rv_board_timer != 0) {
+        rv_board_timer--;
+        if (rv_board_timer == 0) {
+            if (rv_power_to != 2) {
+                goto L1BFE;
+            }
+        }
+    }
+    if (rv_stall_timer != 0) {
+        rv_stall_timer--;
+        if (rv_stall_timer == 0) {
+            if (rv_complied != 1) {
+                goto L1BFE;
+            }
+        }
+    }
+    if (rv_comply_timer != 0) {
+        rv_comply_timer--;
+        if (rv_comply_timer == 0) {
+            if (rv_rescued != 1) {
+                veng6_Say(N_Elasi_Captain, T_VEN2_098);
+                rv_torpedo_timer = 0xA8C;
+            }
+        }
+    }
+    if (rv_torpedo_timer != 0) {
+        rv_torpedo_timer--;
+        if (rv_torpedo_timer == 0) {
+            if (rv_rescued != 1) {
+                veng6_Say(0, T_VENA_F40);
+                svc_GameOver();
+            }
+        }
+    }
+    if (rv_attack_timer != 0) {
+        rv_attack_timer--;
+        if (rv_attack_timer == 0) {
+            if (rv_rescued != 1) {
+                goto L1BFE;
+            }
+        }
+    }
+    return;
+L1BFE:;
+    veng6_Say(0, T_VENA_F32);
+    svc_GameOver();
+    return;
+}
+
+/* [MSG_USE 40 FF 00] */
+static void veng6_E_1D0E(void)
+{
+    { veng6_KillAnything(); return; }
+}
+
+/* [MSG_USE 41 FF 00] */
+static void veng6_KillAnything(void)
+{
+    veng6_Say(N_Mr_Spock, T_VENA_F34);
+    return;
+}
+
+/* The hypo, empty or full of oil.
+ * [MSG_LOOK 82 00 00] */
+static void veng6_LookAtHypo(void)
+{
+    if (rv_hypo_oiled != 1) {
+        veng6_Say(0, T_VEN4N010);
+        return;
+    }
+    veng6_Say(0, T_VEN6N007_2);
+    return;
+}
+
+/* The communicator: before the Enterprise leaves, Uhura; while the Elasi
+ * jam it, Spock; otherwise Uhura, tracking the distress call.
+ * [MSG_USE 47 00 00] */
+static void veng6_CallEnterprise(void)
+{
+    if (rv_enterprise_away != 1) {
+        veng6_Say(N_Capt_Kirk, T_MUD4_018);
+        veng6_Say(N_Lt_Uhura, T_BRIDU146);
+        return;
+    }
+    if (rv_elasi_here == 1) {
+    } else {
+        veng6_Say(N_Capt_Kirk, T_MUD4_018_2);
+        veng6_Say(N_Lt_Uhura, T_VEN2U093);
+        veng6_Say(N_Capt_Kirk, T_VEN2_028);
+        return;
+    }
+    veng6_Say(N_Mr_Spock, T_VEN2_066);
+    return;
+}
+
+/* McCoy and the body.
+ * [MSG_USE 7F 0D 00] */
+static void veng6_E_2046(void)
+{
+    { veng6_MTricorderOnBody(); return; }
+}
+
+/* [MSG_USE 45 0D 00] */
+static void veng6_MTricorderOnBody(void)
+{
+    { veng6_McCoyOnBody(); return; }
+}
+
+/* [MSG_USE 02 0D 00] */
+static void veng6_McCoyOnBody(void)
+{
+    uint16_t ax = 0;
+    ax = (uint16_t)svc_Random(0, 5);
+    fv_mccoy_line = ax;
+    if (fv_mccoy_line == 0) {
+        veng6_Say(N_Dr_McCoy, T_DEM3_019);
+        return;
+    }
+    if (fv_mccoy_line == 1) {
+        veng6_Say(N_Dr_McCoy, T_VEN4_016);
+        return;
+    }
+    if (fv_mccoy_line == 2) {
+        veng6_Say(N_Dr_McCoy, T_G_014);
+        return;
+    }
+    if (fv_mccoy_line == 3) {
+        veng6_Say(N_Dr_McCoy, T_G_014_2);
+        return;
+    }
+    if (fv_mccoy_line == 4) {
+        veng6_Say(N_Dr_McCoy, T_VEN0_016);
+        return;
+    }
+    veng6_Say(N_Dr_McCoy, T_VEN0_016_2);
+    return;
+}
+
+/* Talk: conversation AX (speaker, choices, 0); returns the choice. */
+static void veng6_Talk(uint16_t ax)
+{
+    svc_Talk(ax);
+    return;
+}
+
+/* Say: one line, BX, said by AX (0: narration). */
+static void veng6_Say(uint16_t ax, uint16_t bx)
+{
+    fv_talk_buf = ax;
+    CS_W(0x24E5) = bx;
+    veng6_Talk(talk_buf);
+    return;
+}
+
+/* the scripts, by the offset of their code in the room file */
+const RoomScript veng6_scripts[] = {
+    { 0x00D4, veng6_StartRoom },    /* MSG_TICK 01 00 00 */
+    { 0x024B, veng6_E_024B },    /* MSG_WALK 0C 00 00 */
+    { 0x0253, veng6_WalkToDoor },    /* MSG_WALK 27 00 00 */
+    { 0x0276, veng6_AtDoor },    /* MSG_WALK_DONE 02 00 00 */
+    { 0x02B1, veng6_DoorOpened },    /* MSG_ANIM_DONE 01 00 00 */
+    { 0x02D4, veng6_LookAtPowerPort },    /* MSG_LOOK 20 00 00 */
+    { 0x02E4, veng6_LookAtRegulatorPort },    /* MSG_LOOK 21 00 00 */
+    { 0x02F4, veng6_E_02F4 },    /* MSG_LOOK 27 00 00 */
+    { 0x02FC, veng6_LookAtDoor },    /* MSG_LOOK 0C 00 00 */
+    { 0x0342, veng6_LookAtOil },    /* MSG_LOOK 22 00 00 */
+    { 0x03BD, veng6_E_03BD },    /* MSG_LOOK 0F 00 00 */
+    { 0x03C5, veng6_LookAtCloset },    /* MSG_LOOK 23 00 00 */
+    { 0x0409, veng6_E_0409 },    /* MSG_LOOK 09 00 00 */
+    { 0x0411, veng6_LookAtCable },    /* MSG_LOOK 08 00 00 */
+    { 0x0468, veng6_LookAtRegulator },    /* MSG_LOOK 24 00 00 */
+    { 0x04D2, veng6_E_04D2 },    /* MSG_LOOK 0E 00 00 */
+    { 0x04DA, veng6_LookAtEngines },    /* MSG_LOOK 25 00 00 */
+    { 0x052B, veng6_LookAtControls },    /* MSG_LOOK 26 00 00 */
+    { 0x0586, veng6_LookAtJunction },    /* MSG_LOOK 0A 00 00 */
+    { 0x05F5, veng6_LookAtJournals },    /* MSG_LOOK 0B 00 00 */
+    { 0x06EA, veng6_LookAtKirk },    /* MSG_LOOK 00 00 00 */
+    { 0x0746, veng6_LookAtSpock },    /* MSG_LOOK 01 00 00 */
+    { 0x07C4, veng6_LookAtMcCoy },    /* MSG_LOOK 02 00 00 */
+    { 0x0828, veng6_LookAtRedshirt },    /* MSG_LOOK 03 00 00 */
+    { 0x0861, veng6_LookAtBody },    /* MSG_LOOK 0D 00 00 */
+    { 0x0894, veng6_LookAtEngineering },    /* MSG_LOOK FF 00 00 */
+    { 0x08EE, veng6_TalkToKirk },    /* MSG_TALK 00 00 00 */
+    { 0x09DB, veng6_TalkToSpock },    /* MSG_TALK 01 00 00 */
+    { 0x0A67, veng6_TalkToMcCoy },    /* MSG_TALK 02 00 00 */
+    { 0x0B7F, veng6_TalkToRedshirt },    /* MSG_TALK 03 00 00 */
+    { 0x0BED, veng6_E_0BED },    /* MSG_USE 84 20 00 */
+    { 0x0BF5, veng6_Cable1OnEngines },    /* MSG_USE 84 26 00 */
+    { 0x0C04, veng6_E_0C04 },    /* MSG_USE 85 20 00 */
+    { 0x0C0C, veng6_Cable2OnEngines },    /* MSG_USE 85 26 00 */
+    { 0x0C5D, veng6_E_0C5D },    /* MSG_WALK_DONE 03 00 00 */
+    { 0x0C65, veng6_AtEngines },    /* MSG_WALK_DONE 04 00 00 */
+    { 0x0CCC, veng6_EnginesWired },    /* MSG_ANIM_DONE 05 00 00 */
+    { 0x0D74, veng6_E_0D74 },    /* MSG_USE 84 21 00 */
+    { 0x0D7C, veng6_Cable1OnRegulator },    /* MSG_USE 84 24 00 */
+    { 0x0D8B, veng6_E_0D8B },    /* MSG_USE 85 21 00 */
+    { 0x0D93, veng6_Cable2OnRegulator },    /* MSG_USE 85 24 00 */
+    { 0x0DE4, veng6_E_0DE4 },    /* MSG_WALK_DONE 06 00 00 */
+    { 0x0DEC, veng6_AtRegulator },    /* MSG_WALK_DONE 07 00 00 */
+    { 0x0E53, veng6_RegulatorWired },    /* MSG_ANIM_DONE 08 00 00 */
+    { 0x0F00, veng6_E_0F00 },    /* MSG_USE 01 0A 00 */
+    { 0x0F08, veng6_McCoyOnJunction },    /* MSG_USE 02 0A 00 */
+    { 0x0F10, veng6_KijeOnJunction },    /* MSG_USE 03 0A 00 */
+    { 0x0F18, veng6_UseJunction },    /* MSG_USE 00 0A 00 */
+    { 0x11C4, veng6_SpockAtJunction },    /* MSG_WALK_DONE 09 00 00 */
+    { 0x11E9, veng6_PowerRestored },    /* MSG_ANIM_DONE 0A 00 00 */
+    { 0x12E5, veng6_HypoOnOil },    /* MSG_USE 82 22 00 */
+    { 0x1352, veng6_KirkAtOil },    /* MSG_WALK_DONE 0D 00 00 */
+    { 0x1377, veng6_FilledHypo },    /* MSG_ANIM_DONE 0E 00 00 */
+    { 0x13CE, veng6_UseCloset },    /* MSG_USE 00 0F 00 */
+    { 0x13F5, veng6_KirkAtCloset },    /* MSG_WALK_DONE 0F 00 00 */
+    { 0x141A, veng6_ClosetToggled },    /* MSG_ANIM_DONE 10 00 00 */
+    { 0x14FA, veng6_SpockScansEngines },    /* MSG_USE 44 25 00 */
+    { 0x1683, veng6_SpockScansRegulator },    /* MSG_USE 44 24 00 */
+    { 0x17FA, veng6_SpockScansJunction },    /* MSG_USE 44 0A 00 */
+    { 0x18FC, veng6_FusionOnControls },    /* MSG_USE 83 26 00 */
+    { 0x198B, veng6_GetJunction },    /* MSG_GET 0A 00 00 */
+    { 0x19CC, veng6_GetOil },    /* MSG_GET 22 00 00 */
+    { 0x1A28, veng6_GetJournals },    /* MSG_GET 0B 00 00 */
+    { 0x1A4F, veng6_KirkAtJournals },    /* MSG_WALK_DONE 0B 00 00 */
+    { 0x1A74, veng6_TookJournals },    /* MSG_ANIM_DONE 0C 00 00 */
+    { 0x1AEA, veng6_ElasiDeadlines },    /* MSG_TICK FF FF FF */
+    { 0x1D0E, veng6_E_1D0E },    /* MSG_USE 40 FF 00 */
+    { 0x1D16, veng6_KillAnything },    /* MSG_USE 41 FF 00 */
+    { 0x1DAB, veng6_LookAtHypo },    /* MSG_LOOK 82 00 00 */
+    { 0x1E41, veng6_CallEnterprise },    /* MSG_USE 47 00 00 */
+    { 0x2046, veng6_E_2046 },    /* MSG_USE 7F 0D 00 */
+    { 0x204E, veng6_MTricorderOnBody },    /* MSG_USE 45 0D 00 */
+    { 0x2056, veng6_McCoyOnBody },    /* MSG_USE 02 0D 00 */
+    { 0, 0 }
+};

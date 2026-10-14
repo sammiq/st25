@@ -1,0 +1,1335 @@
+/* FEATHER1.RDF: the room's scripts, translated from the machine code in the room file
+ * (src/rdf/feather1.asm) by tools/rdf2c.py.  They run on the loaded file (CS_B/CS_W) and the
+ * room state (`room`), and call the game through the svc_ macros of rooms.h.
+ *
+ * FEATHER1.RDF - "The Feathered Serpent", the pit Quetzecoatl drops the
+ * party into. Throwing rocks from the pile brings one of the vines low
+ * enough to climb out; a snake lives in a hole in the wall, and with the
+ * hole blocked by a rock Kirk can catch it. The communicators and
+ * phasers don't work.
+ *
+ * Actors: 8 Quetzecoatl, 9 the vine, 10 (0Ah) the snake, 11 (0Bh) the
+ * thrown rock, 12 (0Ch) the rock in the hole.
+ * Objects: 9/23h the vine, 0Ah the snake, 20h the rocks, 21h the hole,
+ * 22h the moss, 24h the light, 25h-27h eyes, 28h the way out at the top.
+ * Exit 3: room 2.
+ *
+ * Labels: H_ script headers, L branch targets, C_ conversations,
+ * T_/N_/S_ strings; talk_buf: the conversation buffer of Say.
+ *
+ * Quirks of the original:
+ * - The script chain runs on into code at 103F: the engine reads its bytes
+ * as key 50 6A 03 2E and next 1EFF (beyond rdf_scripts_end, so the search
+ * stops).
+ */
+
+#include "rooms.h"
+
+/* where the file keeps its strings, conversations and tables */
+enum {
+    N_s5r1qa = 0x00D0,
+    N_s5r1qd = 0x00D7,
+    N_s5r1v0 = 0x00DE,
+    N_s5r1v2 = 0x00E5,
+    N_s5r1v3 = 0x00EC,
+    N_s5r1v4 = 0x00F3,
+    N_s5r1si = 0x00FA,
+    N_s5r1so = 0x0101,
+    N_s5r1kt = 0x0108,
+    N_s5r1kg = 0x010F,
+    N_s5r1ru = 0x0116,
+    N_s5r1rk = 0x011D,
+    N_s5r1kc = 0x0124,
+    N_s5r1sc = 0x012B,
+    N_s5r1mc = 0x0132,
+    N_s5r1rc = 0x0139,
+    N_s5r1kd = 0x0140,
+    N_s5r1sd = 0x0147,
+    N_s5r1md = 0x014E,
+    N_s5r1rd = 0x0155,
+    N_kstndw = 0x015C,
+    N_sstndw = 0x0163,
+    N_mstndw = 0x016A,
+    N_rstndw = 0x0171,
+    N_sscann = 0x0178,
+    N_sscans = 0x017F,
+    N_sscane = 0x0186,
+    N_mscane = 0x018D,
+    N_mscans = 0x0194,
+    N_FEA1LOOP = 0x01A3,
+    N_LD3MAGAP = 0x0249,
+    N_LD3MAGDI = 0x029C,
+    N_THROWROC = 0x075F,
+    N_THROWROC_2 = 0x07F2,
+    T_FEA1_008 = 0x0EB1,
+    N_Capt_Kirk = 0x113C,
+    N_Quetzecoatl = 0x1147,
+    N_Dr_McCoy = 0x1153,
+    N_Mr_Spock = 0x115D,
+    N_Lt_Stragey = 0x1167,
+    S_1173 = 0x1173,
+    T_FEA1_057 = 0x1174,
+    T_FEA1_023 = 0x1255,
+    T_FEA1N000 = 0x12AE,
+    T_FEA1_032 = 0x12EA,
+    T_FEA1_009 = 0x1355,
+    T_FEA1_045 = 0x137C,
+    T_FEA1N005 = 0x13C0,
+    T_FEA1N010 = 0x13EC,
+    T_FEA1_037 = 0x141A,
+    T_FEA1_A46 = 0x1473,
+    T_FEA1_013 = 0x14A8,
+    T_FEA1_052 = 0x1521,
+    T_FEA1_042 = 0x157F,
+    T_FEA1_017 = 0x15F0,
+    T_FEA1_054 = 0x1640,
+    T_FEA1_043 = 0x168A,
+    T_FEA1_021 = 0x16F4,
+    T_FEA1_053 = 0x173C,
+    T_FEA1_034 = 0x1768,
+    T_FEA1_035 = 0x17A7,
+    T_FEA1_005 = 0x17FF,
+    T_FEA1_046 = 0x184A,
+    T_FEA1_027 = 0x18A8,
+    T_FEA1_025 = 0x18EB,
+    T_FEA1_010 = 0x191E,
+    T_FEA1_004 = 0x1957,
+    T_FEA1_051 = 0x19B3,
+    T_FEA1_047 = 0x19DA,
+    T_FEA1N006 = 0x1A05,
+    T_FEA1_033 = 0x1A30,
+    T_FEA1_015 = 0x1A77,
+    T_FEA1_049 = 0x1ACB,
+    T_FEA1_F25 = 0x1B36,
+    T_FEA1_026 = 0x1B7D,
+    T_FEA1_050 = 0x1BDC,
+    T_FEA1N012 = 0x1C7F,
+    T_FEA1N015 = 0x1CF1,
+    T_FEA1N020 = 0x1D2B,
+    T_FEA1N017 = 0x1D76,
+    T_FEA1N014 = 0x1DE2,
+    T_FEA1N016 = 0x1E4E,
+    T_FEA1N011 = 0x1E90,
+    T_FEA1N013 = 0x1EE1,
+    T_FEA1_006 = 0x1F22,
+    T_FEA1_040 = 0x1F9F,
+    T_FEA1_048 = 0x1FED,
+    T_FEA1N021 = 0x2046,
+    T_FEA1N022 = 0x207D,
+    T_FEA1N019 = 0x20B2,
+    T_FEA1N009 = 0x20D9,
+    T_FEA1N008 = 0x2106,
+    T_FEA1_028 = 0x21D3,
+    T_FEA1_039 = 0x2243,
+    T_FEA1_029 = 0x22C5,
+    T_FEA1_031 = 0x2384,
+    T_FEA1_030 = 0x23D0,
+    T_FEA1_038 = 0x2434,
+    T_FEA1_014 = 0x24F6,
+    T_FEA1_012 = 0x252F,
+    T_FEA1_011 = 0x2552,
+    T_FEA1_019 = 0x2588,
+    T_FEA1_044 = 0x25E9,
+    T_FEA1_055 = 0x267B,
+    T_FEA1_002 = 0x26B3,
+    T_FEA1_007 = 0x26CD,
+    T_FEA1N001 = 0x2869,
+    T_FEA1N004 = 0x28BD,
+    T_FEA1N003 = 0x28F2,
+    T_FEA1N002 = 0x292A,
+    T_FEA1_041 = 0x2965,
+    T_FEA1_001 = 0x29EA,
+    T_FEA1_018 = 0x2A35,
+    T_FEA1_003 = 0x2AB1,
+    T_FEA1_024 = 0x2AE8,
+    talk_buf = 0x2B50,
+};
+
+/* the room's variables: in the room state, and in the file itself */
+#define fv_kirk_up CS_B(0xCC)
+#define fv_mccoy_joked CS_B(0xCB)
+#define fv_mccoy_up CS_B(0xCE)
+#define fv_snake_hidden CS_B(0xCA)
+#define fv_spock_up CS_B(0xCD)
+#define fv_stragey_up CS_B(0xCF)
+#define fv_talk_buf CS_W(0x2B50)
+#define rv_caught_snake ROOM_B(0x2C)
+#define rv_hole_blocked ROOM_B(0x31)
+#define rv_score ROOM_W(0x36)
+#define rv_took_rocks ROOM_B(0x2B)
+#define rv_vine ROOM_B(0x2A)
+
+/* functions */
+static void feather1_StartRoom(void);
+static void feather1_QuetzecoatlAppears(void);
+static void feather1_QuetzecoatlScolds(void);
+static void feather1_QuetzecoatlVanishes(void);
+static void feather1_QuetzecoatlGone(void);
+static void feather1_GetVine(void);
+static void feather1_GetVine2(void);
+static void feather1_GetRocks(void);
+static void feather1_KirkAtRocks(void);
+static void feather1_TookRocks(void);
+static void feather1_GetSnake(void);
+static void feather1_KirkGrabs(void);
+static void feather1_SnakeCaught(void);
+static void feather1_SnakeHides(void);
+static void feather1_GrabDone(void);
+static void feather1_SnakeComesOut(void);
+static void feather1_UseCommunicator(void);
+static void feather1_RockInHole(void);
+static void feather1_KirkAtHole(void);
+static void feather1_HoleBlocked(void);
+static void feather1_RockPlaced(void);
+static void feather1_SnakeOnVine(void);
+static void feather1_SnakeOnSpock(void);
+static void feather1_SnakeOnKirk(void);
+static void feather1_SnakeOnMcCoy(void);
+static void feather1_SnakeOnStragey(void);
+static void feather1_RockAtSnake(void);
+static void feather1_SpockGrabsSnake(void);
+static void feather1_McCoyGrabsSnake(void);
+static void feather1_StrageyGrabsSnake(void);
+static void feather1_SpockInHole(void);
+static void feather1_McCoyInHole(void);
+static void feather1_StrageyInHole(void);
+static void feather1_RockOnMoss(void);
+static void feather1_RockAtSpock(void);
+static void feather1_RockAtMcCoy(void);
+static void feather1_RockAtStragey(void);
+static void feather1_SpockOnMoss(void);
+static void feather1_McCoyOnMoss(void);
+static void feather1_StrageyOnMoss(void);
+static void feather1_RockAtVine(void);
+static void feather1_KirkThrows(void);
+static void feather1_VineLower(void);
+static void feather1_KirkThrowsAgain(void);
+static void feather1_VineInReach(void);
+static void feather1_E_0847(void);
+static void feather1_SpockClimbs(void);
+static void feather1_SpockAtVine(void);
+static void feather1_SpockUp(void);
+static void feather1_SpockClimbsDown(void);
+static void feather1_SpockDown(void);
+static void feather1_E_094D(void);
+static void feather1_McCoyClimbs(void);
+static void feather1_McCoyAtVine(void);
+static void feather1_McCoyUp(void);
+static void feather1_McCoyClimbsDown(void);
+static void feather1_McCoyDown(void);
+static void feather1_E_0A53(void);
+static void feather1_StrageyClimbs(void);
+static void feather1_StrageyAtVine(void);
+static void feather1_StrageyUp(void);
+static void feather1_StrageyClimbsDown(void);
+static void feather1_StrageyDown(void);
+static void feather1_E_0B5A(void);
+static void feather1_KirkClimbs(void);
+static void feather1_KirkAtVine(void);
+static void feather1_KirkUp(void);
+static void feather1_KirkClimbsDown(void);
+static void feather1_KirkDown(void);
+static void feather1_StunAnything(void);
+static void feather1_KillAnything(void);
+static void feather1_SpockScansVine(void);
+static void feather1_SpockScansSnake(void);
+static void feather1_SpockScansMoss(void);
+static void feather1_SpockScansHole(void);
+static void feather1_SpockScans(void);
+static void feather1_SpockScansRocks(void);
+static void feather1_McCoyScansVine(void);
+static void feather1_McCoyScansVine2(void);
+static void feather1_McCoyScansMoss(void);
+static void feather1_McCoyScansHole(void);
+static void feather1_McCoyScansSnake(void);
+static void feather1_UseMedkit(void);
+static void feather1_TalkToMcCoy(void);
+static void feather1_TalkToSpock(void);
+static void feather1_TalkToRedshirt(void);
+static void feather1_WalkOut(void);
+static void feather1_LookAtScene(void);
+static void feather1_LookAtSnake(void);
+static void feather1_LookAtVine(void);
+static void feather1_LookAtHole(void);
+static void feather1_LookAtMoss(void);
+static void feather1_LookAtRocks(void);
+static void feather1_LookAtLight(void);
+static void feather1_LookAtEyes1(void);
+static void feather1_LookAtEyes2(void);
+static void feather1_LookAtEyes3(void);
+static void feather1_LookAtKirk(void);
+static void feather1_LookAtSpock(void);
+static void feather1_LookAtMcCoy(void);
+static void feather1_LookAtRedshirt(void);
+static void feather1_LookAtVines(void);
+static void feather1_Talk(uint16_t ax);
+static void feather1_Say(uint16_t ax, uint16_t bx);
+
+/* The room starts. The first time, Quetzecoatl appears above the pit
+ * (ticks 45-95) to scold the party, and vanishes (anim msg 18).
+ * [MSG_TICK 01 00 00] */
+static void feather1_StartRoom(void)
+{
+    svc_Sfx(N_FEA1LOOP);
+    svc_Music(0x1B, STALE_ARG);
+    if (rv_vine == 0) {
+        room.busy = 1;
+    }
+    if (rv_caught_snake == 0) {
+        svc_Anim0(0xA, N_s5r1so, 0x9C, 0xC1, 0);
+    }
+    if (rv_vine == 0) {
+        svc_Anim0(9, N_s5r1v0, 0xA0, 0x23, 0);
+    } else {
+        fv_kirk_up = 1;
+        fv_spock_up = 1;
+        fv_mccoy_up = 1;
+        fv_stragey_up = 1;
+        svc_Anim0(9, N_s5r1v4, 0xA0, 0x23, 0);
+    }
+    return;
+}
+
+/* [MSG_TICK 2D 00 00] */
+static void feather1_QuetzecoatlAppears(void)
+{
+    if (rv_vine == 0) {
+        svc_Sfx(N_LD3MAGAP);
+        svc_Anim0(8, N_s5r1qa, 0xB4, 0x32, 0);
+    }
+    return;
+}
+
+/* [MSG_TICK 55 00 00] */
+static void feather1_QuetzecoatlScolds(void)
+{
+    if (rv_vine == 0) {
+        feather1_Say(N_Quetzecoatl, T_FEA1_057);
+    }
+    return;
+}
+
+/* [MSG_TICK 5F 00 00] */
+static void feather1_QuetzecoatlVanishes(void)
+{
+    if (rv_vine == 0) {
+        svc_Sfx(N_LD3MAGDI);
+        svc_Anim(8, N_s5r1qd, -1, -1, 0x12);
+    }
+    return;
+}
+
+/* [MSG_ANIM_DONE 12 00 00] */
+static void feather1_QuetzecoatlGone(void)
+{
+    room.busy = 0;
+    return;
+}
+
+/* Getting the vine: out of reach until the rocks bring it down.
+ * [MSG_GET 23 00 00] */
+static void feather1_GetVine(void)
+{
+    feather1_Say(S_1173, T_FEA1N008);
+    return;
+}
+
+/* [MSG_GET 09 00 00] */
+static void feather1_GetVine2(void)
+{
+    if (rv_vine == 0) {
+        feather1_Say(S_1173, T_FEA1N009);
+        return;
+    }
+    feather1_Say(S_1173, T_FEA1N008);
+    return;
+}
+
+/* Getting rocks (msgs 6): from the pile.
+ * [MSG_GET 20 00 00] */
+static void feather1_GetRocks(void)
+{
+    if (fv_kirk_up == 0) {
+        if (rv_took_rocks == 1) {
+            feather1_Say(S_1173, T_FEA1N019);
+            return;
+        }
+        svc_Walk(0, 0x90, 0xB6, 6);
+        room.busy = 1;
+        return;
+    }
+    feather1_Say(S_1173, T_FEA1N021);
+    return;
+}
+
+/* [MSG_WALK_DONE 06 00 00] */
+static void feather1_KirkAtRocks(void)
+{
+    svc_Anim(0, N_s5r1kg, -1, -1, 6);
+    return;
+}
+
+/* [MSG_ANIM_DONE 06 00 00] */
+static void feather1_TookRocks(void)
+{
+    room.busy = 0;
+    svc_StopAnim(0);
+    svc_GiveItem(IT_ROCK);
+    feather1_Say(S_1173, T_FEA1N022);
+    rv_took_rocks = 1;
+    return;
+}
+
+/* Grabbing the snake (+1, msgs 8): if its hole is blocked Kirk catches it
+ * (timer 1), else it hides (timer 2) and comes out again (timer 0).
+ * [MSG_GET 0A 00 00] */
+static void feather1_GetSnake(void)
+{
+    rv_score += 1;
+    if (fv_kirk_up == 0) {
+        svc_Walk(0, 0x90, 0xBE, 8);
+        room.busy = 1;
+        return;
+    }
+    feather1_Say(S_1173, T_FEA1N021);
+    return;
+}
+
+/* [MSG_WALK_DONE 08 00 00] */
+static void feather1_KirkGrabs(void)
+{
+    svc_Anim(0, N_s5r1kg, -1, -1, 8);
+    if (rv_hole_blocked == 0) {
+        room.timers[2] = 6;
+        return;
+    }
+    room.timers[1] = 0x14;
+    return;
+}
+
+/* [MSG_TIMER 01 00 00] */
+static void feather1_SnakeCaught(void)
+{
+    svc_GiveItem(IT_SNAKE);
+    svc_StopAnim(0xA);
+    rv_caught_snake = 1;
+    return;
+}
+
+/* [MSG_TIMER 02 00 00] */
+static void feather1_SnakeHides(void)
+{
+    svc_Anim(0xA, N_s5r1si, -1, -1, 0);
+    room.timers[0] = 0x50;
+    fv_snake_hidden = 1;
+    return;
+}
+
+/* [MSG_ANIM_DONE 08 00 00] */
+static void feather1_GrabDone(void)
+{
+    room.busy = 0;
+    svc_StopAnim(0);
+    return;
+}
+
+/* [MSG_TIMER 00 00 00] */
+static void feather1_SnakeComesOut(void)
+{
+    svc_Anim(0xA, N_s5r1so, -1, -1, 0);
+    fv_snake_hidden = 0;
+    return;
+}
+
+/* [MSG_USE 47 FF 00] */
+static void feather1_UseCommunicator(void)
+{
+    feather1_Say(N_Mr_Spock, T_FEA1_023);
+    return;
+}
+
+/* A rock in the hole while the snake is out (+1, msgs 9, timer 3).
+ * [MSG_USE 43 21 00] */
+static void feather1_RockInHole(void)
+{
+    if (fv_kirk_up == 0) {
+        if (rv_hole_blocked == 0) {
+            rv_score += 1;
+            svc_Walk(0, 0xA3, 0xB6, 9);
+            room.busy = 1;
+            if (fv_snake_hidden == 1) {
+                room.timers[0] = 0xC;
+            }
+            return;
+        }
+        feather1_Say(S_1173, T_FEA1N005);
+        return;
+    }
+    feather1_Say(S_1173, T_FEA1N021);
+    return;
+}
+
+/* [MSG_WALK_DONE 09 00 00] */
+static void feather1_KirkAtHole(void)
+{
+    svc_Anim(0, N_s5r1kg, -1, -1, 9);
+    room.timers[3] = 0x12;
+    return;
+}
+
+/* [MSG_TIMER 03 00 00] */
+static void feather1_HoleBlocked(void)
+{
+    svc_Anim0(0xC, N_s5r1rk, 0xAD, 0xBA, 0);
+    rv_hole_blocked = 1;
+    return;
+}
+
+/* [MSG_ANIM_DONE 09 00 00] */
+static void feather1_RockPlaced(void)
+{
+    room.busy = 0;
+    svc_StopAnim(0);
+    return;
+}
+
+/* The snake on things and people.
+ * [MSG_USE 76 09 00] */
+static void feather1_SnakeOnVine(void)
+{
+    feather1_Say(N_Mr_Spock, T_FEA1_037);
+    return;
+}
+
+/* [MSG_USE 76 01 00] */
+static void feather1_SnakeOnSpock(void)
+{
+    feather1_Say(N_Mr_Spock, T_FEA1_041);
+    feather1_Say(N_Capt_Kirk, T_FEA1_001);
+    feather1_Say(N_Dr_McCoy, T_FEA1_018);
+    return;
+}
+
+/* [MSG_USE 76 00 00] */
+static void feather1_SnakeOnKirk(void)
+{
+    feather1_Say(N_Mr_Spock, T_FEA1_026);
+    return;
+}
+
+/* [MSG_USE 76 02 00] */
+static void feather1_SnakeOnMcCoy(void)
+{
+    feather1_Say(N_Dr_McCoy, T_FEA1_F25);
+    return;
+}
+
+/* [MSG_USE 76 03 00] */
+static void feather1_SnakeOnStragey(void)
+{
+    feather1_Say(N_Lt_Stragey, T_FEA1_050);
+    return;
+}
+
+/* Rocks at the snake, and the crew on the snake and its hole.
+ * [MSG_USE 43 0A 00] */
+static void feather1_RockAtSnake(void)
+{
+    if (rv_hole_blocked == 0) {
+        svc_Anim(0xA, N_s5r1si, -1, -1, 0);
+        room.timers[0] = 0x50;
+        fv_snake_hidden = 1;
+        feather1_Say(N_Lt_Stragey, T_FEA1_034);
+    }
+    return;
+}
+
+/* [MSG_USE 01 0A 00] */
+static void feather1_SpockGrabsSnake(void)
+{
+    feather1_Say(N_Mr_Spock, T_FEA1_035);
+    return;
+}
+
+/* [MSG_USE 02 0A 00] */
+static void feather1_McCoyGrabsSnake(void)
+{
+    feather1_Say(N_Dr_McCoy, T_FEA1_005);
+    return;
+}
+
+/* [MSG_USE 03 0A 00] */
+static void feather1_StrageyGrabsSnake(void)
+{
+    feather1_Say(N_Lt_Stragey, T_FEA1_046);
+    return;
+}
+
+/* [MSG_USE 01 21 00] */
+static void feather1_SpockInHole(void)
+{
+    if (fv_snake_hidden == 0) {
+        feather1_Say(N_Mr_Spock, T_FEA1_027);
+        return;
+    }
+    feather1_Say(N_Mr_Spock, T_FEA1_025);
+    return;
+}
+
+/* [MSG_USE 02 21 00] */
+static void feather1_McCoyInHole(void)
+{
+    if (fv_snake_hidden == 0) {
+        feather1_Say(N_Dr_McCoy, T_FEA1_010);
+        return;
+    }
+    feather1_Say(N_Dr_McCoy, T_FEA1_004);
+    return;
+}
+
+/* [MSG_USE 03 21 00] */
+static void feather1_StrageyInHole(void)
+{
+    if (fv_snake_hidden == 0) {
+        feather1_Say(N_Lt_Stragey, T_FEA1_051);
+        return;
+    }
+    feather1_Say(N_Lt_Stragey, T_FEA1_047);
+    return;
+}
+
+/* Rocks and the crew on the moss.
+ * [MSG_USE 43 22 00] */
+static void feather1_RockOnMoss(void)
+{
+    feather1_Say(S_1173, T_FEA1N006);
+    return;
+}
+
+/* [MSG_USE 43 01 00] */
+static void feather1_RockAtSpock(void)
+{
+    feather1_Say(N_Mr_Spock, T_FEA1_032);
+    return;
+}
+
+/* [MSG_USE 43 02 00] */
+static void feather1_RockAtMcCoy(void)
+{
+    feather1_Say(N_Dr_McCoy, T_FEA1_009);
+    return;
+}
+
+/* [MSG_USE 43 03 00] */
+static void feather1_RockAtStragey(void)
+{
+    feather1_Say(N_Lt_Stragey, T_FEA1_045);
+    return;
+}
+
+/* [MSG_USE 01 22 00] */
+static void feather1_SpockOnMoss(void)
+{
+    feather1_Say(N_Mr_Spock, T_FEA1_033);
+    return;
+}
+
+/* [MSG_USE 02 22 00] */
+static void feather1_McCoyOnMoss(void)
+{
+    feather1_Say(N_Dr_McCoy, T_FEA1_015);
+    return;
+}
+
+/* [MSG_USE 03 22 00] */
+static void feather1_StrageyOnMoss(void)
+{
+    feather1_Say(N_Lt_Stragey, T_FEA1_049);
+    return;
+}
+
+/* Rocks at the vine: the first throw (msgs 1) brings it lower, the second
+ * (msgs 2) within reach, +6.
+ * [MSG_USE 43 09 00] */
+static void feather1_RockAtVine(void)
+{
+    if (rv_vine == 0) {
+        rv_vine++;
+        room.busy = 1;
+        svc_Walk(0, 0x7A, 0xB6, 1);
+        return;
+    }
+    if (rv_vine == 1) {
+        rv_vine++;
+        room.busy = 1;
+        svc_Walk(0, 0xA2, 0xB9, 2);
+    }
+    return;
+}
+
+/* [MSG_WALK_DONE 01 00 00] */
+static void feather1_KirkThrows(void)
+{
+    svc_Anim(0, N_s5r1kt, -1, -1, 1);
+    svc_Anim(9, N_s5r1v2, -1, -1, 0);
+    svc_Anim0(0xB, N_s5r1ru, 0x81, 0x6D, 0);
+    svc_Sfx(N_THROWROC);
+    return;
+}
+
+/* [MSG_ANIM_DONE 01 00 00] */
+static void feather1_VineLower(void)
+{
+    room.busy = 0;
+    svc_StopAnim(0);
+    feather1_Say(N_Mr_Spock, T_FEA1_042);
+    feather1_Say(N_Dr_McCoy, T_FEA1_017);
+    feather1_Say(N_Lt_Stragey, T_FEA1_054);
+    return;
+}
+
+/* [MSG_WALK_DONE 02 00 00] */
+static void feather1_KirkThrowsAgain(void)
+{
+    svc_Anim(0, N_s5r1kt, -1, -1, 2);
+    svc_Anim(9, N_s5r1v3, -1, -1, 0);
+    svc_Anim0(0xB, N_s5r1ru, 0xA3, 0x70, 0);
+    svc_Sfx(N_THROWROC_2);
+    return;
+}
+
+/* [MSG_ANIM_DONE 02 00 00] */
+static void feather1_VineInReach(void)
+{
+    rv_score += 6;
+    svc_StopAnim(0);
+    room.busy = 0;
+    feather1_Say(N_Mr_Spock, T_FEA1_043);
+    feather1_Say(N_Dr_McCoy, T_FEA1_021);
+    feather1_Say(N_Lt_Stragey, T_FEA1_053);
+    return;
+}
+
+/* Climbing the vine, once it is low enough (msgs 3-13): up, and down
+ * again for whoever is at the top.
+ * [MSG_USE 01 09 00] */
+static void feather1_E_0847(void)
+{
+    { feather1_SpockClimbs(); return; }
+}
+
+/* [MSG_USE 01 23 00] */
+static void feather1_SpockClimbs(void)
+{
+    if (rv_vine == 2) {
+        if (fv_spock_up == 0) {
+            svc_Walk(1, 0xC3, 0xC7, 3);
+            room.busy = 1;
+            return;
+        }
+        svc_Walk(1, 0xCC, 0x30, 0xA);
+        room.busy = 1;
+        return;
+    }
+    feather1_Say(N_Mr_Spock, T_FEA1_A46);
+    return;
+}
+
+/* [MSG_WALK_DONE 03 00 00] */
+static void feather1_SpockAtVine(void)
+{
+    svc_Anim(1, N_s5r1sc, -1, -1, 3);
+    return;
+}
+
+/* [MSG_ANIM_DONE 03 00 00] */
+static void feather1_SpockUp(void)
+{
+    room.busy = 0;
+    fv_spock_up = 1;
+    svc_Anim(1, N_sstndw, 0xCC, 0x30, 0);
+    svc_Walk(1, 0xAF, 0x30, 0);
+    return;
+}
+
+/* [MSG_WALK_DONE 0A 00 00] */
+static void feather1_SpockClimbsDown(void)
+{
+    svc_Anim(1, N_s5r1sd, 0xC3, 0xC7, 0xA);
+    return;
+}
+
+/* [MSG_ANIM_DONE 0A 00 00] */
+static void feather1_SpockDown(void)
+{
+    room.busy = 0;
+    fv_spock_up = 0;
+    svc_Anim(1, N_sstndw, 0xC3, 0xC7, 0);
+    svc_Walk(1, 0x68, 0xBE, 0);
+    return;
+}
+
+/* [MSG_USE 02 09 00] */
+static void feather1_E_094D(void)
+{
+    { feather1_McCoyClimbs(); return; }
+}
+
+/* [MSG_USE 02 23 00] */
+static void feather1_McCoyClimbs(void)
+{
+    if (rv_vine == 2) {
+        if (fv_mccoy_up == 0) {
+            svc_Walk(2, 0xC3, 0xC7, 4);
+            room.busy = 1;
+            return;
+        }
+        svc_Walk(2, 0xCC, 0x30, 0xB);
+        room.busy = 1;
+        return;
+    }
+    feather1_Say(N_Dr_McCoy, T_FEA1_013);
+    return;
+}
+
+/* [MSG_WALK_DONE 04 00 00] */
+static void feather1_McCoyAtVine(void)
+{
+    svc_Anim(2, N_s5r1mc, -1, -1, 4);
+    return;
+}
+
+/* [MSG_ANIM_DONE 04 00 00] */
+static void feather1_McCoyUp(void)
+{
+    room.busy = 0;
+    fv_mccoy_up = 1;
+    svc_Anim(2, N_mstndw, 0xCC, 0x30, 0);
+    svc_Walk(2, 0xBE, 0x30, 0);
+    return;
+}
+
+/* [MSG_WALK_DONE 0B 00 00] */
+static void feather1_McCoyClimbsDown(void)
+{
+    svc_Anim(2, N_s5r1md, 0xC3, 0xC7, 0xB);
+    return;
+}
+
+/* [MSG_ANIM_DONE 0B 00 00] */
+static void feather1_McCoyDown(void)
+{
+    room.busy = 0;
+    fv_mccoy_up = 0;
+    svc_Anim(2, N_mstndw, 0xC3, 0xC7, 0);
+    svc_Walk(2, 0x55, 0xB4, 0);
+    return;
+}
+
+/* [MSG_USE 03 09 00] */
+static void feather1_E_0A53(void)
+{
+    { feather1_StrageyClimbs(); return; }
+}
+
+/* [MSG_USE 03 23 00] */
+static void feather1_StrageyClimbs(void)
+{
+    if (rv_vine == 2) {
+        if (fv_stragey_up == 0) {
+            svc_Walk(3, 0xC3, 0xC7, 5);
+            room.busy = 1;
+            return;
+        }
+        svc_Walk(3, 0xCC, 0x30, 0xC);
+        room.busy = 1;
+        return;
+    }
+    feather1_Say(N_Lt_Stragey, T_FEA1_052);
+    return;
+}
+
+/* [MSG_WALK_DONE 05 00 00] */
+static void feather1_StrageyAtVine(void)
+{
+    svc_Anim(3, N_s5r1rc, -1, -1, 5);
+    return;
+}
+
+/* [MSG_ANIM_DONE 05 00 00] */
+static void feather1_StrageyUp(void)
+{
+    room.busy = 0;
+    fv_stragey_up = 1;
+    svc_Anim(3, N_rstndw, 0xD2, 0x30, 0);
+    svc_Walk(3, 0xCA, 0x30, 0);
+    return;
+}
+
+/* [MSG_WALK_DONE 0C 00 00] */
+static void feather1_StrageyClimbsDown(void)
+{
+    svc_Anim(3, N_s5r1rd, 0xC3, 0xC7, 0xC);
+    return;
+}
+
+/* [MSG_ANIM_DONE 0C 00 00] */
+static void feather1_StrageyDown(void)
+{
+    room.busy = 0;
+    fv_stragey_up = 0;
+    svc_Anim(3, N_rstndw, 0xC3, 0xC7, 0);
+    svc_Walk(3, 0xDC, 0xC6, 0);
+    return;
+}
+
+/* [MSG_USE 00 09 00] */
+static void feather1_E_0B5A(void)
+{
+    { feather1_KirkClimbs(); return; }
+}
+
+/* [MSG_USE 00 23 00] */
+static void feather1_KirkClimbs(void)
+{
+    if (rv_vine == 2) {
+        if (fv_kirk_up == 0) {
+            svc_Walk(0, 0xC3, 0xC7, 7);
+            room.busy = 1;
+            return;
+        }
+        svc_Walk(0, 0xCC, 0x30, 0xD);
+        room.busy = 1;
+        return;
+    }
+    feather1_Say(S_1173, T_FEA1N010);
+    return;
+}
+
+/* [MSG_WALK_DONE 07 00 00] */
+static void feather1_KirkAtVine(void)
+{
+    svc_Anim(0, N_s5r1kc, -1, -1, 7);
+    return;
+}
+
+/* [MSG_ANIM_DONE 07 00 00] */
+static void feather1_KirkUp(void)
+{
+    room.busy = 0;
+    fv_kirk_up = 1;
+    svc_Anim(0, N_kstndw, 0xCC, 0x30, 0);
+    svc_Walk(0, 0xA0, 0x30, 0);
+    return;
+}
+
+/* [MSG_WALK_DONE 0D 00 00] */
+static void feather1_KirkClimbsDown(void)
+{
+    svc_Anim(0, N_s5r1kd, 0xC3, 0xC7, 0xD);
+    return;
+}
+
+/* [MSG_ANIM_DONE 0D 00 00] */
+static void feather1_KirkDown(void)
+{
+    room.busy = 0;
+    fv_kirk_up = 0;
+    svc_Anim(0, N_kstndw, 0xC3, 0xC7, 0);
+    svc_Walk(0, 0x87, 0xBA, 0);
+    return;
+}
+
+/* Phasers don't work here.
+ * [MSG_USE 40 FF 00] */
+static void feather1_StunAnything(void)
+{
+    feather1_Say(N_Mr_Spock, T_FEA1_028);
+    return;
+}
+
+/* [MSG_USE 41 FF 00] */
+static void feather1_KillAnything(void)
+{
+    feather1_Say(N_Mr_Spock, T_FEA1_028);
+    return;
+}
+
+/* Tricorders.
+ * [MSG_USE 44 23 00] */
+static void feather1_SpockScansVine(void)
+{
+    svc_Anim(1, N_sscann, -1, -1, 0);
+    svc_BridgeSfx(4);
+    feather1_Say(N_Mr_Spock, T_FEA1_039);
+    return;
+}
+
+/* [MSG_USE 44 0A 00] */
+static void feather1_SpockScansSnake(void)
+{
+    svc_Anim(1, N_sscans, -1, -1, 0);
+    svc_BridgeSfx(4);
+    feather1_Say(N_Mr_Spock, T_FEA1_029);
+    return;
+}
+
+/* [MSG_USE 44 22 00] */
+static void feather1_SpockScansMoss(void)
+{
+    svc_Anim(1, N_sscane, -1, -1, 0);
+    svc_BridgeSfx(4);
+    feather1_Say(N_Mr_Spock, T_FEA1_038);
+    return;
+}
+
+/* [MSG_USE 44 21 00] */
+static void feather1_SpockScansHole(void)
+{
+    svc_Anim(1, N_sscane, -1, -1, 0);
+    svc_BridgeSfx(4);
+    if (fv_snake_hidden == 1) {
+        feather1_Say(N_Mr_Spock, T_FEA1_030);
+        return;
+    }
+    feather1_Say(N_Mr_Spock, T_FEA1_031);
+    return;
+}
+
+/* [MSG_USE 44 FF 00] */
+static void feather1_SpockScans(void)
+{
+    svc_Anim(1, N_sscans, -1, -1, 0);
+    svc_BridgeSfx(4);
+    feather1_Say(N_Mr_Spock, T_FEA1_024);
+    return;
+}
+
+/* [MSG_USE 44 20 00] */
+static void feather1_SpockScansRocks(void)
+{
+    svc_Anim(1, N_sscane, -1, -1, 0);
+    svc_BridgeSfx(4);
+    feather1_Say(N_Mr_Spock, T_FEA1_003);
+    return;
+}
+
+/* [MSG_USE 45 09 00] */
+static void feather1_McCoyScansVine(void)
+{
+    feather1_Say(N_Dr_McCoy, T_FEA1_007);
+    return;
+}
+
+/* [MSG_USE 45 23 00] */
+static void feather1_McCoyScansVine2(void)
+{
+    feather1_Say(N_Dr_McCoy, T_FEA1_007);
+    return;
+}
+
+/* [MSG_USE 45 22 00] */
+static void feather1_McCoyScansMoss(void)
+{
+    svc_Anim(2, N_mscane, -1, -1, 0);
+    svc_BridgeSfx(4);
+    feather1_Say(N_Dr_McCoy, T_FEA1_014);
+    return;
+}
+
+/* [MSG_USE 45 21 00] */
+static void feather1_McCoyScansHole(void)
+{
+    svc_Anim(2, N_mscane, -1, -1, 0);
+    svc_BridgeSfx(4);
+    if (fv_snake_hidden == 1) {
+        feather1_Say(N_Dr_McCoy, T_FEA1_011);
+        return;
+    }
+    feather1_Say(N_Dr_McCoy, T_FEA1_012);
+    return;
+}
+
+/* [MSG_USE 45 0A 00] */
+static void feather1_McCoyScansSnake(void)
+{
+    svc_Anim(2, N_mscans, -1, -1, 0);
+    svc_BridgeSfx(4);
+    feather1_Say(N_Dr_McCoy, T_FEA1_019);
+    if (fv_mccoy_joked == 0) {
+        feather1_Say(N_Mr_Spock, T_FEA1_044);
+        feather1_Say(N_Lt_Stragey, T_FEA1_055);
+        feather1_Say(N_Capt_Kirk, T_FEA1_002);
+        fv_mccoy_joked = 1;
+    }
+    return;
+}
+
+/* [MSG_USE 7F FF 00] */
+static void feather1_UseMedkit(void)
+{
+    feather1_Say(N_Dr_McCoy, T_FEA1_008);
+    return;
+}
+
+/* [MSG_TALK 02 00 00] */
+static void feather1_TalkToMcCoy(void)
+{
+    feather1_Say(N_Dr_McCoy, T_FEA1_006);
+    return;
+}
+
+/* [MSG_TALK 01 00 00] */
+static void feather1_TalkToSpock(void)
+{
+    feather1_Say(N_Mr_Spock, T_FEA1_040);
+    return;
+}
+
+/* [MSG_TALK 03 00 00] */
+static void feather1_TalkToRedshirt(void)
+{
+    feather1_Say(N_Lt_Stragey, T_FEA1_048);
+    return;
+}
+
+/* Walking off at the top (exit 3, room 2).
+ * [MSG_WALK 28 00 00] */
+static void feather1_WalkOut(void)
+{
+    svc_Walk(0, 0xA, 0x30, 0);
+    return;
+}
+
+/* Looking.
+ * [MSG_LOOK FF 00 00] */
+static void feather1_LookAtScene(void)
+{
+    feather1_Say(0, T_FEA1N020);
+    return;
+}
+
+/* [MSG_LOOK 0A 00 00] */
+static void feather1_LookAtSnake(void)
+{
+    feather1_Say(0, T_FEA1N017);
+    return;
+}
+
+/* [MSG_LOOK 23 00 00] */
+static void feather1_LookAtVine(void)
+{
+    feather1_Say(0, T_FEA1N015);
+    return;
+}
+
+/* [MSG_LOOK 21 00 00] */
+static void feather1_LookAtHole(void)
+{
+    feather1_Say(0, T_FEA1N014);
+    return;
+}
+
+/* [MSG_LOOK 22 00 00] */
+static void feather1_LookAtMoss(void)
+{
+    feather1_Say(0, T_FEA1N016);
+    return;
+}
+
+/* [MSG_LOOK 20 00 00] */
+static void feather1_LookAtRocks(void)
+{
+    feather1_Say(0, T_FEA1N011);
+    return;
+}
+
+/* [MSG_LOOK 24 00 00] */
+static void feather1_LookAtLight(void)
+{
+    feather1_Say(0, T_FEA1N013);
+    return;
+}
+
+/* [MSG_LOOK 25 00 00] */
+static void feather1_LookAtEyes1(void)
+{
+    feather1_Say(0, T_FEA1N000);
+    return;
+}
+
+/* [MSG_LOOK 26 00 00] */
+static void feather1_LookAtEyes2(void)
+{
+    feather1_Say(0, T_FEA1N000);
+    return;
+}
+
+/* [MSG_LOOK 27 00 00] */
+static void feather1_LookAtEyes3(void)
+{
+    feather1_Say(0, T_FEA1N000);
+    return;
+}
+
+/* [MSG_LOOK 00 00 00] */
+static void feather1_LookAtKirk(void)
+{
+    feather1_Say(0, T_FEA1N001);
+    return;
+}
+
+/* [MSG_LOOK 01 00 00] */
+static void feather1_LookAtSpock(void)
+{
+    feather1_Say(0, T_FEA1N004);
+    return;
+}
+
+/* [MSG_LOOK 02 00 00] */
+static void feather1_LookAtMcCoy(void)
+{
+    feather1_Say(0, T_FEA1N003);
+    return;
+}
+
+/* [MSG_LOOK 03 00 00] */
+static void feather1_LookAtRedshirt(void)
+{
+    feather1_Say(0, T_FEA1N002);
+    return;
+}
+
+/* [MSG_LOOK 09 00 00] */
+static void feather1_LookAtVines(void)
+{
+    if (rv_vine == 0) {
+        feather1_Say(S_1173, T_FEA1N012);
+        return;
+    }
+    feather1_Say(S_1173, T_FEA1N015);
+    return;
+}
+
+/* Talk: conversation AX (speaker, choices, 0); returns the choice. */
+static void feather1_Talk(uint16_t ax)
+{
+    svc_Talk(ax);
+    return;
+}
+
+/* Say: one line, BX, said by AX (0: narration). */
+static void feather1_Say(uint16_t ax, uint16_t bx)
+{
+    fv_talk_buf = ax;
+    CS_W(0x2B52) = bx;
+    feather1_Talk(talk_buf);
+    return;
+}
+
+/* the scripts, by the offset of their code in the room file */
+const RoomScript feather1_scripts[] = {
+    { 0x01A1, feather1_StartRoom },    /* MSG_TICK 01 00 00 */
+    { 0x0241, feather1_QuetzecoatlAppears },    /* MSG_TICK 2D 00 00 */
+    { 0x027E, feather1_QuetzecoatlScolds },    /* MSG_TICK 55 00 00 */
+    { 0x0294, feather1_QuetzecoatlVanishes },    /* MSG_TICK 5F 00 00 */
+    { 0x02D0, feather1_QuetzecoatlGone },    /* MSG_ANIM_DONE 12 00 00 */
+    { 0x02DB, feather1_GetVine },    /* MSG_GET 23 00 00 */
+    { 0x02EB, feather1_GetVine2 },    /* MSG_GET 09 00 00 */
+    { 0x030B, feather1_GetRocks },    /* MSG_GET 20 00 00 */
+    { 0x034C, feather1_KirkAtRocks },    /* MSG_WALK_DONE 06 00 00 */
+    { 0x0368, feather1_TookRocks },    /* MSG_ANIM_DONE 06 00 00 */
+    { 0x0398, feather1_GetSnake },    /* MSG_GET 0A 00 00 */
+    { 0x03CD, feather1_KirkGrabs },    /* MSG_WALK_DONE 08 00 00 */
+    { 0x03FA, feather1_SnakeCaught },    /* MSG_TIMER 01 00 00 */
+    { 0x041D, feather1_SnakeHides },    /* MSG_TIMER 02 00 00 */
+    { 0x0443, feather1_GrabDone },    /* MSG_ANIM_DONE 08 00 00 */
+    { 0x045A, feather1_SnakeComesOut },    /* MSG_TIMER 00 00 00 */
+    { 0x047C, feather1_UseCommunicator },    /* MSG_USE 47 FF 00 */
+    { 0x048C, feather1_RockInHole },    /* MSG_USE 43 21 00 */
+    { 0x04DD, feather1_KirkAtHole },    /* MSG_WALK_DONE 09 00 00 */
+    { 0x04FE, feather1_HoleBlocked },    /* MSG_TIMER 03 00 00 */
+    { 0x0520, feather1_RockPlaced },    /* MSG_ANIM_DONE 09 00 00 */
+    { 0x0537, feather1_SnakeOnVine },    /* MSG_USE 76 09 00 */
+    { 0x0547, feather1_SnakeOnSpock },    /* MSG_USE 76 01 00 */
+    { 0x0569, feather1_SnakeOnKirk },    /* MSG_USE 76 00 00 */
+    { 0x0579, feather1_SnakeOnMcCoy },    /* MSG_USE 76 02 00 */
+    { 0x0589, feather1_SnakeOnStragey },    /* MSG_USE 76 03 00 */
+    { 0x0599, feather1_RockAtSnake },    /* MSG_USE 43 0A 00 */
+    { 0x05CE, feather1_SpockGrabsSnake },    /* MSG_USE 01 0A 00 */
+    { 0x05DE, feather1_McCoyGrabsSnake },    /* MSG_USE 02 0A 00 */
+    { 0x05EE, feather1_StrageyGrabsSnake },    /* MSG_USE 03 0A 00 */
+    { 0x05FE, feather1_SpockInHole },    /* MSG_USE 01 21 00 */
+    { 0x0620, feather1_McCoyInHole },    /* MSG_USE 02 21 00 */
+    { 0x0642, feather1_StrageyInHole },    /* MSG_USE 03 21 00 */
+    { 0x0664, feather1_RockOnMoss },    /* MSG_USE 43 22 00 */
+    { 0x0674, feather1_RockAtSpock },    /* MSG_USE 43 01 00 */
+    { 0x0684, feather1_RockAtMcCoy },    /* MSG_USE 43 02 00 */
+    { 0x0694, feather1_RockAtStragey },    /* MSG_USE 43 03 00 */
+    { 0x06A4, feather1_SpockOnMoss },    /* MSG_USE 01 22 00 */
+    { 0x06B4, feather1_McCoyOnMoss },    /* MSG_USE 02 22 00 */
+    { 0x06C4, feather1_StrageyOnMoss },    /* MSG_USE 03 22 00 */
+    { 0x06D4, feather1_RockAtVine },    /* MSG_USE 43 09 00 */
+    { 0x071D, feather1_KirkThrows },    /* MSG_WALK_DONE 01 00 00 */
+    { 0x077E, feather1_VineLower },    /* MSG_ANIM_DONE 01 00 00 */
+    { 0x07B0, feather1_KirkThrowsAgain },    /* MSG_WALK_DONE 02 00 00 */
+    { 0x0811, feather1_VineInReach },    /* MSG_ANIM_DONE 02 00 00 */
+    { 0x0847, feather1_E_0847 },    /* MSG_USE 01 09 00 */
+    { 0x084F, feather1_SpockClimbs },    /* MSG_USE 01 23 00 */
+    { 0x089E, feather1_SpockAtVine },    /* MSG_WALK_DONE 03 00 00 */
+    { 0x08BA, feather1_SpockUp },    /* MSG_ANIM_DONE 03 00 00 */
+    { 0x08F4, feather1_SpockClimbsDown },    /* MSG_WALK_DONE 0A 00 00 */
+    { 0x0912, feather1_SpockDown },    /* MSG_ANIM_DONE 0A 00 00 */
+    { 0x094D, feather1_E_094D },    /* MSG_USE 02 09 00 */
+    { 0x0955, feather1_McCoyClimbs },    /* MSG_USE 02 23 00 */
+    { 0x09A4, feather1_McCoyAtVine },    /* MSG_WALK_DONE 04 00 00 */
+    { 0x09C0, feather1_McCoyUp },    /* MSG_ANIM_DONE 04 00 00 */
+    { 0x09FA, feather1_McCoyClimbsDown },    /* MSG_WALK_DONE 0B 00 00 */
+    { 0x0A18, feather1_McCoyDown },    /* MSG_ANIM_DONE 0B 00 00 */
+    { 0x0A53, feather1_E_0A53 },    /* MSG_USE 03 09 00 */
+    { 0x0A5B, feather1_StrageyClimbs },    /* MSG_USE 03 23 00 */
+    { 0x0AAA, feather1_StrageyAtVine },    /* MSG_WALK_DONE 05 00 00 */
+    { 0x0AC6, feather1_StrageyUp },    /* MSG_ANIM_DONE 05 00 00 */
+    { 0x0B00, feather1_StrageyClimbsDown },    /* MSG_WALK_DONE 0C 00 00 */
+    { 0x0B1E, feather1_StrageyDown },    /* MSG_ANIM_DONE 0C 00 00 */
+    { 0x0B5A, feather1_E_0B5A },    /* MSG_USE 00 09 00 */
+    { 0x0B62, feather1_KirkClimbs },    /* MSG_USE 00 23 00 */
+    { 0x0BB1, feather1_KirkAtVine },    /* MSG_WALK_DONE 07 00 00 */
+    { 0x0BCD, feather1_KirkUp },    /* MSG_ANIM_DONE 07 00 00 */
+    { 0x0C07, feather1_KirkClimbsDown },    /* MSG_WALK_DONE 0D 00 00 */
+    { 0x0C25, feather1_KirkDown },    /* MSG_ANIM_DONE 0D 00 00 */
+    { 0x0C61, feather1_StunAnything },    /* MSG_USE 40 FF 00 */
+    { 0x0C71, feather1_KillAnything },    /* MSG_USE 41 FF 00 */
+    { 0x0C81, feather1_SpockScansVine },    /* MSG_USE 44 23 00 */
+    { 0x0CB2, feather1_SpockScansSnake },    /* MSG_USE 44 0A 00 */
+    { 0x0CE3, feather1_SpockScansMoss },    /* MSG_USE 44 22 00 */
+    { 0x0D14, feather1_SpockScansHole },    /* MSG_USE 44 21 00 */
+    { 0x0D57, feather1_SpockScans },    /* MSG_USE 44 FF 00 */
+    { 0x0D88, feather1_SpockScansRocks },    /* MSG_USE 44 20 00 */
+    { 0x0DB9, feather1_McCoyScansVine },    /* MSG_USE 45 09 00 */
+    { 0x0DC9, feather1_McCoyScansVine2 },    /* MSG_USE 45 23 00 */
+    { 0x0DD9, feather1_McCoyScansMoss },    /* MSG_USE 45 22 00 */
+    { 0x0E0A, feather1_McCoyScansHole },    /* MSG_USE 45 21 00 */
+    { 0x0E4D, feather1_McCoyScansSnake },    /* MSG_USE 45 0A 00 */
+    { 0x0EA7, feather1_UseMedkit },    /* MSG_USE 7F FF 00 */
+    { 0x0F0A, feather1_TalkToMcCoy },    /* MSG_TALK 02 00 00 */
+    { 0x0F1A, feather1_TalkToSpock },    /* MSG_TALK 01 00 00 */
+    { 0x0F2A, feather1_TalkToRedshirt },    /* MSG_TALK 03 00 00 */
+    { 0x0F3A, feather1_WalkOut },    /* MSG_WALK 28 00 00 */
+    { 0x0F53, feather1_LookAtScene },    /* MSG_LOOK FF 00 00 */
+    { 0x0F62, feather1_LookAtSnake },    /* MSG_LOOK 0A 00 00 */
+    { 0x0F71, feather1_LookAtVine },    /* MSG_LOOK 23 00 00 */
+    { 0x0F80, feather1_LookAtHole },    /* MSG_LOOK 21 00 00 */
+    { 0x0F8F, feather1_LookAtMoss },    /* MSG_LOOK 22 00 00 */
+    { 0x0F9E, feather1_LookAtRocks },    /* MSG_LOOK 20 00 00 */
+    { 0x0FAD, feather1_LookAtLight },    /* MSG_LOOK 24 00 00 */
+    { 0x0FBC, feather1_LookAtEyes1 },    /* MSG_LOOK 25 00 00 */
+    { 0x0FCB, feather1_LookAtEyes2 },    /* MSG_LOOK 26 00 00 */
+    { 0x0FDA, feather1_LookAtEyes3 },    /* MSG_LOOK 27 00 00 */
+    { 0x0FE9, feather1_LookAtKirk },    /* MSG_LOOK 00 00 00 */
+    { 0x0FF8, feather1_LookAtSpock },    /* MSG_LOOK 01 00 00 */
+    { 0x1007, feather1_LookAtMcCoy },    /* MSG_LOOK 02 00 00 */
+    { 0x1016, feather1_LookAtRedshirt },    /* MSG_LOOK 03 00 00 */
+    { 0x1025, feather1_LookAtVines },    /* MSG_LOOK 09 00 00 */
+    { 0, 0 }
+};

@@ -419,11 +419,23 @@ MemHandle LoadSfxFile(char *name, char *ext)
     if ((fd = open(path, O_RDONLY | O_BINARY)) == -1)
         return 0;
     size = filelength(fd);
-    if ((h = AllocMem(size, 1)) == 0) {
+    if ((h = AllocMem(size + 4, 1)) == 0) {       /* MixVoc reads a whole block header at the last byte */
         close(fd);
         return 0;
     }
-    ReadChunk(fd, LockMem(h), size, &got);
+    memset((char *)h->ptr + size, 0, 4);
+    {
+        char *p = LockMem(h);
+        int32_t left = size;
+
+        while (left > 0) {
+            ReadChunk(fd, p, left > 0x4000 ? 0x4000 : (uint16_t)left, &got);
+            if (got == 0)
+                break;
+            p += got;
+            left -= got;
+        }
+    }
     UnlockMem(h);
     close(fd);
     for (i = 0; i < 8; i++)

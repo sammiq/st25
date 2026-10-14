@@ -1,0 +1,1128 @@
+/* LOVE0.RDF: the room's scripts, translated from the machine code in the room file
+ * (src/rdf/love0.asm) by tools/rdf2c.py.  They run on the loaded file (CS_B/CS_W) and the
+ * room state (`room`), and call the game through the svc_ macros of rooms.h.
+ *
+ * LOVE0.RDF - "Love's Labor Jeopardized", the bridge of the research
+ * station ARK7, abandoned, with a Romulan bird of prey on the viewscreen.
+ * The station's computer holds Dr. Marcus' log, and her research on the
+ * Oroborus virus, which is infecting Spock (timer 2). Common to all of the
+ * mission's rooms: the virus, the cure, the gas canisters and the
+ * communicator.
+ *
+ * Actors: 8 the left door, 9 the right door.
+ * Objects: 8 the left door, 9 the right door (secured), 20h the computer,
+ * 21h/22h by the doors, 23h the viewscreen.
+ * Exits: 0 room 2, 2 room 1. Regions 0, 1: the doorsteps.
+ * Timers: 0 crew laugh, 1 Spock laughs, 2 the virus.
+ *
+ * Labels: H_ script headers, L branch targets, C_ conversations,
+ * T_/N_/S_ strings; talk_buf: the conversation buffer of Say.
+ *
+ * Quirks of the original:
+ * - The communicator's four cases (CallEnterprise) all play the same
+ * placeholder lines, recorded for other missions.
+ * - Getting door 8 runs the next script's header as code (GetDoor), and
+ * the doors' own answer is left unreachable after the jmp.
+ */
+
+#include "rooms.h"
+
+/* where the file keeps its strings, conversations and tables */
+enum {
+    N_s3r0d1 = 0x00F9,
+    N_s3r0d1a = 0x0100,
+    N_s3r0d2 = 0x0108,
+    N_s3r0d2a = 0x010F,
+    N_susemn = 0x013A,
+    N_musemw = 0x0141,
+    N_sscans = 0x014F,
+    N_sscann = 0x0156,
+    N_mscans = 0x015D,
+    N_LOV0LOOP = 0x017E,
+    T_LOV0_003 = 0x03BF,
+    T_LOV0_007 = 0x0451,
+    T_LOV0_006 = 0x04E8,
+    T_LOV0_002 = 0x05D0,
+    T_LOV0_036 = 0x0637,
+    N_V6KIRKTY = 0x0707,
+    N_V6KIRKTY_2 = 0x0782,
+    N_musemn = 0x089C,
+    N_sgetdn = 0x08A3,
+    N_get_name_error = 0x0902,
+    T_LOV5_019 = 0x0B73,
+    T_LOV5_015 = 0x0BC1,
+    T_LOVA_F55 = 0x0C04,
+    T_LOV5_015_2 = 0x0C74,
+    T_LOV5_030 = 0x0D14,
+    T_LOV5_038 = 0x0D47,
+    T_LOV5_027 = 0x0D74,
+    S_0DA9 = 0x0DA9,
+    T_spokcoff = 0x0DEC,
+    T_LOVA_F08 = 0x0E23,
+    T_spokcoff_2 = 0x0E89,
+    T_LOVA_F54 = 0x0EBF,
+    T_GENER004 = 0x0F54,
+    T_LOVA_F01 = 0x0F9B,
+    T_LOVA_F02 = 0x0FE3,
+    T_LOVA_F04 = 0x1055,
+    T_LOVA_F03 = 0x10AA,
+    T_LOVA_F08_2 = 0x10EE,
+    T_TUG2_010 = 0x114F,
+    T_LOVA_F10 = 0x1195,
+    T_LOVA_100 = 0x11C9,
+    T_LOVA_F07 = 0x1216,
+    T_LOV2N005 = 0x1251,
+    T_LOV2N005_2 = 0x12A1,
+    T_MUD2_040 = 0x12DA,
+    T_LOV2N005_3 = 0x1333,
+    N_Lt_Uhura = 0x137E,
+    T_MUD4_018 = 0x13AB,
+    T_BRIDU146 = 0x13F0,
+    T_VENA_F41 = 0x1426,
+    T_MUD4_018_2 = 0x144F,
+    T_BRIDU146_2 = 0x1494,
+    T_VENA_F41_2 = 0x14CA,
+    T_MUD4_018_3 = 0x14F8,
+    T_BRIDU146_3 = 0x153D,
+    T_VENA_F41_3 = 0x1573,
+    T_MUD4_018_4 = 0x159C,
+    T_BRIDU146_4 = 0x15E1,
+    T_VENA_F41_4 = 0x1617,
+    N_Capt_Kirk = 0x171B,
+    N_Dr_McCoy = 0x1726,
+    N_Mr_Spock = 0x1730,
+    N_Lt_Ferris = 0x173A,
+    N_Computer = 0x1745,
+    N_wes = 0x174E,
+    S_1752 = 0x1752,
+    T_LOV0N008 = 0x1753,
+    T_LOV0N006 = 0x17A1,
+    T_LOV0N004 = 0x1829,
+    T_LOV0N002 = 0x1853,
+    T_LOV0N005 = 0x1894,
+    T_LOV0N003 = 0x18C8,
+    T_LOV0N009 = 0x18FF,
+    T_LOV0N000 = 0x1931,
+    T_LOV0N007 = 0x197D,
+    T_LOV0_027 = 0x19FA,
+    T_LOV0_038 = 0x1A68,
+    T_LOV0_008 = 0x1AC0,
+    T_LOV0_031 = 0x1B13,
+    T_LOV0_028 = 0x1B96,
+    T_COMPU188 = 0x1BC2,
+    T_LOV0_024 = 0x1D70,
+    T_LOV0_035 = 0x1E7D,
+    T_LOV0_023 = 0x1EC9,
+    T_LOV0_004 = 0x1EFD,
+    T_LOV0_009 = 0x1F3F,
+    T_COMPU192 = 0x201C,
+    T_COMPU190 = 0x20F2,
+    T_COMPU193 = 0x229A,
+    T_COMPU189 = 0x24A5,
+    T_COMPU186 = 0x25AA,
+    T_COMPU187 = 0x2688,
+    T_LOV0_005 = 0x27A5,
+    T_LOV0N001 = 0x288C,
+    T_LOV0_011 = 0x2902,
+    T_LOV0_020 = 0x2924,
+    T_LOV0_016 = 0x2960,
+    T_LOV0_012 = 0x2981,
+    T_LOV0_014 = 0x29BD,
+    T_LOV0_022 = 0x29ED,
+    T_LOV0_015 = 0x2A25,
+    T_LOV0_021 = 0x2A5B,
+    T_LOV0_013 = 0x2AA9,
+    T_LOV0_019 = 0x2ADF,
+    T_LOV0_017 = 0x2B2F,
+    T_LOV0_039 = 0x2B6C,
+    T_LOV0_048 = 0x2B8E,
+    T_LOV0_045 = 0x2BCA,
+    T_LOV0_040 = 0x2BEB,
+    T_LOV0_042 = 0x2C27,
+    T_LOV0_050 = 0x2C57,
+    T_LOV0_043 = 0x2C8F,
+    T_LOV0_049 = 0x2CC5,
+    T_LOV0_041 = 0x2D13,
+    T_LOV0_047 = 0x2D49,
+    T_LOV0_046 = 0x2D99,
+    T_LOV0_029 = 0x2DD6,
+    T_LOV0_033 = 0x2E12,
+    T_LOV0_026 = 0x2E4E,
+    T_LOV0_124 = 0x2E9B,
+    T_LOV0_025 = 0x2ECD,
+    T_LOV0_101 = 0x2F1E,
+    T_LOV0_102 = 0x2F5E,
+    T_LOV0_103 = 0x2FA4,
+    T_LOV0_104 = 0x2FD6,
+    T_LOV0_105 = 0x300F,
+    T_LOV0_106 = 0x307F,
+    T_LOV0_107 = 0x30C3,
+    N_dialog_error = 0x30F8,
+    talk_buf = 0x3105,
+    C_310B = 0x310B,
+};
+
+/* the room's variables: in the room state, and in the file itself */
+#define fv_cure_steps CS_B(0x8AA)
+#define fv_cure_x CS_B(0x8AB)
+#define fv_cure_y CS_B(0x8AC)
+#define fv_going_door CS_B(0xDE)
+#define fv_heard_log CS_B(0xDA)
+#define fv_laugher CS_W(0xDF)
+#define fv_left_door_steps CS_B(0xDD)
+#define fv_right_door_steps CS_B(0xDC)
+#define fv_roll CS_W(0xE1)
+#define fv_talk_buf CS_W(0x3105)
+#define fv_user CS_W(0xE3)
+#define fv_user_anim CS_W(0xE5)
+#define fv_user_line CS_W(0xE9)
+#define fv_user_name CS_W(0xE7)
+#define rv_called_ship ROOM_B(0x47)
+#define rv_called_ship_cured ROOM_B(0x48)
+#define rv_have_research ROOM_B(0x2A)
+#define rv_made_cure ROOM_B(0x4F)
+#define rv_mccoy_read_log ROOM_B(0x4A)
+#define rv_n2o_released ROOM_B(0x2C)
+#define rv_rlg_released ROOM_B(0x2D)
+#define rv_score ROOM_W(0x52)
+#define rv_spock_cured ROOM_B(0x46)
+#define rv_spock_read_log ROOM_B(0x49)
+#define rv_tank1 ROOM_B(0x36)
+#define rv_tank2 ROOM_B(0x37)
+#define rv_virus ROOM_B(0x45)
+#define rv_virus_struck ROOM_B(0x41)
+#define rv_visited ROOM_B(0x29)
+
+/* functions */
+static void love0_StartRoom(void);
+static void love0_Tick10(void);
+static void love0_E_0214(void);
+static void love0_WalkToRightDoor(void);
+static void love0_ReachRightDoor(void);
+static void love0_E_0277(void);
+static void love0_ThroughRightDoor(void);
+static void love0_E_02A2(void);
+static void love0_WalkToLeftDoor(void);
+static void love0_ReachLeftDoor(void);
+static void love0_E_0301(void);
+static void love0_ThroughLeftDoor(void);
+static void love0_LookAtComputer(void);
+static void love0_LookAtViewscreen(void);
+static void love0_LookAtScene(void);
+static void love0_LookAtLeftDoor(void);
+static void love0_LookAtRightDoor(void);
+static void love0_LookAtKirk(void);
+static void love0_LookAtMcCoy(void);
+static void love0_LookAtSpock(void);
+static void love0_LookAtRedshirt(void);
+static void love0_TalkToKirk(void);
+static void love0_TalkToMcCoy(void);
+static void love0_TalkToSpock(void);
+static void love0_TalkToRedshirt(void);
+static void love0_McCoyScans(void);
+static void love0_SpockScansComputer(void);
+static void love0_SpockScans(void);
+static void love0_KirkUsesComputer(void);
+static void love0_FerrisUsesComputer(void);
+static void love0_SpockUsesComputer(void);
+static void love0_AtComputer(void);
+static void love0_ComputerLog(void);
+static void love0_McCoyUsesComputer(void);
+static void love0_McCoyAtComputer(void);
+static void love0_McCoyReadsResearch(void);
+static void love0_part_07F9(void);
+static void love0_E_0880(void);
+static void love0_GetComputer(void);
+static void love0_CrewLaugh(void);
+static void love0_SpockLaughs(void);
+static void love0_MedkitOnSpock(void);
+static void love0_SampleOnSpock(uint16_t ax);
+static void love0_CureSpock(uint16_t ax);
+static void love0_part_0C9D(uint16_t ax);
+static void love0_AtSpock(void);
+static void love0_SpockCured(void);
+static void love0_VirusProgresses(void);
+static void love0_McCoyScansSpock(void);
+static void love0_E_11EF(void);
+static void love0_McCoyScansMcCoy(void);
+static void love0_McCoyScansCrew(void);
+static void love0_ReleaseRLG(void);
+static void love0_ReleaseN2O(void);
+static void love0_ReleaseNH3(void);
+static void love0_CallEnterprise(void);
+static uint16_t love0_Talk(uint16_t ax);
+static void love0_Say(uint16_t ax, uint16_t bx);
+
+/* The room starts. The first time, the mission's state is set up. Gases
+ * already released keep working; the virus timer runs; the doors.
+ * [MSG_TICK 01 00 00] */
+static void love0_StartRoom(void)
+{
+    uint16_t ax = 0;
+    if (rv_visited == 0) {
+        rv_tank1 = 1;
+        rv_tank2 = 2;
+        rv_visited = 1;
+        svc_Sfx(N_LOV0LOOP);
+    }
+    if (rv_n2o_released == 1) {
+        ax = (uint16_t)svc_Random(0xC8, 0x190);
+        room.timers[0] = ax;
+    }
+    if (rv_rlg_released == 1) {
+        ax = (uint16_t)svc_Random(0xC8, 0x190);
+        room.timers[1] = ax;
+    }
+    room.timers[2] = 0xC8;
+    svc_Anim0(9, N_s3r0d2a, 0xE6, 0x80, 0);
+    svc_Anim0(8, N_s3r0d1a, 0x123, 0x8D, 0);
+    fv_cure_x = 0xF4;
+    fv_cure_y = 0x8F;
+    return;
+}
+
+/* [MSG_TICK 0A 00 00] */
+static void love0_Tick10(void)
+{
+    return;
+}
+
+/* The right door (to room 2): walk (msg 4), it opens at the step
+ * (anim msg 3), and when both are done, through.
+ * [MSG_WALK 21 00 00] */
+static void love0_E_0214(void)
+{
+    { love0_WalkToRightDoor(); return; }
+}
+
+/* [MSG_WALK 09 00 00] */
+static void love0_WalkToRightDoor(void)
+{
+    room.busy = 1;
+    fv_going_door = 2;
+    svc_Walk(0, 0xE6, 0x81, 4);
+    room.fall[0] = 0;
+    return;
+}
+
+/* [MSG_REGION 00 00 00] */
+static void love0_ReachRightDoor(void)
+{
+    if (fv_going_door == 2) {
+        svc_Anim0(9, N_s3r0d2, 0xE6, 0x80, 3);
+        svc_BridgeSfx(5);
+    }
+    return;
+}
+
+/* [MSG_WALK_DONE 04 00 00] */
+static void love0_E_0277(void)
+{
+    { love0_ThroughRightDoor(); return; }
+}
+
+/* [MSG_ANIM_DONE 03 00 00] */
+static void love0_ThroughRightDoor(void)
+{
+    fv_right_door_steps++;
+    if (fv_right_door_steps != 2) {
+        return;
+    }
+    svc_GotoRoom(2, 1);
+    return;
+}
+
+/* The left door (to room 1), the same with msgs 5 and 4.
+ * [MSG_WALK 22 00 00] */
+static void love0_E_02A2(void)
+{
+    { love0_WalkToLeftDoor(); return; }
+}
+
+/* [MSG_WALK 08 00 00] */
+static void love0_WalkToLeftDoor(void)
+{
+    room.busy = 1;
+    fv_going_door = 1;
+    svc_Walk(0, 0x125, 0x8D, 5);
+    return;
+}
+
+/* [MSG_REGION 01 00 00] */
+static void love0_ReachLeftDoor(void)
+{
+    if (fv_going_door == 1) {
+        svc_Anim0(8, N_s3r0d1, 0x123, 0x8D, 4);
+        svc_BridgeSfx(5);
+    }
+    return;
+}
+
+/* [MSG_WALK_DONE 05 00 00] */
+static void love0_E_0301(void)
+{
+    { love0_ThroughLeftDoor(); return; }
+}
+
+/* [MSG_ANIM_DONE 04 00 00] */
+static void love0_ThroughLeftDoor(void)
+{
+    fv_left_door_steps++;
+    if (fv_left_door_steps != 2) {
+        return;
+    }
+    svc_GotoRoom(1, 3);
+    return;
+}
+
+/* Looking and talking.
+ * [MSG_LOOK 20 00 00] */
+static void love0_LookAtComputer(void)
+{
+    love0_Say(0, T_LOV0N006);
+    return;
+}
+
+/* [MSG_LOOK 23 00 00] */
+static void love0_LookAtViewscreen(void)
+{
+    love0_Say(0, T_LOV0N000);
+    return;
+}
+
+/* [MSG_LOOK FF 00 00] */
+static void love0_LookAtScene(void)
+{
+    love0_Say(0, T_LOV0N009);
+    return;
+}
+
+/* [MSG_LOOK 08 00 00] */
+static void love0_LookAtLeftDoor(void)
+{
+    love0_Say(0, T_LOV0N008);
+    return;
+}
+
+/* [MSG_LOOK 09 00 00] */
+static void love0_LookAtRightDoor(void)
+{
+    love0_Say(0, T_LOV0N007);
+    return;
+}
+
+/* [MSG_LOOK 00 00 00] */
+static void love0_LookAtKirk(void)
+{
+    love0_Say(0, T_LOV0N002);
+    return;
+}
+
+/* [MSG_LOOK 02 00 00] */
+static void love0_LookAtMcCoy(void)
+{
+    love0_Say(0, T_LOV0N004);
+    return;
+}
+
+/* [MSG_LOOK 01 00 00] */
+static void love0_LookAtSpock(void)
+{
+    love0_Say(0, T_LOV0N005);
+    return;
+}
+
+/* [MSG_LOOK 03 00 00] */
+static void love0_LookAtRedshirt(void)
+{
+    love0_Say(0, T_LOV0N003);
+    return;
+}
+
+/* [MSG_TALK 00 00 00] */
+static void love0_TalkToKirk(void)
+{
+    love0_Say(N_Capt_Kirk, T_LOV0_003);
+    return;
+}
+
+/* [MSG_TALK 02 00 00] */
+static void love0_TalkToMcCoy(void)
+{
+    love0_Say(N_Dr_McCoy, T_LOV0_007);
+    return;
+}
+
+/* [MSG_TALK 01 00 00] */
+static void love0_TalkToSpock(void)
+{
+    love0_Say(N_Mr_Spock, T_LOV0_027);
+    return;
+}
+
+/* [MSG_TALK 03 00 00] */
+static void love0_TalkToRedshirt(void)
+{
+    love0_Say(N_Lt_Ferris, T_LOV0_038);
+    return;
+}
+
+/* Tricorders.
+ * [MSG_USE 45 FF 00] */
+static void love0_McCoyScans(void)
+{
+    svc_Anim(2, N_mscans, -1, -1, 0);
+    svc_BridgeSfx(4);
+    if (rv_have_research != 1) {
+        love0_Say(N_Dr_McCoy, T_LOV0_006);
+        return;
+    }
+    love0_Say(N_Dr_McCoy, T_LOV0_008);
+    return;
+}
+
+/* [MSG_USE 44 20 00] */
+static void love0_SpockScansComputer(void)
+{
+    svc_Anim(1, N_sscann, -1, -1, 0);
+    svc_BridgeSfx(4);
+    love0_Say(N_Mr_Spock, T_LOV0_031);
+    return;
+}
+
+/* [MSG_USE 44 FF 00] */
+static void love0_SpockScans(void)
+{
+    svc_Anim(1, N_sscans, -1, -1, 0);
+    svc_BridgeSfx(4);
+    love0_Say(N_Mr_Spock, T_LOV0_028);
+    return;
+}
+
+/* The computer: Spock reads Dr. Marcus' log (+4, once); McCoy reads it
+ * and finds her research on the Oroborus virus (+2, once): have_research.
+ * [MSG_USE 00 20 00] */
+static void love0_KirkUsesComputer(void)
+{
+    love0_Say(N_Capt_Kirk, T_LOV0_002);
+    { love0_SpockUsesComputer(); return; }
+}
+
+/* [MSG_USE 03 20 00] */
+static void love0_FerrisUsesComputer(void)
+{
+    love0_Say(N_Lt_Ferris, T_LOV0_036);
+    return;
+}
+
+/* [MSG_USE 01 20 00] */
+static void love0_SpockUsesComputer(void)
+{
+    fv_user = 1;
+    fv_user_name = N_Mr_Spock;
+    fv_user_line = T_LOV0_005;
+    fv_user_anim = N_susemn;
+    svc_Walk(fv_user, 0x9A, 0x9A, 2);
+    if (rv_spock_read_log != 1) {
+        rv_spock_read_log = 1;
+        rv_score += 4;
+    }
+    return;
+}
+
+/* [MSG_WALK_DONE 02 00 00] */
+static void love0_AtComputer(void)
+{
+    svc_Anim(fv_user, fv_user_anim, -1, -1, 5);
+    return;
+}
+
+/* [MSG_ANIM_DONE 05 00 00] */
+static void love0_ComputerLog(void)
+{
+    uint16_t ax = 0, bx = 0;
+    svc_Sfx(N_V6KIRKTY);
+    if (rv_have_research == 1) {
+        { love0_part_07F9(); return; }
+    }
+    love0_Say(N_Computer, T_COMPU188);
+    ax = fv_user_name;
+    bx = fv_user_line;
+    love0_Say(ax, bx);
+    fv_heard_log = 1;
+    return;
+}
+
+/* [MSG_USE 02 20 00] */
+static void love0_McCoyUsesComputer(void)
+{
+    svc_Walk(2, 0x78, 0x98, 3);
+    return;
+}
+
+/* [MSG_WALK_DONE 03 00 00] */
+static void love0_McCoyAtComputer(void)
+{
+    svc_Anim(2, N_musemw, -1, -1, 6);
+    return;
+}
+
+/* [MSG_ANIM_DONE 06 00 00] */
+static void love0_McCoyReadsResearch(void)
+{
+    svc_Sfx(N_V6KIRKTY_2);
+    if (rv_mccoy_read_log != 1) {
+        rv_mccoy_read_log = 1;
+        rv_score += 2;
+    }
+    if (rv_have_research == 1) {
+        { love0_part_07F9(); return; }
+    }
+    if (fv_heard_log == 0) {
+        love0_Say(N_Computer, T_COMPU188);
+        fv_heard_log = 1;
+    }
+    love0_Say(N_Dr_McCoy, T_LOV0_024);
+    love0_Say(N_Mr_Spock, T_LOV0_035);
+    love0_Say(N_Dr_McCoy, T_LOV0_023);
+    love0_Say(N_Capt_Kirk, T_LOV0_004);
+    love0_Say(N_Dr_McCoy, T_LOV0_009);
+    rv_have_research = 1;
+    return;
+}
+
+static void love0_part_07F9(void)
+{
+    uint16_t ax = 0;
+L07F9:;
+    love0_Say(N_Computer, T_COMPU192);
+    ax = (uint16_t)love0_Talk(C_310B);
+    if (ax == 0) {
+    } else {
+        if (ax == 1) {
+            goto L083E;
+        }
+        if (ax == 2) {
+            goto L0849;
+        }
+        if (ax == 3) {
+            goto L0854;
+        }
+        if (ax == 4) {
+            goto L085F;
+        }
+        if (ax == 5) {
+            return;
+        }
+        goto L086A;
+    }
+    love0_Say(N_Computer, T_COMPU190);
+    goto L07F9;
+L083E:;
+    love0_Say(N_Computer, T_COMPU193);
+    goto L07F9;
+L0849:;
+    love0_Say(N_Computer, T_COMPU189);
+    goto L07F9;
+L0854:;
+    love0_Say(N_Computer, T_COMPU186);
+    goto L07F9;
+L085F:;
+    love0_Say(N_Computer, T_COMPU187);
+    goto L07F9;
+L086A:;
+    love0_Say(N_wes, N_dialog_error);
+    return;
+}
+
+/* [MSG_GET 09 00 00] */
+static void love0_E_0880(void)
+{
+    { love0_GetComputer(); return; }
+}
+
+/* [MSG_GET 20 00 00] */
+static void love0_GetComputer(void)
+{
+    love0_Say(S_1752, T_LOV0N001);
+    return;
+}
+
+/* The gases, common to all of the mission's rooms. Timer 0 (after
+ * laughing gas): a random crew member giggles, and again in 200-400 ticks.
+ * [MSG_TIMER 00 00 00] */
+static void love0_CrewLaugh(void)
+{
+    uint16_t ax = 0, bx = 0;
+    ax = (uint16_t)svc_Random(0, 2);
+    fv_roll = ax;
+    if (fv_roll == 0) {
+        fv_laugher = N_Dr_McCoy;
+    } else {
+        if (fv_roll == 1) {
+            fv_laugher = N_Lt_Ferris;
+            if (room.redshirt_dead == 1) {
+                fv_laugher = N_Dr_McCoy;
+                goto L09BE;
+            }
+        } else {
+            love0_Say(0, N_get_name_error);
+            return;
+        }
+    }
+    fv_laugher = N_Dr_McCoy;
+    ax = (uint16_t)svc_Random(0, 0xA);
+    fv_roll = ax;
+    if (fv_roll == 0) {
+        bx = T_LOV0_011;
+        goto L0A65;
+    }
+    if (fv_roll == 1) {
+        bx = T_LOV0_020;
+        goto L0A65;
+    }
+    if (fv_roll == 2) {
+        bx = T_LOV0_016;
+        goto L0A65;
+    }
+    if (fv_roll == 3) {
+        bx = T_LOV0_012;
+        goto L0A65;
+    }
+    if (fv_roll == 4) {
+        bx = T_LOV0_014;
+        goto L0A65;
+    }
+    if (fv_roll == 5) {
+        bx = T_LOV0_022;
+        goto L0A65;
+    }
+    if (fv_roll == 6) {
+        bx = T_LOV0_015;
+        goto L0A65;
+    }
+    if (fv_roll == 7) {
+        bx = T_LOV0_021;
+        goto L0A65;
+    }
+    if (fv_roll == 8) {
+        bx = T_LOV0_013;
+        goto L0A65;
+    }
+    if (fv_roll == 9) {
+        bx = T_LOV0_019;
+        goto L0A65;
+    }
+    bx = T_LOV0_017;
+    goto L0A65;
+L09BE:;
+    if (room.redshirt_dead == 1) {
+        return;
+    }
+    fv_laugher = N_Lt_Ferris;
+    ax = (uint16_t)svc_Random(0, 0xA);
+    fv_roll = ax;
+    if (fv_roll == 0) {
+        bx = T_LOV0_039;
+    } else if (fv_roll == 1) {
+        bx = T_LOV0_048;
+    } else if (fv_roll == 2) {
+        bx = T_LOV0_045;
+    } else if (fv_roll == 3) {
+        bx = T_LOV0_040;
+    } else if (fv_roll == 4) {
+        bx = T_LOV0_042;
+    } else if (fv_roll == 5) {
+        bx = T_LOV0_050;
+    } else if (fv_roll == 6) {
+        bx = T_LOV0_043;
+    } else if (fv_roll == 7) {
+        bx = T_LOV0_049;
+    } else if (fv_roll == 8) {
+        bx = T_LOV0_041;
+    } else if (fv_roll == 9) {
+        bx = T_LOV0_047;
+    } else {
+        bx = T_LOV0_046;
+        goto L0A65;
+    }
+L0A65:;
+    ax = fv_laugher;
+    love0_Say(ax, bx);
+    if (rv_rlg_released == 1) {
+        return;
+    }
+    ax = (uint16_t)svc_Random(0, 3);
+    fv_roll = ax;
+    ax = N_Mr_Spock;
+    if (fv_roll == 0) {
+        bx = T_LOV0_029;
+    } else if (fv_roll == 1) {
+        bx = T_LOV0_033;
+    } else if (fv_roll == 2) {
+        bx = T_LOV0_026;
+    } else {
+        bx = T_LOV0_124;
+        goto L0AB4;
+    }
+L0AB4:;
+    love0_Say(ax, bx);
+    ax = (uint16_t)svc_Random(0xC8, 0x190);
+    room.timers[0] = ax;
+    return;
+}
+
+/* Timer 1 (after Romulan laughing gas): Spock laughs.
+ * [MSG_TIMER 01 00 00] */
+static void love0_SpockLaughs(void)
+{
+    uint16_t ax = 0, bx = 0;
+    ax = (uint16_t)svc_Random(0, 7);
+    fv_roll = ax;
+    ax = N_Mr_Spock;
+    if (fv_roll == 0) {
+        bx = T_LOV0_025;
+    } else if (fv_roll == 1) {
+        bx = T_LOV0_101;
+    } else if (fv_roll == 2) {
+        bx = T_LOV0_102;
+    } else if (fv_roll == 3) {
+        bx = T_LOV0_103;
+    } else if (fv_roll == 4) {
+        bx = T_LOV0_104;
+    } else if (fv_roll == 5) {
+        bx = T_LOV0_105;
+    } else if (fv_roll == 6) {
+        bx = T_LOV0_106;
+    } else {
+        bx = T_LOV0_107;
+        goto L0B45;
+    }
+L0B45:;
+    love0_Say(ax, bx);
+    ax = (uint16_t)svc_Random(0xC8, 0x190);
+    room.timers[1] = ax;
+    return;
+}
+
+/* Curing Spock, common to all of the mission's rooms: with the cure,
+ * Spock and McCoy walk to the cure spot (msg 99), and McCoy injects him.
+ * [MSG_USE 7F 01 00] */
+static void love0_MedkitOnSpock(void)
+{
+    if (rv_spock_cured != 1) {
+        love0_Say(N_Dr_McCoy, T_LOV5_019);
+        return;
+    }
+    love0_Say(N_Dr_McCoy, T_LOV5_015);
+    return;
+}
+
+/* [MSG_USE 4C 01 00] */
+static void love0_SampleOnSpock(uint16_t ax)
+{
+    if (rv_spock_cured == 1) {
+        { love0_part_0C9D(ax); return; }
+    }
+    love0_Say(N_Dr_McCoy, T_LOVA_F55);
+    return;
+}
+
+/* [MSG_USE 4D 01 00] */
+static void love0_CureSpock(uint16_t ax)
+{
+    if (rv_spock_cured != 1)
+        { love0_part_0C9D(ax); return; }
+    love0_Say(N_Dr_McCoy, T_LOV5_015_2);
+    return;
+}
+
+static void love0_part_0C9D(uint16_t ax)
+{
+    uint16_t t0;
+    SETHI(ax, 0);
+    SETLO(ax, fv_cure_y);
+    SETHI(ax, 0);
+    SETLO(ax, fv_cure_x);
+    ax = (uint16_t)svc_Walk(1, ax, ax, 0x63);
+    SETHI(ax, 0);
+    SETLO(ax, fv_cure_y);
+    ax = ax + 0xA;
+    t0 = ax;
+    SETHI(ax, 0);
+    SETLO(ax, fv_cure_x);
+    svc_Walk(2, ax, ax, 0x63);
+    return;
+}
+
+/* [MSG_WALK_DONE 63 00 00] */
+static void love0_AtSpock(void)
+{
+    fv_cure_steps++;
+    if (fv_cure_steps != 2) {
+        return;
+    }
+    svc_Anim(2, N_musemn, -1, -1, 0x63);
+    return;
+}
+
+/* [MSG_ANIM_DONE 63 00 00] */
+static void love0_SpockCured(void)
+{
+    love0_Say(N_Dr_McCoy, T_LOV5_030);
+    love0_Say(N_Mr_Spock, T_LOV5_038);
+    love0_Say(N_Dr_McCoy, T_LOV5_027);
+    love0_Say(N_Mr_Spock, S_0DA9);
+    rv_spock_cured = 1;
+    return;
+}
+
+/* Timer 2, every 200 ticks until Spock is cured: the virus advances,
+ * with a line at 0Fh, 1Eh, 2Dh; at 3Ch Spock collapses, at 64h he dies.
+ * [MSG_TIMER 02 00 00] */
+static void love0_VirusProgresses(void)
+{
+    if (rv_spock_cured == 1) {
+        return;
+    }
+    rv_virus++;
+    if ((int8_t)rv_virus >= (int8_t)0x64) {
+    } else {
+        if (rv_virus == 0xF) {
+            love0_Say(N_Mr_Spock, T_spokcoff);
+            rv_virus++;
+        } else {
+            if (rv_virus == 0x1E) {
+                love0_Say(N_Dr_McCoy, T_LOVA_F08);
+                rv_virus++;
+            } else {
+                if (rv_virus == 0x2D) {
+                    love0_Say(N_Mr_Spock, T_spokcoff_2);
+                    rv_virus++;
+                } else {
+                    if (rv_virus == 0x3C) {
+                        love0_Say(N_Mr_Spock, T_LOVA_F54);
+                        rv_virus_struck = 1;
+                        rv_virus++;
+                        goto L0F22;
+                    }
+                }
+            }
+        }
+L0F22:;
+        room.timers[2] = 0xC8;
+        return;
+    }
+    svc_Anim(1, N_sgetdn, -1, -1, 0);
+    svc_Music(2, STALE_ARG);
+    love0_Say(0, T_GENER004);
+    svc_GameOver();
+    return;
+}
+
+/* McCoy's tricorder on Spock follows the virus; on the others, normal.
+ * [MSG_USE 45 01 00] */
+static void love0_McCoyScansSpock(void)
+{
+    svc_BridgeSfx(4);
+    if (rv_spock_cured == 1) {
+        love0_Say(N_Dr_McCoy, T_LOVA_F01);
+        return;
+    }
+    if (rv_have_research != 1) {
+        love0_Say(N_Dr_McCoy, T_LOVA_F02);
+        return;
+    }
+    if ((int8_t)rv_virus < (int8_t)0xA) {
+        love0_Say(N_Dr_McCoy, T_LOVA_F04);
+        return;
+    }
+    if ((int8_t)rv_virus < (int8_t)0x1E) {
+        love0_Say(N_Dr_McCoy, T_LOVA_F03);
+        return;
+    }
+    if ((int8_t)rv_virus < (int8_t)0x32) {
+        love0_Say(N_Dr_McCoy, T_LOVA_F08_2);
+        return;
+    }
+    if (rv_virus == 0x46) {
+        love0_Say(N_Dr_McCoy, T_TUG2_010);
+        return;
+    }
+    if ((int8_t)rv_virus < (int8_t)0x64) {
+        love0_Say(N_Dr_McCoy, T_LOVA_F10);
+        return;
+    }
+    love0_Say(N_Dr_McCoy, T_LOVA_100);
+    return;
+}
+
+/* [MSG_USE 45 00 00] */
+static void love0_E_11EF(void)
+{
+    { love0_McCoyScansMcCoy(); return; }
+}
+
+/* [MSG_USE 45 02 00] */
+static void love0_McCoyScansMcCoy(void)
+{
+    { love0_McCoyScansCrew(); return; }
+}
+
+/* [MSG_USE 45 03 00] */
+static void love0_McCoyScansCrew(void)
+{
+    svc_BridgeSfx(4);
+    love0_Say(N_Dr_McCoy, T_LOVA_F07);
+    return;
+}
+
+/* Opening a gas canister: Romulan laughing gas sets Spock laughing,
+ * nitrous oxide the crew, ammonia nothing.
+ * [MSG_USE 49 FF 00] */
+static void love0_ReleaseRLG(void)
+{
+    love0_Say(S_1752, T_LOV2N005);
+    rv_rlg_released = 1;
+    svc_TakeItem(IT_RLG);
+    return;
+}
+
+/* [MSG_USE 65 FF 00] */
+static void love0_ReleaseN2O(void)
+{
+    love0_Say(S_1752, T_LOV2N005_2);
+    love0_Say(N_Mr_Spock, T_MUD2_040);
+    rv_n2o_released = 1;
+    svc_TakeItem(IT_N2O);
+    svc_Music(3, STALE_ARG);
+    return;
+}
+
+/* [MSG_USE 66 FF 00] */
+static void love0_ReleaseNH3(void)
+{
+    love0_Say(S_1752, T_LOV2N005_3);
+    if (room.redshirt_dead != 1) {
+    }
+    svc_TakeItem(IT_NH3);
+    return;
+}
+
+/* The communicator: four cases (first call, later calls, the same after
+ * the cure), all with the same three lines borrowed from other missions'
+ * speech files.
+ * [MSG_USE 47 FF 00] */
+static void love0_CallEnterprise(void)
+{
+    if (rv_made_cure == 1) {
+    } else {
+        if (rv_called_ship == 1) {
+        } else {
+            love0_Say(N_Capt_Kirk, T_MUD4_018);
+            love0_Say(N_Lt_Uhura, T_BRIDU146);
+            love0_Say(N_Capt_Kirk, T_VENA_F41);
+            rv_called_ship = 1;
+            return;
+        }
+        love0_Say(N_Capt_Kirk, T_MUD4_018_2);
+        love0_Say(N_Lt_Uhura, T_BRIDU146_2);
+        love0_Say(N_Capt_Kirk, T_VENA_F41_2);
+        return;
+    }
+    if (rv_called_ship_cured == 1) {
+    } else {
+        love0_Say(N_Capt_Kirk, T_MUD4_018_3);
+        love0_Say(N_Lt_Uhura, T_BRIDU146_3);
+        love0_Say(N_Capt_Kirk, T_VENA_F41_3);
+        rv_called_ship_cured = 1;
+        return;
+    }
+    love0_Say(N_Capt_Kirk, T_MUD4_018_4);
+    love0_Say(N_Lt_Uhura, T_BRIDU146_4);
+    love0_Say(N_Capt_Kirk, T_VENA_F41_4);
+    return;
+}
+
+/* Talk: conversation AX (speaker, choices, 0); returns the choice. */
+static uint16_t love0_Talk(uint16_t ax)
+{
+    ax = (uint16_t)svc_Talk(ax);
+    return ax;
+}
+
+/* Say: one line, BX, said by AX (0: narration). */
+static void love0_Say(uint16_t ax, uint16_t bx)
+{
+    fv_talk_buf = ax;
+    CS_W(0x3107) = bx;
+    love0_Talk(talk_buf);
+    return;
+}
+
+/* [MSG_GET 08 00 00] This script has no code of its own: its entry is the next
+ * script's header, whose six bytes the machine ran as code (with no effect), and then that script. */
+static void love0_E_087A(void)
+{
+    love0_E_0880();
+}
+
+/* the scripts, by the offset of their code in the room file */
+const RoomScript love0_scripts[] = {
+    { 0x016A, love0_StartRoom },    /* MSG_TICK 01 00 00 */
+    { 0x020D, love0_Tick10 },    /* MSG_TICK 0A 00 00 */
+    { 0x0214, love0_E_0214 },    /* MSG_WALK 21 00 00 */
+    { 0x021C, love0_WalkToRightDoor },    /* MSG_WALK 09 00 00 */
+    { 0x0245, love0_ReachRightDoor },    /* MSG_REGION 00 00 00 */
+    { 0x0277, love0_E_0277 },    /* MSG_WALK_DONE 04 00 00 */
+    { 0x027F, love0_ThroughRightDoor },    /* MSG_ANIM_DONE 03 00 00 */
+    { 0x02A2, love0_E_02A2 },    /* MSG_WALK 22 00 00 */
+    { 0x02AA, love0_WalkToLeftDoor },    /* MSG_WALK 08 00 00 */
+    { 0x02CF, love0_ReachLeftDoor },    /* MSG_REGION 01 00 00 */
+    { 0x0301, love0_E_0301 },    /* MSG_WALK_DONE 05 00 00 */
+    { 0x0309, love0_ThroughLeftDoor },    /* MSG_ANIM_DONE 04 00 00 */
+    { 0x032C, love0_LookAtComputer },    /* MSG_LOOK 20 00 00 */
+    { 0x033B, love0_LookAtViewscreen },    /* MSG_LOOK 23 00 00 */
+    { 0x034A, love0_LookAtScene },    /* MSG_LOOK FF 00 00 */
+    { 0x0359, love0_LookAtLeftDoor },    /* MSG_LOOK 08 00 00 */
+    { 0x0368, love0_LookAtRightDoor },    /* MSG_LOOK 09 00 00 */
+    { 0x0377, love0_LookAtKirk },    /* MSG_LOOK 00 00 00 */
+    { 0x0386, love0_LookAtMcCoy },    /* MSG_LOOK 02 00 00 */
+    { 0x0395, love0_LookAtSpock },    /* MSG_LOOK 01 00 00 */
+    { 0x03A4, love0_LookAtRedshirt },    /* MSG_LOOK 03 00 00 */
+    { 0x03B3, love0_TalkToKirk },    /* MSG_TALK 00 00 00 */
+    { 0x0446, love0_TalkToMcCoy },    /* MSG_TALK 02 00 00 */
+    { 0x0496, love0_TalkToSpock },    /* MSG_TALK 01 00 00 */
+    { 0x04A6, love0_TalkToRedshirt },    /* MSG_TALK 03 00 00 */
+    { 0x04B6, love0_McCoyScans },    /* MSG_USE 45 FF 00 */
+    { 0x0563, love0_SpockScansComputer },    /* MSG_USE 44 20 00 */
+    { 0x0594, love0_SpockScans },    /* MSG_USE 44 FF 00 */
+    { 0x05C5, love0_KirkUsesComputer },    /* MSG_USE 00 20 00 */
+    { 0x062C, love0_FerrisUsesComputer },    /* MSG_USE 03 20 00 */
+    { 0x069C, love0_SpockUsesComputer },    /* MSG_USE 01 20 00 */
+    { 0x06E4, love0_AtComputer },    /* MSG_WALK_DONE 02 00 00 */
+    { 0x0705, love0_ComputerLog },    /* MSG_ANIM_DONE 05 00 00 */
+    { 0x074A, love0_McCoyUsesComputer },    /* MSG_USE 02 20 00 */
+    { 0x0764, love0_McCoyAtComputer },    /* MSG_WALK_DONE 03 00 00 */
+    { 0x0780, love0_McCoyReadsResearch },    /* MSG_ANIM_DONE 06 00 00 */
+    { 0x0880, love0_E_0880 },    /* MSG_GET 09 00 00 */
+    { 0x0892, love0_GetComputer },    /* MSG_GET 20 00 00 */
+    { 0x08B3, love0_CrewLaugh },    /* MSG_TIMER 00 00 00 */
+    { 0x0AD0, love0_SpockLaughs },    /* MSG_TIMER 01 00 00 */
+    { 0x0B62, love0_MedkitOnSpock },    /* MSG_USE 7F 01 00 */
+    /* 0BF0: a helper, not a script */
+    /* 0C63: a helper, not a script */
+    { 0x0CDF, love0_AtSpock },    /* MSG_WALK_DONE 63 00 00 */
+    { 0x0D09, love0_SpockCured },    /* MSG_ANIM_DONE 63 00 00 */
+    { 0x0DC8, love0_VirusProgresses },    /* MSG_TIMER 02 00 00 */
+    { 0x0F7E, love0_McCoyScansSpock },    /* MSG_USE 45 01 00 */
+    { 0x11EF, love0_E_11EF },    /* MSG_USE 45 00 00 */
+    { 0x11F7, love0_McCoyScansMcCoy },    /* MSG_USE 45 02 00 */
+    { 0x11FF, love0_McCoyScansCrew },    /* MSG_USE 45 03 00 */
+    { 0x1246, love0_ReleaseRLG },    /* MSG_USE 49 FF 00 */
+    { 0x1296, love0_ReleaseN2O },    /* MSG_USE 65 FF 00 */
+    { 0x1328, love0_ReleaseNH3 },    /* MSG_USE 66 FF 00 */
+    { 0x138E, love0_CallEnterprise },    /* MSG_USE 47 FF 00 */
+    { 0x087A, love0_E_087A },
+    { 0, 0 }
+};

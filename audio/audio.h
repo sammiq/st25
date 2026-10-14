@@ -13,20 +13,24 @@
 #define AUDIO_H
 
 #include <stdint.h>
+#include "sbdrv.h"
 
 /* The host's side (platform/plat_audio_*.c). */
 int plat_audio_open(int *rate);     /* start the stream; 1 if there is sound. Sets the sample rate */
 void plat_audio_close(void);
 void plat_audio_lock(void);
 void plat_audio_unlock(void);
-void plat_set_timer_callback(void (*cb)(void));    /* 18.2 Hz timer interrupt, run from plat_pump */
+
+/* The 18.2 Hz timer interrupt: cb runs from plat_pump (audio.c). */
+void plat_set_timer_callback(void (*cb)(void));
+void audio_poll(void);              /* the host's event pump calls this */
 
 /* Fill out with frames of 16 bit stereo (interleaved) samples. */
 void audio_render(int16_t *out, int frames);
 
 /* ---- FM music (fm.c) ---- */
 void fm_init(int rate);
-void fm_render(int16_t *lr);                /* one stereo frame */
+void fm_render(int16_t *lr);                /* one stereo frame, running the sequencer */
 
 /* ---- Sound Blaster DAC and DMA (sb.c) ---- */
 void sb_init(int rate);
