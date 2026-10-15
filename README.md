@@ -118,3 +118,33 @@ The scripts are hand-written and contain some oddities and outright bugs. Each s
 - FEATHER6 has two scripts keyed `MSG_USE, IT_ROCK, ANY`, so the second never runs. FEATHER5 gives Kirk McCoy's line "Jim! Are you out of your mind?".
 - SINS0, SINS1 and SINS4 each have a second script with the same key as an earlier one (talking to Mosher, talking to Spock, Spock on the lock), which never runs. SINS3 has a script keyed on using object 20h, which is no item. SINS5 tests five point-once flags it never sets, so those points come every time.
 - Both of VENG2's conversation menus end in a debug line from a speaker "wes" ("kirk dialog error.", "power allocation error.") for a choice that can't happen. VENG8's script for Kije reaching the transporter pad also answers a walk that is never started, and counts arrivals as if two crewmen were walking there.
+
+## Amiga version
+
+The AGA (A1200) release can be put into `orig/AMIGA` for analysis. The decompilation doesn't use it, and nothing below is part of the build.
+
+Graphics: the same as the DOS floppy
+
+- All 5,700 bitmaps it shares with the floppy have identical pixels. They're all 320×200, 256-colour images, with only the 8-byte header byte-swapped.
+AGA can show 256 colours, so nothing was reduced.
+- The palettes are the same colours. DOS stores 6-bit values (0–63) and the Amiga stores them scaled up to 8-bit, so there's no finer colour detail.
+- Every other shared graphics and room file (ANM, SHP, R3S, XOR, MAP, IW, PRI) is the same size as on floppy. They are straight byte-swapped conversions.
+- 1,293 extra .BAM files. Each one works out at exactly 9 bits per pixel: 8 bitplanes plus a mask, the format the Amiga's blitter draws. They hold the
+room background animations (bridge lights, flickers and so on) as finished frames. On DOS, a .BAN file is a stream of pixel changes drawn into the
+background. On the Amiga, the .BAN is just a list of which BAM frames to show (e.g. S5R5L1.BAN is 52 bytes vs 1.1K on DOS). The animations are the
+same, only stored differently.
+- The CD's redrawn title logo isn't here: GOLDLOGO matches the floppy.
+
+Music: a separate implementation
+
+- DOS: Music is MIDI sequences played through the Miles AIL driver on AdLib, MT-32, PC speaker or Tandy (.AD/.MT/.PC/.TD).
+- Amiga: The Amiga version doesn't use the DOS XMIDI music. Its `TREK*.SNG` files are "The Player 4.1A" (`P41A`) tracker modules with the samples taken out. The letter before `.SNG` names the bank they draw on (`SAMPLES.A`–`D`), and `snd.bin` is the 68k replayer. `tools/amiga_music.py OUT` turns them into ProTracker `.mod` files, plus `.wav` files with `--wav` (needs an ffmpeg built with libopenmpt). The script's docstring describes the format and how the player's effects differ from ProTracker's. Again, it's a standalone tool: nothing in the build calls it.
+
+RDF room scripts: still x86
+
+The Amiga RDFs contain the same x86 machine code as DOS, and the Amiga executable has an 8086 interpreter built in. [src/rdf/i8086.c](src/rdf/i8086.c) is a hand decompilation of that interpreter, kept for reference only. It isn't compiled.
+
+Content: floppy-based, with some text fixes
+
+- Some text edits that later appear on the CD, Overall there are about 700 changed lines in the room scripts compared with the floppy.
+- Extra files it has that neither DOS version has: room graphics for TRIAL9 and TUG9 (BMP/PRI/MAP/IW), STARS00–15, and CREDIT06. The Amiga has the TRIAL9 background but no TRIAL9.RDF, while the CD has the RDF but no background. So a room 9 seems to have been designed and then abandoned, with each port shipping a different part of it.

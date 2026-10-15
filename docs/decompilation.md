@@ -235,7 +235,8 @@ Every room has been done this way. The DEMON rooms (`src/rdf/demon0.asm` to `dem
 | `tools/fdiff.py`, `tools/disasm.py`, `tools/progress.py` | command-line diff, disassembly, progress summary |
 | `tools/rename.py` | renames symbols in `symbols.txt`, `relocs.txt` and every source and header (`tools/rename.py _sub_3AEFF _AIL_startup …`) |
 | `tools/linkcheck.py` | lists externals that no object or C library defines, as LINK would report them; exits non-zero if any (run `ninja` first) |
-| `tools/resource.py` | reads `DATA.DIR`/`DATA.RUN`/`DATA.001`: lists and unpacks the game's files |
+| `tools/resource.py` | reads `DATA.DIR`/`DATA.RUN`/`DATA.001` (or the Amiga's `data000.*`): lists and unpacks the game's files |
+| `tools/amiga_music.py` | converts the Amiga version's music to ProTracker `.mod` (and `.wav`); not used by the build |
 | `tools/rdf.py` | room scripts: generates, checks, patches and counts `src/rdf/<room>.asm` |
 | `tools/strrel.py` | gives each string in a unit's `.rodata` a symbol and adds `relocs.txt` entries for `push` operands IDA left as numbers (`tools/strrel.py seg030 [--dry-run]`) |
 
