@@ -81,6 +81,69 @@ int16_t voc_fd = -1;
 char *music_data = 0;
 int16_t sound_closed = 0;
 
+/* The Amiga version's music (audio/mod.c) and sampled effects
+ * (audio/amiga_sfx.c), when they are there, play in place of the FM music
+ * and effects.  The Amiga game maps each music file's sequences onto its 20
+ * songs and 42 effects with these tables (data hunk 1C28-1C80 of its EXE):
+ * a song number, or minus an effect number (TREK<n>.SFX), or 0 for nothing.
+ * The sequences with 0 still play on FM, as does "init", which the Amiga
+ * game doesn't have. */
+static const struct {
+    const char *name;
+    int8_t map[34];
+} amiga_maps[] = {
+    { "title",   { 1 } },
+    { "bridge",  { -19, -15, 6, 9, 10, -23, -25, -17, -4, -26, -41, 20, 17, 15, 19, 3, -3, 5 } },
+    { "bridgew", { -19, -15, 7, 9, 10, -23, -25, -17, -4, -26, -41, 20, 17, 15, 19, 3, -3, 5 } },
+    { "bridgeb", { -19, -15, 8, 9, 10, -23, -25, -17, -4, -26, -41, 20, 17, 15, 19, 3, -3, 5 } },
+    /* ground 33 is -34 in the Amiga game, an effect where the DOS music
+     * plays the tune of bridge 11: it is song 20 here. */
+    { "ground",  { 2, 3, 4, 5, -27, -30, -14, -4, -35, -37, -36, 0, -2, -1, -34, -9, -5, -22,
+                   -1, -18, -10, -40, -12, 0, 13, 14, 15, 16, 17, 18, 19, 11, 12, 20 } },
+};
+static int16_t amiga_music;             /* the Amiga music is there */
+static const int8_t *amiga_map;         /* for music_name, or 0 */
+static int16_t amiga_playing;           /* slot 0 is an Amiga song */
+static int16_t amiga_voice = -1;        /* slot 0 is an Amiga effect on this voice */
+static int16_t amiga_voice_fx;          /* which effect */
+static int16_t amiga_voice_base;        /* and the number it was asked as */
+
+/* The Amiga song for sequence seq of the loaded music, or 0. */
+int16_t AmigaSong(int16_t seq)
+{
+    if (!amiga_map || seq < 0 || seq >= 34 || amiga_map[seq] <= 0)
+        return 0;
+    return amiga_map[seq];
+}
+
+/* The Amiga effect for sequence seq of the loaded music, or 0. */
+static int16_t AmigaEffect(int16_t seq)
+{
+    if (!amiga_map || seq < 0 || seq >= 34 || amiga_map[seq] >= 0)
+        return 0;
+    return -amiga_map[seq];
+}
+
+/* Play effect *n as the Amiga game does: some numbers stand for a few
+ * variants, one picked at random (EXE 20D64).  *n becomes the one played.
+ * Returns its voice, or -1. */
+static int AmigaEffectPlay(int16_t *n)
+{
+    switch (*n) {
+    case 3:
+        *n += rand() % 5;
+        break;
+    case 10:
+        *n += rand() & 3;
+        break;
+    case 20:
+    case 30:
+        *n += rand() % 3;
+        break;
+    }
+    return asfx_play(*n);
+}
+
 /* The original's timer interrupt ran the digital sound tick (DigiTick) 18
  * times a second: the host calls it at that rate from its event pump. */
 void HookTimer(void)
@@ -111,6 +174,8 @@ void SoundInit(void)
     }
     fm_init(rate);
     sb_init(rate);
+    amiga_music = mod_init(rate);
+    asfx_init(rate);
     midi_ok = 1;
     digi_ok = 1;
     midi_handle = 0;
@@ -149,6 +214,8 @@ void SoundStop(void)
         UnhookTimer();
     if (midi_ok || digi_ok) {
         AIL_shutdown(0);
+        mod_stop();
+        asfx_stop_all(-1);
         sb_stop();
         plat_audio_close();
     }
@@ -156,6 +223,17 @@ void SoundStop(void)
 
 void StopSeq(uint16_t slot)
 {
+    if (slot == 0 && amiga_playing) {
+        mod_stop();
+        amiga_playing = 0;
+        seq_ids[0] = -1;
+    }
+    if (slot == 0 && amiga_voice != -1) {
+        if (asfx_playing(amiga_voice, amiga_voice_fx))
+            asfx_stop(amiga_voice);
+        amiga_voice = -1;
+        seq_ids[0] = -1;
+    }
     if (seq_handles[slot] != -1) {
         AIL_stop_sequence(midi_handle, seq_handles[slot]);
         AIL_release_sequence_handle(midi_handle, seq_handles[slot]);
@@ -166,9 +244,29 @@ void StopSeq(uint16_t slot)
 
 void PlaySeq(uint16_t slot, int16_t seq)
 {
+    int16_t n, base;
+    int v;
+
+    base = slot == 0 ? AmigaEffect(seq) : 0;
+    /* the Amiga game leaves an effect that is still playing alone */
+    if (base && amiga_voice != -1 && amiga_voice_base == base && asfx_playing(amiga_voice, amiga_voice_fx))
+        return;
     StopSeq(slot);
     if (seq == -1)
         return;
+    if (slot == 0 && mod_play(AmigaSong(seq))) {
+        amiga_playing = 1;
+        seq_ids[0] = seq;
+        return;
+    }
+    n = base;
+    if (base && (v = AmigaEffectPlay(&n)) >= 0) {
+        amiga_voice = v;
+        amiga_voice_fx = n;
+        amiga_voice_base = base;
+        seq_ids[0] = seq;
+        return;
+    }
     seq_handles[slot] = AIL_register_sequence(midi_handle, music_data, seq, seq_state[slot], 0);
     seq_ids[slot] = seq;
     AIL_start_sequence(midi_handle, seq_handles[slot]);
@@ -180,6 +278,10 @@ int16_t MusicPlaying(void)
 
     if (midi_ok == 0)
         return 0;
+    if (amiga_playing && mod_status() == MOD_PLAYING)
+        return 1;
+    if (amiga_voice != -1 && asfx_playing(amiga_voice, amiga_voice_fx))
+        return 1;
     for (i = 0; i < NUM_SEQ; i++)
         if (seq_handles[i] != -1 && AIL_sequence_status(midi_handle, seq_handles[i]) == 1)
             return 1;
@@ -205,12 +307,13 @@ void StopAllSound(void)
 
     for (i = 0; i < NUM_SEQ; i++)
         StopSeq(i);
+    asfx_stop_all(-1);
     StopVoc();
 }
 
 void LoadMusic(char *name)
 {
-    int16_t unused;
+    int16_t i;
     uint16_t size;
 
     if (midi_ok == 0)
@@ -220,6 +323,10 @@ void LoadMusic(char *name)
     if (strcmpi(name, music_name) == 0)
         return;
     strcpy(music_name, name);
+    amiga_map = 0;
+    for (i = 0; amiga_music && i < (int16_t)(sizeof(amiga_maps) / sizeof(amiga_maps[0])); i++)
+        if (strcmpi(name, amiga_maps[i].name) == 0)
+            amiga_map = amiga_maps[i].map;
     if (music_data)
         PopMem();
     size = GetFileSize(name, midi_suffix);
@@ -341,7 +448,17 @@ void MusicTick(void)
 
     if (midi_ok == 0 || music_on == 0)
         return;
-    if (seq_handles[0] != -1 && AIL_sequence_status(midi_handle, seq_handles[0]) == 2) {
+    if (amiga_playing && mod_status() == MOD_DONE) {
+        if (music_cur == music_next && music_cur != -1)
+            mod_play(AmigaSong(music_cur));
+        else
+            PlayMusic(music_next, music_next);
+    } else if (amiga_voice != -1 && !asfx_playing(amiga_voice, amiga_voice_fx)) {
+        /* an Amiga effect is as long as the Amiga plays it: it isn't repeated */
+        amiga_voice = -1;
+        if (music_cur != music_next)
+            PlayMusic(music_next, music_next);
+    } else if (seq_handles[0] != -1 && AIL_sequence_status(midi_handle, seq_handles[0]) == 2) {
         if (music_cur == music_next && music_cur != -1)
             AIL_start_sequence(midi_handle, seq_handles[0]);
         else
@@ -365,9 +482,11 @@ void SetMusicOn(int16_t on)
  * least recently used one. */
 void PlaySfxSeq(int16_t seq)
 {
-    int16_t i;
+    int16_t i, n;
 
     if (midi_ok == 0 || music_on == 0)
+        return;
+    if ((n = AmigaEffect(seq)) != 0 && AmigaEffectPlay(&n) >= 0)
         return;
     for (i = 1; i < NUM_SEQ; i++) {
         if (seq_ids[i] == seq) {
@@ -390,9 +509,11 @@ void SetSfxOn(int16_t on)
     if (digi_ok == 0 || sfx_on == on)
         return;
     sfx_on = on;
-    if (sfx_on == 0)
+    if (sfx_on == 0) {
         for (i = 1; i < NUM_SEQ; i++)
             StopSeq(i);
+        asfx_stop_all(asfx_playing(amiga_voice, amiga_voice_fx) ? amiga_voice : -1);
+    }
     if (sfx_on == 0)
         FreeAllSfxFiles();
     if (sfx_on == 1 && sfx_name[0])

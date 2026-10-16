@@ -121,6 +121,28 @@ static const char *user_dir(void)
     return user_dir_path;
 }
 
+static char amiga_music_path[1024];
+static int amiga_music_set;
+
+void plat_set_amiga_music_dir(const char *dir)
+{
+    snprintf(amiga_music_path, sizeof(amiga_music_path), "%s", dir);
+    amiga_music_set = 1;
+}
+
+const char *plat_amiga_music_dir(void)
+{
+    struct stat st;
+
+    if (!amiga_music_set) {
+        snprintf(amiga_music_path, sizeof(amiga_music_path), "%s/amiga", user_dir());
+        if (stat(amiga_music_path, &st) != 0 || !S_ISDIR(st.st_mode))
+            amiga_music_path[0] = 0;
+        amiga_music_set = 1;
+    }
+    return amiga_music_path[0] ? amiga_music_path : NULL;
+}
+
 /* Resolve a DOS path to a real one under the data directory.  Components
  * that do not exist are appended as given, so that a file can be created.
  * Returns 1 if the whole path exists. */

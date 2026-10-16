@@ -7,6 +7,10 @@
  * Both are mixed into one stream by audio_render, which the host's audio
  * thread calls.  The game's thread and the audio thread share state under
  * plat_audio_lock.
+ *
+ * Optionally the Amiga version's music (ProTracker modules) and sampled
+ * effects replace the FM music and effects; they are mixed into the same
+ * stream.
  */
 
 #ifndef AUDIO_H
@@ -31,6 +35,23 @@ void audio_render(int16_t *out, int frames);
 /* ---- FM music (fm.c) ---- */
 void fm_init(int rate);
 void fm_render(int16_t *lr);                /* one stereo frame, running the sequencer */
+
+/* ---- the Amiga version's music, optionally instead of FM (mod.c) ---- */
+enum { MOD_STOPPED, MOD_PLAYING, MOD_DONE };    /* as AIL_sequence_status */
+int mod_init(int rate);                     /* 1 if the Amiga music is there */
+int mod_play(int song);                     /* song 1-20 from the start; 0 if missing */
+void mod_stop(void);
+int mod_status(void);
+void mod_render(int16_t *lr);               /* one stereo frame */
+
+/* ---- the Amiga version's sampled effects, instead of FM ones (amiga_sfx.c) ---- */
+void asfx_init(int rate);
+int asfx_play(int n);                       /* effect 0-42: its voice, or -1 if missing */
+int asfx_playing(int v, int n);             /* voice v is still playing effect n */
+int asfx_find(int n);                       /* the voice playing effect n, or -1 */
+void asfx_stop(int v);
+void asfx_stop_all(int keep);               /* all voices but keep (-1: all) */
+int asfx_render(void);                      /* one mono sample */
 
 /* ---- Sound Blaster DAC and DMA (sb.c) ---- */
 void sb_init(int rate);

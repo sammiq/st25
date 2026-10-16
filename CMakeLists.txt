@@ -16,7 +16,8 @@ add_compile_options(-fsigned-char -fwrapv -fno-strict-aliasing -Wall -Wextra
                     -Wno-error=incompatible-pointer-types)
 
 file(GLOB GAME_SRC CONFIGURE_DEPENDS src/*.c src/rooms/*.c)
-set(AUDIO_SRC audio/audio.c audio/audio_drv.c audio/fm.c audio/sb.c audio/nuked/opl3.c)
+set(AUDIO_SRC audio/audio.c audio/audio_drv.c audio/fm.c audio/sb.c audio/mod.c audio/amiga_sfx.c
+              audio/nuked/opl3.c audio/micromod/micromod.c)
 add_library(game STATIC ${GAME_SRC} ${AUDIO_SRC})
 target_include_directories(game PUBLIC include audio)
 target_link_libraries(game PUBLIC m)

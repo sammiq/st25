@@ -629,7 +629,7 @@ void plat_pump(void)
 
 int plat_init(int argc, char **argv)
 {
-    const char *dir = getenv("STARTREK_DATA");
+    const char *dir = getenv("STARTREK_DATA"), *music = getenv("STARTREK_AMIGA_MUSIC");
     int i, out = 1;
     int lh;
 
@@ -642,11 +642,15 @@ int plat_init(int argc, char **argv)
             opt_fullscreen = 1;
         else if (!strcmp(argv[i], "--square"))
             opt_square_pixels = 1;
+        else if (!strcmp(argv[i], "--amiga-music") && i + 1 < argc)
+            music = argv[++i];
         else
             argv[out++] = argv[i];
     }
     if (dir)
         plat_set_data_dir(dir);
+    if (music)
+        plat_set_amiga_music_dir(music);
     shot_file = getenv("STARTREK_SHOT");
     if (getenv("STARTREK_SHOT_MS"))
         shot_ms = atoi(getenv("STARTREK_SHOT_MS"));

@@ -134,8 +134,14 @@ void Intro(void)
         switch (frame) {
         case 0:
             dz = 10;
-            PlayMusic(0, -1);
+            if (!AmigaSong(0))
+                PlayMusic(0, -1);
             byte_45B3C[0] = 0;
+            break;
+        case 12:
+            /* the Amiga game starts its title song here */
+            if (AmigaSong(0))
+                PlayMusic(0, -1);
             break;
         case 30:
             sprintf(path, "%ssfx\\kirkintr.voc", voc_path);

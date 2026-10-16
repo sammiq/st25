@@ -1,5 +1,5 @@
-/* audio.c - mixes the FM music and the Sound Blaster into the host's stream,
- * and runs the 18.2 Hz timer for the game.
+/* audio.c - mixes the FM music, the Amiga music and effects and the Sound
+ * Blaster into the host's stream, and runs the 18.2 Hz timer for the game.
  */
 
 #include <stdint.h>
@@ -9,6 +9,8 @@
 #include "platform.h"
 
 /* ---- the output stream ---- */
+
+#define MOD_VOL 12                          /* sixteenths: the Amiga sound against the FM and the DAC */
 
 static int clip(int v)
 {
@@ -20,13 +22,15 @@ void audio_render(int16_t *out, int frames)
     int i;
 
     for (i = 0; i < frames; i++) {
-        int16_t lr[2];
-        int dac;
+        int16_t lr[2], mod[2];
+        int dac, amiga;
 
         fm_render(lr);
+        mod_render(mod);
+        amiga = asfx_render() * 3 / 4;      /* on one Paula channel each: centred, a little down */
         dac = sb_render() * 5 / 8;          /* the DAC is far louder than the FM chip: balance them */
-        out[2 * i] = (int16_t)clip(lr[0] * 3 + dac);
-        out[2 * i + 1] = (int16_t)clip(lr[1] * 3 + dac);
+        out[2 * i] = (int16_t)clip(lr[0] * 3 + (mod[0] + amiga) * MOD_VOL / 16 + dac);
+        out[2 * i + 1] = (int16_t)clip(lr[1] * 3 + (mod[1] + amiga) * MOD_VOL / 16 + dac);
     }
 }
 

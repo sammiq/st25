@@ -73,4 +73,10 @@ int plat_access(const char *path, int mode);
 void *plat_fopen(const char *path, const char *mode);   /* a FILE * */
 int plat_scan_dir(const char *dir, void (*cb)(const char *name));  /* names in dir */
 
+/* The folder of the Amiga version's music as .mod files (--amiga-music,
+ * STARTREK_AMIGA_MUSIC, else "amiga" in the player's data folder if there is
+ * one), or NULL: then the music is the FM one. */
+const char *plat_amiga_music_dir(void);
+void plat_set_amiga_music_dir(const char *dir);
+
 #endif

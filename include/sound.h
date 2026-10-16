@@ -80,6 +80,7 @@ void StopVoc(void);
 void StopAllSound(void);
 void LoadMusic(char *name);
 void PlayMusic(int16_t seq, int16_t next);
+int16_t AmigaSong(int16_t seq);
 int16_t ReadVoc(char *buf, int16_t len);
 void MusicTick(void);
 void SetMusicOn(int16_t on);
